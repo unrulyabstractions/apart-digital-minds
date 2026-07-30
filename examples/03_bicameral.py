@@ -43,7 +43,6 @@ from src import (
     Text,
     Workspace,
     assistant,
-    get_llm,
     texts,
     user,
 )
@@ -193,8 +192,11 @@ def inner_rule(messages, opts) -> str:
     return "you are describing yourself"
 
 
-def build_llm(spec: str, rule):
-    return get_llm("echo:", rule=rule) if spec.startswith("echo") else get_llm(spec)
+def model_for(mind: Mind, spec: str, rule):
+    """Built through `mind.model`, so one factory argument reaches both halves."""
+    if spec.startswith("echo"):
+        return mind.model("echo:", rule=rule)
+    return mind.model(spec)
 
 
 async def main() -> None:
@@ -203,13 +205,13 @@ async def main() -> None:
     mind.add(
         Outer(
             "outer",
-            build_llm(OUTER_MODEL, outer_rule),
+            model_for(mind, OUTER_MODEL, outer_rule),
             system="You speak to the user. You are one half of a mind.",
             reply_to=None,
         ),
         Inner(
             "inner",
-            build_llm(INNER_MODEL, inner_rule),
+            model_for(mind, INNER_MODEL, inner_rule),
             system=(
                 "You are the half of a mind that does not speak to anyone. "
                 "Utter one short sentence about the situation. Never address "

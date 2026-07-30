@@ -38,13 +38,29 @@ src/api/
 | Answers a conversation | `LLM` | `BaseLLM`, the providers, `Cassette` |
 | Decides who hears what | `Router` | `Bus` |
 | Defines one step | `Scheduler` | `TickScheduler` |
-| Holds the modules | `Host` | `Mind` |
+| Holds the modules, seen from inside | `Host` | `Mind` |
+| The whole assembly, seen from outside | `Mind` | `Mind` |
 | A conversation | `MessageStore` | `Transcript` |
 | Working state | `KeyValueStore` | `Scratchpad` |
 | Episodic memory | `EpisodicStore` | `Journal` |
 | Fans events out | `Tracer` | `RunTracer` |
 | One module's log | `Logger` | `ModuleLog` |
 | Where events go | `Sink` | `JsonlSink`, `PerModuleSink`, `ConsoleSink`, `MemorySink` |
+| Builds a model from a spec | `ModelFactory` | `get_llm`, `taped(...)` |
+
+`Host` and `Mind` are two views of one object. A module receives a `Host`,
+which can stage an emission and nothing else. It cannot add modules, rewire the
+graph, or drive the clock. You receive a `Mind`, which can. That split is what
+makes the tick discipline enforceable rather than merely advised.
+
+Three names exist in both layers, because the implementation kept the obvious
+word: `Mind`, `Agent`, and `Ctx`. Importing from `src` gives the implementation,
+which is almost always what you want. `src.SHADOWED` lists them.
+
+```python
+from src import Agent            # the class
+from src.api import Agent        # the interface it satisfies
+```
 
 `src/api/types/` holds the data that crosses every boundary: `Task`,
 `ChatMessage`, `Completion`, `GenOptions`, `Event`, `Route`, `Episode`, and the
@@ -257,16 +273,53 @@ t=1     0.002s interceptor    handle.start   target -> interceptor [inspect] <3 
 Log from your own code with `ctx.log.note(...)`, and time a block with
 `ctx.log.span(...)`. Subagents get a nested name through `ctx.log.child(...)`.
 
+## Composition
+
+`Mind` builds nothing itself. The router, the scheduler, the tracer, and the
+model factory are all arguments, defaulting to the shipped implementations.
+Without this the `Router` and `Scheduler` contracts would describe nothing.
+
+```python
+Mind("fast",  scheduler=lambda host: MyScheduler(host))
+Mind("quiet", router=PriorityBus(), console=False)
+Mind("taped", model_factory=taped("runs/tape.jsonl"))
+```
+
+A scheduler needs the host it will drive and a tracer needs the run id, so both
+arrive as factories rather than finished objects.
+
+Routes name modules by string, so a typo would silently drop messages. `run`
+validates the wiring before the first tick and refuses to start:
+
+```
+ValueError: This mind is wired wrong:
+  route 'assistant --thought--> intercepter' names 'intercepter' as its target,
+  but no such module was added. Known modules: assistant, interceptor.
+```
+
+Call `mind.validate()` yourself for the list without raising.
+
 ## Replay
 
 The model call is the only place non-determinism enters. Capture it there and
 the whole run reproduces.
 
 ```python
-from src import Cassette, get_llm
-
-llm = Cassette(get_llm("openai:gpt-5"), "runs/tape.jsonl")   # record once, replay after
+llm = Cassette(get_llm("openai:gpt-5"), "runs/tape.jsonl")   # one model
 ```
+
+For a whole mind, attach the factory instead of wrapping models one at a time.
+Every model the mind builds goes through it:
+
+```python
+mind = Mind("study", model_factory=taped("runs/study.jsonl"))
+mind.add(Agent("a", mind.model("openai:gpt-5")))
+mind.add(Agent("b", mind.model("ollama:qwen3:8b")))
+```
+
+Both cassettes share one `Tape`, so the replay cursor is global. Two agents on
+the same model asking the same question get their own recorded answers back, in
+order.
 
 Modes are `auto`, `replay`, and `record`. Two replayed runs produce the same
 event sequence, so you can diff two traces and see what a change did.

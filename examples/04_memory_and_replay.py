@@ -24,13 +24,13 @@ from pathlib import Path
 
 from src import (
     Agent,
-    Cassette,
     Ctx,
     Journal,
     Mind,
     Task,
     Text,
     get_llm,
+    taped,
     texts,
     user,
 )
@@ -107,10 +107,25 @@ async def part1_memory_survives() -> Path:
 
 
 async def run_once(tape: Path, mode: str, run_id: str) -> tuple[str, list]:
-    """One full run against a cassette. Returns the answer and the trace."""
-    mind = Mind(run_id, run_id=run_id, run_dir=WORK / "traces", console=False)
-    llm = Cassette(get_llm("echo:", rule=jittery_rule), tape, mode=mode)
-    mind.add(make_agent(WORK / f"journal-{run_id}.jsonl", llm))
+    """One full run against a tape. Returns the answer and the trace.
+
+    The tape is attached with `model_factory`, not by wrapping a model by hand.
+    Every model this mind builds goes through it, so a mind with twenty agents
+    on five providers is made reproducible by this one argument.
+    """
+    mind = Mind(
+        run_id,
+        run_id=run_id,
+        run_dir=WORK / "traces",
+        console=False,
+        model_factory=taped(tape, mode=mode),
+    )
+    mind.add(
+        make_agent(
+            WORK / f"journal-{run_id}.jsonl",
+            mind.model("echo:", rule=jittery_rule),
+        )
+    )
     replies = await mind.prompt("what are octopuses like?")
     events = list(mind.events.events)
     mind.close()

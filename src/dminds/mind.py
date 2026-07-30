@@ -16,11 +16,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from ..api.models import LLM
 from ..api.modules import Module
-from ..api.observability import TASK_DELIVER, TASK_EMIT, Sink
-from ..api.runtime import WILDCARD, WORLD, Host
+from ..api.observability import TASK_DELIVER, TASK_EMIT, Sink, Tracer
+from ..api.runtime import (
+    WILDCARD,
+    WORLD,
+    ModelFactory,
+    Router,
+    Scheduler,
+    SchedulerFactory,
+)
+from ..api.runtime import Mind as MindInterface
 from ..api.types import Payload, Route, Task, Text
 from .bus import Bus
+from .llm import get_llm
 from .scheduler import TickScheduler
 from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
@@ -42,7 +52,18 @@ def _fresh_run_id(run_dir: str | Path | None) -> str:
     return candidate
 
 
-class Mind(Host):
+class Mind(MindInterface):
+    """The default composition, with every part replaceable.
+
+    The router, the scheduler, the tracer, and the model factory are all
+    arguments. Left alone they are `Bus`, `TickScheduler`, `RunTracer`, and
+    `get_llm`. Passed in, they are whatever you wrote.
+
+        Mind("fast", scheduler=lambda host: MyScheduler(host))
+        Mind("taped", model_factory=taped("runs/tape.jsonl"))
+        Mind("quiet", router=PriorityBus(), console=False)
+    """
+
     def __init__(
         self,
         name: str = "mind",
@@ -53,19 +74,27 @@ class Mind(Host):
         strict: bool = True,
         max_ticks: int = 200,
         sinks: Sequence[Sink] | None = None,
+        router: Router | None = None,
+        scheduler: SchedulerFactory | None = None,
+        tracer: Tracer | None = None,
+        model_factory: ModelFactory | None = None,
     ):
         self.name = name
         self.run_id = run_id or _fresh_run_id(run_dir)
         self.modules: dict[str, Module] = {}
-        self.bus = Bus()
+        self.bus: Router = router if router is not None else Bus()
         self.outbox: list[Task] = []
+        self.model_factory: ModelFactory = (
+            model_factory if model_factory is not None else get_llm
+        )
         self._task_counter = 0
+        self._validated = False
 
         #: Where `prompt` delivers, unless you say otherwise. Defaults to the
         #: first module added. Set it directly to change the front door.
         self.entry: str | None = None
 
-        self.tracer = RunTracer(self.run_id)
+        self.tracer: Tracer = tracer if tracer is not None else RunTracer(self.run_id)
         self.events: MemorySink | None = None
         self.run_path: Path | None = None
 
@@ -81,7 +110,22 @@ class Mind(Host):
         for sink in sinks or []:
             self.tracer.add_sink(sink)
 
-        self.scheduler = TickScheduler(self, strict=strict, max_ticks=max_ticks)
+        self.scheduler: Scheduler = (
+            scheduler(self)
+            if scheduler is not None
+            else TickScheduler(self, strict=strict, max_ticks=max_ticks)
+        )
+
+    # -- models ----------------------------------------------------------
+
+    def model(self, spec: str, **kwargs) -> LLM:
+        """Build a model through this mind's factory.
+
+        Going through the mind rather than calling `get_llm` directly is what
+        lets one constructor argument tape, throttle, or redirect every model
+        in the run.
+        """
+        return self.model_factory(spec, **kwargs)
 
     # -- assembly ------------------------------------------------------
 
@@ -117,6 +161,43 @@ class Mind(Host):
         each other without being in the middle of the conversation.
         """
         return self.bus.observe(dst, kind, src)
+
+    def validate(self) -> list[str]:
+        """Every problem with the assembly, as readable lines.
+
+        Routes name modules by string, so a typo would otherwise fail silently
+        by dropping messages into nowhere. `run` calls this before the first
+        tick and refuses to start if anything comes back.
+        """
+        problems = []
+        reserved = {WILDCARD, WORLD}
+
+        for route in [*self.bus.routes, *self.bus.observers]:
+            for name, position in ((route.src, "source"), (route.dst, "target")):
+                if name in reserved or name in self.modules:
+                    continue
+                known = ", ".join(sorted(self.modules)) or "none"
+                problems.append(
+                    f"route {route.describe()!r} names {name!r} as its {position}, "
+                    f"but no such module was added. Known modules: {known}."
+                )
+
+        if self.entry is not None and self.entry not in self.modules:
+            problems.append(
+                f"entry is {self.entry!r}, which is not a module. "
+                f"Known modules: {', '.join(sorted(self.modules)) or 'none'}."
+            )
+        return problems
+
+    def _check_once(self) -> None:
+        if self._validated:
+            return
+        self._validated = True
+        problems = self.validate()
+        if problems:
+            raise ValueError(
+                "This mind is wired wrong:\n  " + "\n  ".join(problems)
+            )
 
     # -- task plumbing ---------------------------------------------------
 
@@ -242,7 +323,12 @@ class Mind(Host):
         return tasks
 
     async def run(self, max_ticks: int | None = None) -> int:
-        """Tick until quiet. Returns the number of ticks run."""
+        """Tick until quiet. Returns the number of ticks run.
+
+        Validates the wiring before the first tick, so a mistyped module name
+        fails loudly instead of silently dropping messages.
+        """
+        self._check_once()
         return await self.scheduler.run_until_idle(max_ticks)
 
     async def prompt(

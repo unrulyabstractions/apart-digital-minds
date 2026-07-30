@@ -5,7 +5,8 @@
     api.LLM           -> BaseLLM, the providers, Cassette
     api.Router        -> Bus
     api.Scheduler     -> TickScheduler
-    api.Host          -> Mind
+    api.Host          -> Mind (narrow view, for modules)
+    api.Mind          -> Mind (full view, for you)
     api.MessageStore  -> Transcript
     api.KeyValueStore -> Scratchpad
     api.EpisodicStore -> Journal
@@ -31,6 +32,7 @@ from .llm import (
     BaseLLM,
     Cassette,
     CassetteMiss,
+    Tape,
     available_providers,
     get_llm,
     merge_consecutive,
@@ -38,6 +40,7 @@ from .llm import (
     register_provider,
     request_key,
     split_system,
+    taped,
 )
 from .memory import Journal, Scratchpad, Transcript
 from .mind import Mind, texts
@@ -82,7 +85,9 @@ __all__ = [
     "DEFAULT_MODELS",
     "Cassette",
     "CassetteMiss",
+    "Tape",
     "request_key",
+    "taped",
     "split_system",
     "merge_consecutive",
     # memory

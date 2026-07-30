@@ -64,7 +64,19 @@ from .observability import (
     Sink,
     Tracer,
 )
-from .runtime import WILDCARD, WORLD, Host, RunawayMind, Router, Scheduler
+from .runtime import (
+    WILDCARD,
+    WORLD,
+    Host,
+    Mind,
+    ModelFactory,
+    RouterFactory,
+    RunawayMind,
+    Router,
+    Scheduler,
+    SchedulerFactory,
+    TracerFactory,
+)
 from .types import (
     ChatMessage,
     Completion,
@@ -109,7 +121,13 @@ __all__ = [
     "Router",
     "Scheduler",
     "Host",
+    "Mind",
     "RunawayMind",
+    # factories
+    "ModelFactory",
+    "RouterFactory",
+    "SchedulerFactory",
+    "TracerFactory",
     # data
     "Task",
     "Text",

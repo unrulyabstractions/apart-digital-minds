@@ -126,3 +126,43 @@ executed.
 
 The UNVERIFIED provider list still stands. Those five paths were untouched by
 this change.
+
+## 2026-07-30 — `Mind` interface, dependency injection, model factories
+
+`Mind` was used in every example and declared nowhere. It now has a contract,
+split from `Host`: a module receives the narrow view and cannot rewire the
+graph or drive the clock. `Mind` also stopped constructing its own router,
+scheduler, and tracer, which had made those contracts decorative.
+
+Added `ModelFactory`, with `get_llm` as the default and `taped(...)` as the
+interesting case: one constructor argument tapes every model in a run.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 31 | `Mind` satisfies both contracts | `api.Mind` and `api.Host` are both in `dminds.Mind.__mro__` | VERIFIED |
+| 32 | `Host` is genuinely narrower | Compared the public names on both. `stage`/`deliver` are on `Host`; `add`/`wire`/`run`/`prompt` are on `Mind` and absent from `Host` | VERIFIED |
+| 33 | Injection actually takes effect | Three tests: a counting router recorded resolve calls and delivered the message, a subclassed scheduler recorded its ticks, an injected tracer is identity-equal | VERIFIED |
+| 34 | Defaults still apply when nothing is injected | Asserted `Bus`, `TickScheduler`, `RunTracer`, `get_llm` | VERIFIED |
+| 35 | Wiring validation | Five tests: mistyped route target, mistyped observer, bad entry, `world`/`*` accepted, and `run` refusing to start | VERIFIED |
+| 36 | Validation runs once, not per tick | Counted calls across two prompts | VERIFIED (1) |
+| 37 | Interface conformance across the board | 15 implementation/contract pairs checked by `__mro__` | VERIFIED (15/15) |
+| 38 | Test suite | `tests/run_tests.py` in the clean pip venv | VERIFIED (66 passed, 0 failed) |
+| 39 | Examples | All four run; example 03 output and `model calls by tick` unchanged, example 04 still reports `identical: True` and `record vs replay differences: 0` | VERIFIED (4/4) |
+| 40 | The README composition snippets | Ran all four verbatim. The injected scheduler and router appear on the built minds, and the documented `ValueError` text matches character for character | VERIFIED |
+| 41 | `api` purity and dead imports | AST scan across 27 api files and all of `src/` | VERIFIED (0 and 0) |
+
+### Bug found by a new test
+
+`taped()` originally gave each `Cassette` its own replay cursor while sharing
+one file. Two agents on the same model asking the same question produce the
+same request key, so on replay both consumed entry 0 and the second recorded
+answer was unreachable. `test_taped_makes_a_whole_mind_reproducible` caught it.
+
+Fixed by extracting `Tape`, which owns the entries and one shared cursor.
+`Cassette` now holds a `Tape` rather than a path. This also removed the
+`truncate` flag I had added minutes earlier to paper over the same problem: one
+tape is cleared once, by the object that owns it.
+
+The UNVERIFIED provider list still stands.

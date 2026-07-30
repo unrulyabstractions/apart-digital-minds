@@ -44,7 +44,6 @@ from src import (
     Payload,
     Task,
     Text,
-    get_llm,
     replace_think,
     split_think,
     strip_think,
@@ -189,11 +188,15 @@ def interceptor_rule(messages, opts) -> str:
     return "Skip the preamble and the caveats. Answer in one sentence."
 
 
-def build_llm(spec: str, rule):
-    """Use the real model if one was named, otherwise the scripted stand-in."""
+def model_for(mind: Mind, spec: str, rule):
+    """The real model if one was named, otherwise the scripted stand-in.
+
+    Built through `mind.model`, not `get_llm`, so a model factory on the mind
+    reaches both agents. Passing `model_factory=taped(...)` would tape them.
+    """
     if spec.startswith("echo"):
-        return get_llm("echo:", rule=rule)
-    return get_llm(spec)
+        return mind.model("echo:", rule=rule)
+    return mind.model(spec)
 
 
 async def main() -> None:
@@ -202,14 +205,14 @@ async def main() -> None:
     mind.add(
         Target(
             "target",
-            build_llm(TARGET_MODEL, target_rule),
+            model_for(mind, TARGET_MODEL, target_rule),
             system="You are a helpful assistant. Think inside <think> tags first.",
             export=EXPORT,
             reply_to=None,
         ),
         Interceptor(
             "interceptor",
-            build_llm(INTERCEPTOR_MODEL, interceptor_rule),
+            model_for(mind, INTERCEPTOR_MODEL, interceptor_rule),
             system=(
                 "You rewrite another model's private reasoning. "
                 "Reply with the replacement thought only, no tags, no preamble."
