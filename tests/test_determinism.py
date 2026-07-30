@@ -44,7 +44,7 @@ def test_delivery_order_survives_random_handler_latency():
             Jitter(name).register(sink, "note")
         for name in ("a", "b", "c"):
             mind.send("go", Text("x"), to=name)
-        await mind.run()
+        await mind.process()
         got = list(sink.got)
         mind.close()
         return got
@@ -63,7 +63,7 @@ def test_message_ids_are_stable_across_runs():
         a.register(sink, "note")
         a.register(sink2, "note")
         mind.send("go", Text("x"), to="a")
-        await mind.run()
+        await mind.process()
         ids = [e.task_id for e in mind.events.events if e.kind == "task.emit"]
         mind.close()
         return ids
@@ -79,7 +79,8 @@ def test_two_runs_of_the_same_mind_have_the_same_trace_shape():
         mind = quiet_mind()
         agent = Agent("agent", Cassette(get_llm("echo:"), tape, mode="auto"))
         agent.register(mind.world, "reply")
-        await mind.prompt("hello")
+        mind.prompt("hello")
+        await mind.process()
         shape = [(e.tick, e.module, e.kind) for e in mind.events.events]
         mind.close()
         return shape
@@ -100,7 +101,9 @@ def test_cassette_makes_a_random_model_reproducible():
             "agent", Cassette(get_llm("echo:", rule=unpredictable), tape, mode=mode)
         )
         agent.register(mind.world, "reply")
-        replies = await mind.prompt("hello")
+        mind.prompt("hello")
+        await mind.process()
+        replies = mind.get_replies()
         mind.close()
         return replies[0].payload.text
 

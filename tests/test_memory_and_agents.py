@@ -156,7 +156,9 @@ def test_agent_default_handler_emits_on_reply():
         mind = Mind("t", run_dir=None, console=False)
         agent = Agent("a", get_llm("echo:", script=["hi there"]), system="be terse")
         agent.register(mind.world, "reply")
-        replies = await mind.prompt("hello")
+        mind.prompt("hello")
+        await mind.process()
+        replies = mind.get_replies()
         mind.close()
         return replies, agent
 
@@ -180,7 +182,8 @@ def test_max_context_limits_what_is_sent_not_what_is_kept():
         )
         agent.register(mind.world, "reply")
         for _ in range(4):
-            await mind.prompt("hello")
+            mind.prompt("hello")
+        await mind.process()
         mind.close()
         return seen["n"], len(agent.transcript)
 
@@ -193,7 +196,8 @@ def test_memory_writes_land_in_the_agents_own_log():
     async def run():
         mind = Mind("t", run_dir=None, console=False)
         Agent("a", get_llm("echo:")).register(mind.world, "reply")
-        await mind.prompt("hello")
+        mind.prompt("hello")
+        await mind.process()
         events = [
             e for e in mind.events.events if e.kind == "memory.write" and e.module == "a"
         ]

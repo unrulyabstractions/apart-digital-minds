@@ -10,10 +10,11 @@
 Wiring is absent from both. Modules register consumers on each other, so a
 mind holds modules and time, and has no opinion about who talks to whom.
 
-    mind = Mind("demo")
-    a, b = Agent("a", ...), Agent("b", ...)
-    a.register(mind.world, "reply")     # a joins, because world is already here
-    a.register(b, "draft")              # b joins, because a is here now
+A mind is one target model, its **soul**, plus whatever you attach to it.
+
+    mind = Mind("demo", "openai:gpt-5", system="Be terse.")
+    mind.soul.register(mind.world, "reply")     # hear what it says
+    mind.soul.register(monitor, "context")      # read what it remembers
 
 There is no separate step for adding a module. Wiring it in is adding it.
 
@@ -37,6 +38,10 @@ class Mind(Host):
     name: str
     run_id: str
     scheduler: Scheduler
+
+    #: The target model, as a module. The thing a mind is built around, and
+    #: the thing an experiment is about. None if the mind was given no model.
+    soul: Module | None
 
     #: The module standing for you, outside the mind. Register onto a channel
     #: with it as the consumer and whatever arrives lands in `outbox`.
@@ -98,21 +103,37 @@ class Mind(Host):
         """Inject an external input. Delivered immediately, not next tick."""
 
     @abstractmethod
-    async def run(self, max_ticks: int | None = None) -> int:
-        """Tick until quiet. Returns the number of ticks run."""
-
-    @abstractmethod
-    async def prompt(
+    def prompt(
         self,
         text: str,
         to: str | Sequence[str] | None = None,
         channel: str = "user_prompt",
-        max_ticks: int | None = None,
     ) -> list[Message]:
-        """Say something, wait for the mind to settle, take what it produced.
+        """Say something. Delivers immediately and returns, without running.
 
-        Returns only the messages that reached `world` during this prompt.
+        Driving a mind is three steps, kept apart on purpose: put something in,
+        let it think, read what came out.
+
+            mind.prompt("hello")
+            await mind.process()
+            replies = mind.get_replies()
         """
+
+    @abstractmethod
+    async def process_one(self) -> int:
+        """Run exactly one tick. Returns how many modules took a turn.
+
+        Step through an experiment with this, reading state between ticks.
+        Zero means nothing had work and the mind is settled.
+        """
+
+    @abstractmethod
+    async def process(self, max_ticks: int | None = None) -> int:
+        """Tick until nothing has work anywhere. Returns the number of ticks."""
+
+    @abstractmethod
+    def get_replies(self) -> list[Message]:
+        """Everything that reached `world` since you last asked. Reading drains."""
 
     # -- lifecycle -----------------------------------------------------
 

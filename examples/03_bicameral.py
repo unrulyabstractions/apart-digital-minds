@@ -39,10 +39,12 @@ from src import (
     InnerVoice,
     Message,
     Mind,
+    Soul,
     Speaker,
     Text,
     Workspace,
     assistant,
+    get_llm,
     texts,
     user,
 )
@@ -51,7 +53,7 @@ OUTER_MODEL = os.environ.get("OUTER_MODEL", "echo:")
 INNER_MODEL = os.environ.get("INNER_MODEL", "echo:")
 
 
-class Outer(Agent, Speaker):
+class Outer(Soul, Speaker):
     """The speaking hemisphere.
 
     The `Speaker` contract is two steps: work out an answer alone, then
@@ -60,6 +62,8 @@ class Outer(Agent, Speaker):
     an instruction to follow.
     """
 
+    # A custom soul: it publishes different things from the default one, so
+    # it replaces OUTPUTS rather than extending them.
     OUTPUTS = {
         "situation": "what is going on, for the other half",
         "deliberate": "a note to itself, to draft on the next tick",
@@ -208,24 +212,25 @@ def inner_rule(messages, opts) -> str:
     return "you are describing yourself"
 
 
-def model_for(mind: Mind, spec: str, rule):
-    """Built through `mind.model`, so one factory argument reaches both halves."""
-    if spec.startswith("echo"):
-        return mind.model("echo:", rule=rule)
-    return mind.model(spec)
+def stand_in(spec: str, rule):
+    """The real model if one was named, otherwise the scripted fake."""
+    return get_llm("echo:", rule=rule) if spec.startswith("echo") else get_llm(spec)
 
 
 async def main() -> None:
-    mind = Mind("bicameral", run_dir="runs")
-
-    outer = Outer(
-        "outer",
-        model_for(mind, OUTER_MODEL, outer_rule),
+    # The speaking half is the soul: it is the model this experiment is about.
+    # `soul=Outer` puts a custom one at the centre instead of the default.
+    mind = Mind(
+        "bicameral",
+        stand_in(OUTER_MODEL, outer_rule),
         system="You speak to the user. You are one half of a mind.",
+        soul=Outer,
+        run_dir="runs",
     )
+    outer = mind.soul
     inner = Inner(
         "inner",
-        model_for(mind, INNER_MODEL, inner_rule),
+        stand_in(INNER_MODEL, inner_rule),
         system=(
             "You are the half of a mind that does not speak to anyone. "
             "Utter one short sentence about the situation. Never address "
@@ -234,8 +239,7 @@ async def main() -> None:
     )
     blackboard = Blackboard()
 
-    # Each half wires its own outputs, and joins the mind by doing so.
-    outer.register(mind.world, "reply")
+    # The soul already speaks to you. The rest of the mind is wired by hand.
     outer.register(inner, "situation")
     outer.register(outer, "deliberate")  # a note to itself, heard next tick
     inner.register(outer, "voice")
@@ -246,14 +250,16 @@ async def main() -> None:
 
     print(mind.describe(), "\n")
 
-    replies = await mind.prompt("What is a digital mind?")
+    mind.prompt("What is a digital mind?")
+    await mind.process()
+    replies = mind.get_replies()
 
     print("\n" + "=" * 70)
     print("spoken:", texts(replies)[0] if replies else "(none)")
     print("=" * 70)
 
     print("\nglobal workspace:")
-    print(mind.modules["blackboard"].render())
+    print(blackboard.render())
 
     print(f"\nticks used: {mind.scheduler.t}")
 

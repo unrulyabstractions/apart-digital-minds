@@ -41,7 +41,8 @@ def test_host_is_narrower_than_mind():
     host_names = {n for n in dir(Host) if not n.startswith("_")}
     mind_names = {n for n in dir(MindInterface) if not n.startswith("_")}
     assert "stage" in host_names and "deliver" in host_names
-    for name in ("add", "adopt", "run", "prompt", "validate"):
+    for name in ("add", "adopt", "process", "process_one", "prompt",
+                 "get_replies", "validate"):
         assert name in mind_names, name
         assert name not in host_names, f"{name} should not be reachable from a module"
 
@@ -105,7 +106,7 @@ def test_add_is_only_needed_for_a_module_wired_to_nothing():
     async def run():
         mind = quiet()
         loner = mind.add(Loner())
-        await mind.run()
+        await mind.process()
         mind.close()
         return loner.ran
 
@@ -136,7 +137,8 @@ def test_scheduler_can_be_injected():
     async def run():
         mind = quiet(scheduler=lambda host: LoudScheduler(host, max_ticks=5))
         Echoer("a").register(mind.world, "reply")
-        await mind.prompt("hi")
+        mind.prompt("hi")
+        await mind.process()
         assert isinstance(mind.scheduler, LoudScheduler)
         mind.close()
 
@@ -206,8 +208,10 @@ def test_validation_runs_once_not_every_tick():
     mind.validate = counting
 
     async def run():
-        await mind.prompt("one")
-        await mind.prompt("two")
+        mind.prompt("one")
+        await mind.process()
+        mind.prompt("two")
+        await mind.process()
 
     asyncio.run(run())
     mind.close()
@@ -247,7 +251,9 @@ def test_taped_makes_a_whole_mind_reproducible():
             Agent(name, mind.model("echo:", rule=jittery)).register(
                 mind.world, "reply"
             )
-        out = texts(await mind.prompt("hello", to=["a", "b"]))
+        mind.prompt("hello", to=["a", "b"])
+        await mind.process()
+        out = texts(mind.get_replies())
         mind.close()
         return out
 

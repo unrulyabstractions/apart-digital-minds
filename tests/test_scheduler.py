@@ -39,7 +39,7 @@ def test_emission_is_not_visible_in_the_same_tick():
         mind.add(a, b)
         a.register(b, "ping")
         mind.send("ping", Text("x"), to="a")
-        await mind.run()
+        await mind.process()
         mind.close()
         return a, b
 
@@ -58,7 +58,7 @@ def test_a_turn_is_every_input_then_one_process():
         mind.add(a)
         for _ in range(3):
             mind.send("ping", Text("x"), to="a")
-        await mind.run()
+        await mind.process()
         mind.close()
         return a
 
@@ -76,7 +76,7 @@ def test_run_until_idle_drains_a_chain():
         a.register(b, "ping")
         b.register(c, "ping")
         mind.send("ping", Text("x"), to="a")
-        ticks = await mind.run()
+        ticks = await mind.process()
         idle = mind.scheduler.is_idle()
         mind.close()
         return ticks, idle
@@ -100,7 +100,7 @@ def test_modules_in_one_tick_run_concurrently():
             mind.send("go", Text("x"), to=name)
         loop = asyncio.get_running_loop()
         start = loop.time()
-        await mind.run()
+        await mind.process()
         elapsed = loop.time() - start
         mind.close()
         return elapsed
@@ -119,7 +119,7 @@ def test_runaway_is_caught():
         b.register(a, "ping")
         mind.send("ping", Text("x"), to="a")
         try:
-            await mind.run()
+            await mind.process()
         except RunawayMind as exc:
             mind.close()
             return str(exc)
@@ -149,7 +149,7 @@ def test_wants_process_lets_a_module_act_unprompted():
         mind = quiet_mind()
         s = Spontaneous("s", times=3)
         mind.add(s)
-        ticks = await mind.run()
+        ticks = await mind.process()
         mind.close()
         return s.ran, ticks
 
@@ -165,7 +165,7 @@ def test_an_idle_module_costs_nothing():
     async def run():
         mind = quiet_mind()
         mind.add(Quiet("q"))
-        ticks = await mind.run()
+        ticks = await mind.process()
         mind.close()
         return ticks
 
@@ -183,8 +183,12 @@ def test_prompt_returns_only_this_prompts_output():
         mind = quiet_mind()
         t = mind.add(Talker("t"))
         t.register(mind.world, "reply")
-        first = await mind.prompt("one")
-        second = await mind.prompt("two")
+        mind.prompt("one")
+        await mind.process()
+        first = mind.get_replies()
+        mind.prompt("two")
+        await mind.process()
+        second = mind.get_replies()
         mind.close()
         return first, second
 

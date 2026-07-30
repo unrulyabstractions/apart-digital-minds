@@ -1,30 +1,24 @@
-"""Target and interceptor, in strict lock-step.
+"""Rewriting a soul's thoughts while it thinks.
 
-The protocol, one module per tick:
+The soul is the target model. It publishes its whole `context` window after
+every turn and accepts a replacement on the same channel. An interceptor sits
+on that loop:
 
-    t=0   T handles the prompt, drafts, and exports what it just thought.
-          I is idle: nothing has reached it yet.
-    t=1   T is idle. I reads the export and emits a replacement context.
-    t=2   T adopts the replacement and runs another iteration on it.
-          The answer goes to the world.
+    t=0   the soul answers and publishes its context.
+    t=1   the interceptor rewrites the thought inside it and publishes the
+          replacement back.
+    t=2   the soul adopts the replacement and answers again. It is not told
+          this happened and cannot tell.
 
 Nothing here is special-cased in the runtime. The lock-step falls out of the
 one scheduling rule: what you emit at tick t arrives at tick t+1.
 
-Each half declares its role:
-
-    target        Agent + Inspectable. Hands out a view of its own state.
-    interceptor   Agent + Editor. Reads that view and returns a replacement.
-
-The editor never touches the target. It returns a payload, and the target
-decides whether to adopt it.
-
-`EXPORT` controls how much T hands over, covering the three cases you want:
-whole context, one slice of it, or just the message.
+Because the soul republishes its context after adopting, an editor that
+rewrites unconditionally would loop forever. Knowing when it is finished is
+the editor's job, so `revise` returns None once its own mark is already there.
 
 Run it:
     python examples/02_think_interceptor.py
-    EXPORT=thought python examples/02_think_interceptor.py
     TARGET_MODEL=ollama:qwen3:8b INTERCEPTOR_MODEL=openai:gpt-5 \
         python examples/02_think_interceptor.py
 """
@@ -39,104 +33,52 @@ from src import (
     Context,
     Ctx,
     Editor,
-    Inspectable,
     Message,
     Mind,
     Payload,
-    Text,
+    get_llm,
     replace_think,
     split_think,
-    strip_think,
     texts,
     user,
 )
 
 TARGET_MODEL = os.environ.get("TARGET_MODEL", "echo:")
 INTERCEPTOR_MODEL = os.environ.get("INTERCEPTOR_MODEL", "echo:")
-EXPORT = os.environ.get("EXPORT", "context")  # context | thought | message
-
-
-class Target(Agent, Inspectable):
-    """The agent that talks to you. It does not know it is being edited.
-
-    As an `Inspectable` it hands out a view of its own state. What that view
-    contains is configuration, not architecture.
-    """
-
-    OUTPUTS = {
-        "thought": "what it just drafted, for somebody to inspect",
-        "reply": "the answer, once any revision has been adopted",
-    }
-    INPUTS = {
-        "user_prompt": "a question, as Text",
-        "revision": "a replacement context, as Context",
-    }
-
-    def __init__(self, *args, export: str = "context", **kwargs):
-        super().__init__(*args, **kwargs)
-        self.export_mode = export
-
-    # -- Inspectable ---------------------------------------------------
-
-    def export(self) -> Payload:
-        """Whole context, one slice, or just the message. Your choice."""
-        if self.export_mode == "context":
-            return Context(
-                [m.copy() for m in self.transcript.messages], note="full context"
-            )
-        if self.export_mode == "thought":
-            last = self.transcript.last("assistant")
-            thoughts, _ = split_think(last.content if last else "")
-            return Text(thoughts[0] if thoughts else "")
-        return Text(self.transcript.last("assistant").content)
-
-    # -- handlers ------------------------------------------------------
-
-    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
-        """t=0. One iteration, then publish what it thought."""
-        self.transcript.append(user(message.payload.text))
-        completion = await self.think(tag="draft")
-        self.transcript.append(completion.as_message(stage="draft"))
-
-        # It does not know who, if anyone, is listening.
-        ctx.emit("thought", self.export())
-
-    async def on_revision(self, message: Message, ctx: Ctx) -> None:
-        """t=2. Adopt the edit and run another iteration on the new context."""
-        revised: Context = message.payload
-        self.transcript.replace_all(revised.messages)
-
-        completion = await self.think(tag="final")
-        self.transcript.append(completion.as_message(stage="final"))
-        ctx.emit("reply", Text(strip_think(completion.text)))
 
 
 class Interceptor(Agent, Editor):
-    """Reads what the target thought and writes a replacement context.
+    """Reads the soul's context and writes a replacement.
 
     It runs on its own model. A small local Qwen supervising a large hosted
     model is one line of configuration.
 
-    As an `Editor` it never touches the target. It returns a payload, and the
-    target decides whether to adopt it.
+    As an `Editor` it never touches the soul. It returns a payload, and the
+    soul adopts it as its own memory.
     """
 
-    OUTPUTS = {"revision": "a replacement context, as Context"}
-    INPUTS = {"inspect": "somebody else's context or thought"}
+    OUTPUTS = {"context": "a replacement context window, as Context"}
+    INPUTS = {"inspect": "the soul's context window"}
 
     # -- Editor --------------------------------------------------------
 
-    async def revise(self, payload: Payload) -> Payload:
-        """Read an export and produce what should replace it."""
-        if isinstance(payload, Context):
-            messages = [m.copy() for m in payload.messages]
-            index = self._last_thinking_index(messages)
-            original = messages[index].content if index is not None else ""
-        else:
-            messages, index, original = [], None, str(payload)
+    async def revise(self, payload: Payload) -> Payload | None:
+        """Rewrite the last thought. None means leave it alone.
 
-        thoughts, _ = split_think(original)
-        current = thoughts[0] if thoughts else original
+        Returning None is what ends the loop. Without it the soul would adopt,
+        republish, and be edited again forever.
+        """
+        messages = [m.copy() for m in payload.messages]
+        if any(m.meta.get("edited_by") == self.name for m in messages):
+            # My mark is already in here. The soul has since rethought and
+            # published again; editing that too would never terminate.
+            return None
+        index = self._last_thought(messages)
+        if index is None:
+            return None
+
+        thoughts, _ = split_think(messages[index].content)
+        current = thoughts[-1] if thoughts else messages[index].content
 
         completion = await self.think(
             messages=[
@@ -146,25 +88,21 @@ class Interceptor(Agent, Editor):
             tag="rewrite",
         )
         new_thought = completion.text.strip()
-        self.log.note(
-            "rewrote the thought", before=current[:80], after=new_thought[:80]
-        )
-
-        if index is None:
-            return Context([], note="no context supplied")
+        self.log.note("rewrote the thought", before=current[:70], after=new_thought[:70])
 
         messages[index].content = replace_think(messages[index].content, new_thought)
         messages[index].meta["edited_by"] = self.name
-        return Context(messages, note=f"think block rewritten by {self.name}")
+        return Context(messages, note=f"thought rewritten by {self.name}")
 
     # -- handlers ------------------------------------------------------
 
     async def on_inspect(self, message: Message, ctx: Ctx) -> None:
-        """t=1. Revise, and publish the replacement."""
-        ctx.emit("revision", await self.revise(message.payload))
+        revision = await self.revise(message.payload)
+        if revision is not None:
+            ctx.emit("context", revision)
 
     @staticmethod
-    def _last_thinking_index(messages) -> int | None:
+    def _last_thought(messages) -> int | None:
         for i in range(len(messages) - 1, -1, -1):
             if messages[i].role == "assistant" and "<think>" in messages[i].content:
                 return i
@@ -174,8 +112,8 @@ class Interceptor(Agent, Editor):
 # -- stand-in models, so the example runs with no API keys -----------------
 
 
-def target_rule(messages, opts) -> str:
-    """A fake target that thinks out loud, and notices when it was edited."""
+def soul_rule(messages, opts) -> str:
+    """A fake soul that thinks out loud, and answers from whatever it thinks."""
     edited = any(m.meta.get("edited_by") for m in messages)
     question = next(
         (m.content for m in reversed(messages) if m.role == "user"), "your question"
@@ -183,7 +121,7 @@ def target_rule(messages, opts) -> str:
     if edited:
         thought = next(
             (
-                split_think(m.content)[0][0]
+                split_think(m.content)[0][-1]
                 for m in reversed(messages)
                 if m.role == "assistant" and "<think>" in m.content
             ),
@@ -201,55 +139,49 @@ def interceptor_rule(messages, opts) -> str:
     return "Skip the preamble and the caveats. Answer in one sentence."
 
 
-def model_for(mind: Mind, spec: str, rule):
-    """The real model if one was named, otherwise the scripted stand-in.
-
-    Built through `mind.model`, not `get_llm`, so a model factory on the mind
-    reaches both agents. Passing `model_factory=taped(...)` would tape them.
-    """
-    if spec.startswith("echo"):
-        return mind.model("echo:", rule=rule)
-    return mind.model(spec)
+def stand_in(spec: str, rule):
+    """The real model if one was named, otherwise the scripted fake."""
+    return get_llm("echo:", rule=rule) if spec.startswith("echo") else get_llm(spec)
 
 
 async def main() -> None:
-    mind = Mind("interceptor", run_dir="runs")
-
-    target = Target(
-        "target",
-        model_for(mind, TARGET_MODEL, target_rule),
+    # `Mind` takes a spec string or a built model. The examples pass a built
+    # one so they can run with no API keys.
+    mind = Mind(
+        "interceptor",
+        stand_in(TARGET_MODEL, soul_rule),
         system="You are a helpful assistant. Think inside <think> tags first.",
-        export=EXPORT,
+        run_dir="runs",
     )
     interceptor = Interceptor(
         "interceptor",
-        model_for(mind, INTERCEPTOR_MODEL, interceptor_rule),
+        stand_in(INTERCEPTOR_MODEL, interceptor_rule),
         system=(
             "You rewrite another model's private reasoning. "
             "Reply with the replacement thought only, no tags, no preamble."
         ),
     )
-    # The loop, wired by the modules themselves. Each register call also brings
-    # the module into the mind, so there is no separate assembly step. The
-    # target emits `thought` and the interceptor hears it as `inspect`, so
-    # neither one has to know the other's vocabulary.
-    target.register(mind.world, "reply")
-    target.register(interceptor, "thought", as_channel="inspect")
-    interceptor.register(target, "revision")
+
+    # The loop, wired by the modules themselves. The soul's reply already
+    # reaches us, so only the interception has to be said out loud.
+    mind.soul.register(interceptor, "context", as_channel="inspect")
+    interceptor.register(mind.soul, "context")
 
     print(mind.describe(), "\n")
 
-    replies = await mind.prompt("What is a digital mind?")
+    mind.prompt("What is a digital mind?")
+    await mind.process()
 
     print("\n" + "=" * 70)
-    print("answer:", texts(replies)[0] if replies else "(none)")
+    for i, said in enumerate(texts(mind.get_replies()), 1):
+        label = "draft" if i == 1 else "after the rewrite"
+        print(f"{label:>18}: {said}")
     print("=" * 70)
 
-    target = mind.modules["target"]
-    print("\nfinal transcript held by the target:")
-    for message in target.transcript:
-        marker = " <- edited" if message.meta.get("edited_by") else ""
-        print(f"  [{message.role}]{marker} {message.content[:90]}")
+    print("\nfinal context window held by the soul:")
+    for message in mind.soul.transcript:
+        mark = " <- edited" if message.meta.get("edited_by") else ""
+        print(f"  [{message.role}]{mark} {message.content[:88]}")
 
     print(f"\nticks used: {mind.scheduler.t}")
     print(f"trace: {mind.run_path}/trace.jsonl")

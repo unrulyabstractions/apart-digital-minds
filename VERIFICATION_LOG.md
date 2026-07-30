@@ -225,3 +225,48 @@ that call wires `outer`'s output. Checking it surfaced a defect.
 | 55 | Both fixes | Ran the suite and all four examples | VERIFIED (78 passed; 4/4) |
 | 56 | What actually feeds `outer.on_input` | Enumerated every `Link` in the bicameral mind and printed producer, channel, and the channel the consumer sees. Three sources reach `outer`: its own `deliberate`, `inner`'s `voice`, and `world`'s `user_prompt` from `mind.prompt` | VERIFIED |
 | 57 | The rendered link table | Read `mind.describe()` output for example 03 | VERIFIED (6 links, wildcards read correctly) |
+
+## 2026-07-30 — the soul, and prompt / process / get_replies
+
+A mind is now built around one target model, its **soul**. `Mind(name, model)`
+creates it, holds it as `mind.soul`, makes it the entry, and connects its
+`reply` to `world`, so a mind answers with no wiring at all. The soul
+publishes `context`, `reply`, and `thought`, and accepts a replacement
+`context`.
+
+Driving split into three: `prompt` delivers, `process` runs to quiescence,
+`get_replies` drains. `process_one` runs a single tick for stepping.
+`Mind.run` is gone.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 58 | Test suite | `tests/run_tests.py` in the clean pip venv, including a new `test_soul.py` | VERIFIED (95 passed, 0 failed) |
+| 59 | A mind answers with no wiring | Asserted the only link is `soul --reply--> world`, entry is `soul`, and a prompt round-trips | VERIFIED |
+| 60 | `autowire=False` leaves it unwired | Asserted zero links | VERIFIED |
+| 61 | What the soul publishes | `context` carries the whole window with its note; `reply` has reasoning stripped; `thought` is published only when a think block exists | VERIFIED (3 tests) |
+| 62 | A replacement context is adopted wholesale | The old window is gone from the transcript and the soul answered a second time | VERIFIED |
+| 63 | Custom souls | `soul=` accepts a subclass and a factory; both land at `mind.soul` named `soul` | VERIFIED |
+| 64 | The three driving calls | `prompt` leaves `scheduler.t == 0` with the message queued; `process_one` returns 1 then 0; `process` ran 4 ticks over a 3-hop relay; `get_replies` drains while `outbox` keeps history | VERIFIED (4 tests) |
+| 65 | Examples | All four run. Example 02 shows draft and rewritten answer; example 03 still reports `model calls by tick: [(1,'soul'), (1,'inner'), (2,'soul')]`; example 04 still reports `identical: True` | VERIFIED (4/4) |
+| 66 | Trace artifacts | Re-opened every `trace.jsonl` and per-module file | VERIFIED (seq contiguous, per-module sums match) |
+| 67 | `api` purity and dead imports | AST scan across `src/` | VERIFIED (0 and 0) |
+| 68 | README quick start | Ran it verbatim | VERIFIED |
+
+### Cleaned up
+
+- Example 02 lost its whole `Target` class. The soul is the target, so the
+  example is now one `Interceptor` plus three lines of wiring.
+- A first pass at example 02 contained `model_for(None, ...) if False else ...`
+  and reassigned `mind.soul.llm` after construction. Replaced by passing a
+  built `LLM` to `Mind`, which the signature already allowed.
+- Example 03's outer hemisphere became the soul via `soul=Outer`.
+- Example 04's remembering agent became the soul.
+
+### Found by a failing test
+
+`Soul.on_context` republishes `context` after adopting, so an editor that
+rewrites unconditionally loops forever. The first version of example 02 did
+exactly that and hit `RunawayMind` after 200 ticks. Knowing when to stop is the
+editor's job, so `revise` now returns None once its own mark is in the window.

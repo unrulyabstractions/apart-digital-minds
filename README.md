@@ -1,8 +1,9 @@
 # dmind
 
-A small runtime for digital-mind experiments. Several agents hold queues, pass
-messages, and run on a clock you control. No cognitive architecture is built in.
-You wire the parts together yourself.
+A small runtime for digital-mind experiments. A mind is one target model, its
+**soul**, plus whatever you attach to it: something reading its context,
+something rewriting its thoughts, something speaking beside it. Everything runs
+on a clock you control. No cognitive architecture is built in.
 
 The package has no required dependencies. Provider SDKs are imported only when
 you ask for that provider.
@@ -99,15 +100,62 @@ pip install -e '.[all]'   # plus every provider SDK
 
 ```python
 import asyncio
-from src import Mind, Agent, texts
+from src import Mind, texts
 
 async def main():
-    mind = Mind("demo")
-    assistant = Agent("assistant", mind.model("echo:"), system="Be terse.")
-    assistant.register(mind.world, "reply")     # wires it and adds it
-    print(texts(await mind.prompt("What is a digital mind?")))
+    mind = Mind("demo", "echo:", system="Be terse.")
+    mind.prompt("What is a digital mind?")
+    await mind.process()
+    print(texts(mind.get_replies()))
 
 asyncio.run(main())
+```
+
+No wiring. The soul is the front door in both directions: `prompt` reaches it
+because it is the entry, and its `reply` reaches you because the mind connected
+it.
+
+Driving a mind is three steps, kept apart on purpose.
+
+| Call | What it does |
+| --- | --- |
+| `mind.prompt(text)` | Put something in. Delivers and returns; runs nothing. |
+| `await mind.process()` | Tick until no module anywhere has work. |
+| `await mind.process_one()` | Run exactly one tick, for stepping through a run. |
+| `mind.get_replies()` | Read what came out. Reading drains. |
+
+## The soul
+
+The model a mind is built around. `mind.soul` publishes three channels and
+accepts two.
+
+| Publishes | |
+| --- | --- |
+| `context` | the whole context window, after every turn |
+| `reply` | what it just said, reasoning stripped out |
+| `thought` | the reasoning it just did, if it was tagged |
+
+| Accepts | |
+| --- | --- |
+| `user_prompt` | something to answer |
+| `context` | a replacement window, adopted wholesale |
+
+Adopting a replacement is itself a turn, so the soul publishes again
+afterwards. It is not told this happened and cannot tell. That is the whole
+interception experiment, and it is why an editor on `context` has to know when
+it is finished.
+
+```python
+mind.soul.register(monitor, "context")      # read what it remembers
+mind.soul.register(interceptor, "thought")  # read what it just reasoned
+interceptor.register(mind.soul, "context")  # and rewrite the window
+```
+
+Put something else at the centre with `soul=`:
+
+```python
+Mind("halves", "ollama:qwen3:8b", soul=Outer)              # a subclass
+Mind("study", "openai:gpt-5", soul=lambda llm: Mine(...))  # or a factory
 ```
 
 `echo:` is a fake model. It needs no key and always answers the same way, so

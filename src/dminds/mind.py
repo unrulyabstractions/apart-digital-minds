@@ -1,13 +1,21 @@
 """`Mind`: the standard implementation of `api.Mind`.
 
-It holds modules and time. It does not wire them, and it has no routing table.
-A module registers consumers onto its own channels, so the mind never decides
-who hears what.
+A mind is one target model, called its **soul**, plus whatever you attach to
+it. It holds modules and time. It does not wire them and has no routing table,
+because a module registers consumers onto its own channels.
 
-    mind = Mind("demo")
-    assistant = mind.add(Agent("assistant", mind.model("echo:")))
-    assistant.register(mind.world, "reply")
-    replies = await mind.prompt("hello")
+    mind = Mind("demo", "openai:gpt-5", system="Be terse.")
+    mind.prompt("hello")
+    await mind.process()
+    print(texts(mind.get_replies()))
+
+The soul is wired to you in both directions already: `prompt` reaches it
+because it is the entry, and its `reply` reaches you because the mind
+connected it. Put a module in between to preprocess either side.
+
+`mind.soul` publishes `context`, `reply`, and `thought`. Register anything you
+like onto those, and register back onto its `context` to rewrite what it
+remembers.
 
 `prompt` injects one external input and runs until every queue is empty, so
 when it returns the mind has finished thinking.
@@ -17,7 +25,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from ..api.models import LLM
 from ..api.modules import Module
@@ -27,8 +35,29 @@ from ..api.runtime import Mind as MindInterface
 from ..api.types import Link, Message, Payload, Text
 from .llm import get_llm
 from .module import BaseModule
+from .soul import Soul
 from .scheduler import TickScheduler
 from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
+
+
+def _build_soul(
+    soul: type[Module] | Callable[[LLM], Module] | None,
+    llm: LLM,
+    system: str | None,
+) -> Module:
+    """Turn the `soul=` argument into the module at the centre of a mind.
+
+    Three forms, so the common cases stay short:
+
+        None        the default `Soul`
+        a class     built as `cls("soul", llm, system=system)`
+        a callable  called as `fn(llm)`, for anything else
+    """
+    if soul is None:
+        return Soul("soul", llm, system=system)
+    if isinstance(soul, type):
+        return soul("soul", llm, system=system)
+    return soul(llm)
 
 
 def _fresh_run_id(run_dir: str | Path | None) -> str:
@@ -77,16 +106,32 @@ class World(BaseModule):
 class Mind(MindInterface):
     """The default composition, with every part replaceable.
 
-    The scheduler, the tracer, and the model factory are arguments. Left alone
-    they are `TickScheduler`, `RunTracer`, and `get_llm`.
+    Args:
+        model: the target model, as a spec string or a built `LLM`. The mind
+            wraps it in a soul and holds it as `mind.soul`. Leave it out for a
+            mind that is only a graph of modules.
+        system: the soul's system prompt.
+        soul: something other than the default `Soul` at the centre. A
+            subclass, or a callable taking the `LLM` and returning a module.
+        autowire: connect the soul's `reply` channel to `world`, so a mind
+            answers you without any wiring at all. Turn it off to put a filter
+            in between.
 
-        Mind("fast",  scheduler=lambda host: MyScheduler(host))
-        Mind("taped", model_factory=taped("runs/tape.jsonl"))
+    The scheduler, the tracer, and the model factory are arguments too. Left
+    alone they are `TickScheduler`, `RunTracer`, and `get_llm`.
+
+        Mind("study", "openai:gpt-5", system="Think first.")
+        Mind("halves", "ollama:qwen3:8b", soul=Outer)
+        Mind("taped", "echo:", model_factory=taped("runs/tape.jsonl"))
     """
 
     def __init__(
         self,
         name: str = "mind",
+        model: str | LLM | None = None,
+        system: str | None = None,
+        soul: type[Module] | Callable[[LLM], Module] | None = None,
+        autowire: bool = True,
         run_id: str | None = None,
         run_dir: str | Path | None = "runs",
         console: bool = True,
@@ -106,6 +151,7 @@ class Mind(MindInterface):
             model_factory if model_factory is not None else get_llm
         )
         self._message_counter = 0
+        self._read_mark = 0
         self._validated = False
 
         #: Where `prompt` delivers, unless you say otherwise. Defaults to the
@@ -137,6 +183,17 @@ class Mind(MindInterface):
             if scheduler is not None
             else TickScheduler(self, strict=strict, max_ticks=max_ticks)
         )
+
+        #: The target model, as a module. None if the mind was given no model.
+        self.soul: Module | None = None
+        if model is not None:
+            llm = model if isinstance(model, LLM) else self.model(model)
+            self.soul = self.adopt(_build_soul(soul, llm, system))
+            # The soul is the front door in both directions: `prompt` delivers
+            # to it because it is the entry, and its replies reach you because
+            # of this. Everything else you wire yourself.
+            if autowire and "reply" in self.soul.OUTPUTS:
+                self.soul.register(self.world, "reply")
 
     # -- models ----------------------------------------------------------
 
@@ -351,8 +408,36 @@ class Mind(MindInterface):
                 messages.append(message)
         return messages
 
-    async def run(self, max_ticks: int | None = None) -> int:
-        """Tick until quiet. Returns the number of ticks run.
+    def prompt(
+        self,
+        text: str,
+        to: str | Sequence[str] | None = None,
+        channel: str = "user_prompt",
+    ) -> list[Message]:
+        """Say something. Delivers immediately and returns.
+
+        This does not run the mind. Call `process` for that, then
+        `get_replies` to read what came out.
+
+            mind.prompt("hello")
+            await mind.process()
+            print(texts(mind.get_replies()))
+
+        Delivers to `to`, or to `self.entry` when you do not say.
+        """
+        return self.send(channel, Text(text), to=to)
+
+    async def process_one(self) -> int:
+        """Run exactly one tick. Returns how many modules took a turn.
+
+        Step through an experiment with this, reading state between ticks.
+        Zero means nothing had work and the mind is settled.
+        """
+        self._check_once()
+        return await self.scheduler.tick()
+
+    async def process(self, max_ticks: int | None = None) -> int:
+        """Tick until nothing has work anywhere. Returns the number of ticks.
 
         Validates the assembly before the first tick, so a consumer that was
         never added fails loudly instead of silently dropping messages.
@@ -360,22 +445,15 @@ class Mind(MindInterface):
         self._check_once()
         return await self.scheduler.run_until_idle(max_ticks)
 
-    async def prompt(
-        self,
-        text: str,
-        to: str | Sequence[str] | None = None,
-        channel: str = "user_prompt",
-        max_ticks: int | None = None,
-    ) -> list[Message]:
-        """Say something, wait for the mind to settle, take what it produced.
+    def get_replies(self) -> list[Message]:
+        """Everything that reached `world` since you last asked.
 
-        Delivers to `to`, or to `self.entry` when you do not say. Returns only
-        the messages that reached `world` during this prompt.
+        Reading drains, so a prompt-process-read loop sees each reply once.
+        `mind.outbox` keeps the whole history if you want it.
         """
-        mark = len(self.outbox)
-        self.send(channel, Text(text), to=to)
-        await self.run(max_ticks)
-        return self.outbox[mark:]
+        new = self.outbox[self._read_mark :]
+        self._read_mark = len(self.outbox)
+        return new
 
     # -- inspection --------------------------------------------------------
 

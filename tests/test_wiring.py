@@ -40,7 +40,7 @@ def drive(build) -> Mind:
         mind = quiet_mind()
         build(mind)
         mind.send("go", Text("x"), to="src")
-        await mind.run()
+        await mind.process()
         return mind
 
     return asyncio.run(run())
@@ -76,7 +76,7 @@ def test_emitting_on_an_undeclared_channel_fails():
         mind.add(Rogue("r"))
         mind.send("go", Text("x"), to="r")
         try:
-            await mind.run()
+            await mind.process()
         except ValueError as exc:
             mind.close()
             return str(exc)
@@ -186,7 +186,7 @@ def test_a_module_can_register_itself():
         p = mind.add(SelfPoker("p"))
         p.register(p, "again")
         mind.send("go", Text("x"), to="p")
-        await mind.run()
+        await mind.process()
         mind.close()
         return p.turns_taken
 
@@ -259,7 +259,7 @@ def test_on_input_routes_to_a_per_channel_method_when_one_exists():
         mind.send("user_prompt", Text("x"), to="r")
         mind.send("inspect.context", Text("x"), to="r")  # dots become underscores
         mind.send("unheard_of", Text("x"), to="r")
-        await mind.run()
+        await mind.process()
         mind.close()
         return r.calls, r.inputs
 
@@ -282,7 +282,7 @@ def test_take_inputs_drains_the_buffer():
         b = mind.add(Batcher())
         for _ in range(3):
             mind.send("x", Text("x"), to="b")
-        await mind.run()
+        await mind.process()
         mind.close()
         return b.batches, b.inputs
 

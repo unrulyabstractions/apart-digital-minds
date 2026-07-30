@@ -23,12 +23,13 @@ import shutil
 from pathlib import Path
 
 from src import (
-    Agent,
     Ctx,
     Journal,
     Message,
     Mind,
+    Soul,
     Text,
+    get_llm,
     taped,
     texts,
     user,
@@ -37,11 +38,14 @@ from src import (
 WORK = Path("runs/example04")
 
 
-class Remembering(Agent):
+class Remembering(Soul):
     """An agent that consults its journal before answering, and writes to it after."""
 
     OUTPUTS = {"reply": "the answer, informed by what it remembered"}
     INPUTS = {"user_prompt": "a question, as Text"}
+
+    def __init__(self, *args, journal_path=None, **kwargs):
+        super().__init__(*args, journal=Journal(path=journal_path), **kwargs)
 
     async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
         prompt = message.payload.text
@@ -64,16 +68,18 @@ class Remembering(Agent):
         ctx.emit("reply", Text(completion.text))
 
 
-def make_agent(mind: Mind, journal_path: Path, llm) -> Remembering:
-    """Build the agent, add it, and wire its one output to the caller."""
-    agent = Remembering(
-        "assistant",
-        llm,
+def remembering_mind(journal_path: Path, llm, **kwargs) -> Mind:
+    """A mind whose soul consults a journal before answering."""
+    return Mind(
+        model=llm,
         system="You are an assistant with a long memory.",
-        journal=Journal(path=journal_path),
+        soul=lambda built: Remembering(
+            "soul", built, system="You are an assistant with a long memory.",
+            journal_path=journal_path,
+        ),
+        console=False,
+        **kwargs,
     )
-    agent.register(mind.world, "reply")   # wires it and joins the mind
-    return agent
 
 
 def jittery_rule(messages, opts) -> str:
@@ -93,19 +99,22 @@ async def part1_memory_survives() -> Path:
 
     journal_path = WORK / "journal.jsonl"
 
-    mind_a = Mind("session-a", run_dir=None, console=False)
-    make_agent(mind_a, journal_path, mind_a.model("echo:", rule=jittery_rule))
-    print("session A:", texts(await mind_a.prompt("what are octopuses like?"))[0])
-    print(f"  journal now holds {len(mind_a.modules['assistant'].journal)} episodes")
+    mind_a = remembering_mind(journal_path, get_llm("echo:", rule=jittery_rule),
+                              name="session-a", run_dir=None)
+    mind_a.prompt("what are octopuses like?")
+    await mind_a.process()
+    print("session A:", texts(mind_a.get_replies())[0])
+    print(f"  journal now holds {len(mind_a.soul.journal)} episodes")
     mind_a.close()
 
     # A brand new process would do the same thing: the file is the memory.
-    mind_b = Mind("session-b", run_dir=None, console=False)
-    make_agent(mind_b, journal_path, mind_b.model("echo:", rule=jittery_rule))
-    agent_b = mind_b.modules["assistant"]
-    print(f"session B loaded {len(agent_b.journal)} episodes from disk")
-    print("session B:", texts(await mind_b.prompt("tell me about octopuses"))[0])
-    print(f"  recall hit: {[e.text for e in agent_b.journal.recall('octopuses')]}")
+    mind_b = remembering_mind(journal_path, get_llm("echo:", rule=jittery_rule),
+                              name="session-b", run_dir=None)
+    print(f"session B loaded {len(mind_b.soul.journal)} episodes from disk")
+    mind_b.prompt("tell me about octopuses")
+    await mind_b.process()
+    print("session B:", texts(mind_b.get_replies())[0])
+    print(f"  recall hit: {[e.text for e in mind_b.soul.journal.recall('octopuses')]}")
     mind_b.close()
     return journal_path
 
@@ -117,17 +126,18 @@ async def run_once(tape: Path, mode: str, run_id: str) -> tuple[str, list]:
     Every model this mind builds goes through it, so a mind with twenty agents
     on five providers is made reproducible by this one argument.
     """
-    mind = Mind(
-        run_id,
+    factory = taped(tape, mode=mode)
+    mind = remembering_mind(
+        WORK / f"journal-{run_id}.jsonl",
+        factory("echo:", rule=jittery_rule),
+        name=run_id,
         run_id=run_id,
         run_dir=WORK / "traces",
-        console=False,
-        model_factory=taped(tape, mode=mode),
+        model_factory=factory,
     )
-    make_agent(
-        mind, WORK / f"journal-{run_id}.jsonl", mind.model("echo:", rule=jittery_rule)
-    )
-    replies = await mind.prompt("what are octopuses like?")
+    mind.prompt("what are octopuses like?")
+    await mind.process()
+    replies = mind.get_replies()
     events = list(mind.events.events)
     mind.close()
     return texts(replies)[0], events

@@ -1,4 +1,15 @@
-"""One agent, one prompt, and a full trace on disk.
+"""One mind, one soul, and a full trace on disk.
+
+A mind is built around one target model. That model is its **soul**, and it
+publishes three channels: `context`, `reply`, and `thought`. Its `reply` is
+connected to you already, so this example wires nothing. Register consumers
+onto `context` or `thought` when you want to read or edit what it remembers.
+
+Driving a mind is three steps, kept apart on purpose:
+
+    mind.prompt(...)      put something in
+    await mind.process()  let it think until nothing has work
+    mind.get_replies()    read what came out
 
 Run it:
     python examples/01_hello_agent.py
@@ -17,36 +28,28 @@ from __future__ import annotations
 import asyncio
 import os
 
-from src import Agent, Mind, texts
+from src import Mind, texts
 
 MODEL = os.environ.get("MODEL", "echo:")
 
 
 async def main() -> None:
-    mind = Mind("hello", run_dir="runs")
-
-    assistant = Agent(
-        "assistant",
-        mind.model(MODEL),
+    mind = Mind(
+        "hello",
+        MODEL,
         system="You are a careful assistant. Answer in two sentences.",
+        run_dir="runs",
     )
-
-    # One verb. `Agent` declares one output channel, `reply`; nobody hears it
-    # until somebody registers. Registering against `mind.world` both wires the
-    # channel and brings the agent into the mind, so there is nothing else to
-    # call.
-    assistant.register(mind.world, "reply")
-
     print(mind.describe(), "\n")
 
     for question in ["What is a digital mind?", "What did I just ask you?"]:
-        replies = await mind.prompt(question)
+        mind.prompt(question)
+        await mind.process()
         print(f"\nyou : {question}")
-        print(f"mind: {texts(replies)[0]}\n")
+        print(f"mind: {texts(mind.get_replies())[0]}\n")
 
     # The transcript is ordinary data. Read it, edit it, save it.
-    agent = mind.modules["assistant"]
-    print(f"transcript holds {len(agent.transcript)} messages")
+    print(f"transcript holds {len(mind.soul.transcript)} messages")
     print(f"trace written to {mind.run_path}/trace.jsonl")
     print(f"per-module logs in {mind.run_path}/modules/")
 
