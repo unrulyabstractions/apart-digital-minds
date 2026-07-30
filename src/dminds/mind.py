@@ -51,20 +51,27 @@ def _fresh_run_id(run_dir: str | Path | None) -> str:
 class World(BaseModule):
     """You, from the mind's point of view.
 
-    A sink. Register it onto any channel and whatever is emitted there lands
-    in `mind.outbox`, which is what `prompt` returns.
+    A sink, and the one module that is never scheduled. Register it as the
+    consumer of any channel and whatever is emitted there lands in
+    `mind.outbox`, which is what `prompt` returns.
 
         assistant.register(mind.world, "reply")
+
+    It absorbs on delivery rather than on a turn, so it overrides `receive`
+    instead of `on_input`. Waiting for a turn would cost a tick and would make
+    the mind look like it was still thinking when it had already answered.
     """
 
     INPUTS = {"*": "anything a module wants to hand back to the caller"}
+    OUTPUTS: dict[str, str] = {}
 
     def __init__(self, outbox: list[Message], name: str = WORLD):
         super().__init__(name)
-        self._outbox = outbox
+        self.outbox = outbox
 
-    async def on_input(self, message: Message, ctx) -> None:
-        self._outbox.append(message)
+    def receive(self, message: Message) -> None:
+        """Take the message straight out of the mind. Never queued."""
+        self.outbox.append(message)
 
 
 class Mind(MindInterface):
@@ -299,11 +306,9 @@ class Mind(MindInterface):
             )
             return False
 
-        if target is self.world:
-            # World is never scheduled, so it absorbs on delivery.
-            self.outbox.append(message)
-        else:
-            target.receive(message)
+        # Uniform: every module, including world, takes it through `receive`.
+        # World's override drops it in the outbox instead of a queue.
+        target.receive(message)
 
         self.tracer.emit(
             message.dst,

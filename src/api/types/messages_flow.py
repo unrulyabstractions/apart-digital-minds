@@ -46,6 +46,10 @@ class Link:
     as_channel: str
 
     def describe(self) -> str:
+        if self.channel == "*":
+            # A wildcard listener hears each channel under its own name, so
+            # printing `as *` would misdescribe what arrives.
+            return f"{self.src} --*--> {self.dst} (every channel, named as sent)"
         renamed = f" as {self.as_channel}" if self.as_channel != self.channel else ""
         return f"{self.src} --{self.channel}--> {self.dst}{renamed}"
 

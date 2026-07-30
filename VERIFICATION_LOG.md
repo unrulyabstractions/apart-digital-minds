@@ -201,3 +201,27 @@ wired to nothing.
 Two validation tests were deleted rather than fixed. `validate` used to catch a
 consumer that was never added to the mind; registering now makes that state
 unreachable. A test asserting the new guarantee replaced them.
+
+## 2026-07-30 — dead code in `World`, found by a question about wiring direction
+
+Asked where `outer.register(mind.world, "reply")` connects to `outer.on_input`,
+the answer is that it does not: registration reads producer to consumer, and
+that call wires `outer`'s output. Checking it surfaced a defect.
+
+### Fixed
+
+- `World.on_input` and `World._outbox` were dead. `Mind.deliver` special-cased
+  world and appended to `self.outbox` directly, so the handler never ran.
+  `World` now overrides `receive`, which is what it actually does, and
+  `deliver` calls `target.receive(...)` uniformly with no special case.
+- `Link.describe` rendered a wildcard registration as `as *`. A wildcard
+  listener hears each channel under its own name, so the rendering was wrong.
+  It now reads `(every channel, named as sent)`.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 55 | Both fixes | Ran the suite and all four examples | VERIFIED (78 passed; 4/4) |
+| 56 | What actually feeds `outer.on_input` | Enumerated every `Link` in the bicameral mind and printed producer, channel, and the channel the consumer sees. Three sources reach `outer`: its own `deliberate`, `inner`'s `voice`, and `world`'s `user_prompt` from `mind.prompt` | VERIFIED |
+| 57 | The rendered link table | Read `mind.describe()` output for example 03 | VERIFIED (6 links, wildcards read correctly) |
