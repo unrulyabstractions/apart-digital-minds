@@ -1,9 +1,12 @@
 """The implementations. Every one of them satisfies a contract in `src.api`.
 
-    api.Module        -> BaseModule, FnModule, Agent
+Internal machinery lives here too, beside what uses it: `Host` is the narrow
+view a module gets of its mind, and `Scheduler` is the clock. Neither is part
+of the external surface in `src.api`.
+
+    api.Module        -> BaseModule, Agent
     api.Ctx           -> Ctx
     api.LLM           -> BaseLLM, the providers, Cassette
-    api.Scheduler     -> TickScheduler
     api.Host          -> Mind (narrow view, for modules)
     api.Mind          -> Mind (full view, for you)
     api.Agent         -> Subject, the target model a mind is built around
@@ -45,8 +48,9 @@ from .llm import (
 from .memory import Journal, Scratchpad, Transcript
 from .mind import Mind, World, texts
 from .subject import Ego, Subject
-from .module import BaseModule, Ctx, FnModule, UndeclaredChannel, handler_name
-from .scheduler import TickScheduler
+from .module import BaseModule, Ctx, UndeclaredChannel
+from .host import Host, SchedulerFactory
+from .scheduler import Scheduler, TickScheduler
 from .trace import (
     ConsoleSink,
     JsonlSink,
@@ -54,7 +58,6 @@ from .trace import (
     ModuleLog,
     PerModuleSink,
     RunTracer,
-    causal_chain,
     read_trace,
 )
 
@@ -64,15 +67,15 @@ __all__ = [
     # runtime
     "Mind",
     "BaseModule",
-    "FnModule",
     "Ctx",
-    "World",
     "Subject",
     "Ego",
     "UndeclaredChannel",
     "TickScheduler",
+    "Scheduler",
+    "Host",
+    "SchedulerFactory",
     "texts",
-    "handler_name",
     # agents
     "Agent",
     "split_think",
@@ -86,12 +89,8 @@ __all__ = [
     "register_provider",
     "available_providers",
     "parse_spec",
-    "ALIASES",
-    "DEFAULT_MODELS",
     "Cassette",
     "CassetteMiss",
-    "Tape",
-    "request_key",
     "taped",
     "split_system",
     "merge_consecutive",
@@ -101,11 +100,9 @@ __all__ = [
     "Journal",
     # observability
     "RunTracer",
-    "ModuleLog",
     "MemorySink",
     "JsonlSink",
     "PerModuleSink",
     "ConsoleSink",
     "read_trace",
-    "causal_chain",
 ]

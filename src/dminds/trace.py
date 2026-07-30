@@ -226,15 +226,3 @@ def read_trace(path: str | Path) -> list[Event]:
         if line.strip():
             events.append(Event(**json.loads(line)))
     return events
-
-
-def causal_chain(events: list[Event], task_id: str) -> list[Event]:
-    """Every event descending from one task. Answers "why did this happen"."""
-    wanted = {task_id}
-    chain = []
-    for event in events:
-        if event.task_id in wanted or event.cause in wanted:
-            chain.append(event)
-            if event.task_id:
-                wanted.add(event.task_id)
-    return chain

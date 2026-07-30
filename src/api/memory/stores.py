@@ -94,12 +94,3 @@ class EpisodicStore(Protocol):
 
     def as_text(self, episodes: Sequence[Episode] | None = None) -> str:
         """Render for injection into a prompt."""
-
-
-@runtime_checkable
-class Recallable(Protocol):
-    """The smallest useful memory contract, if the ones above are too much."""
-
-    def remember(self, text: str, **meta: Any) -> Any: ...
-
-    def recall(self, query: str, k: int = 5) -> Sequence[Any]: ...

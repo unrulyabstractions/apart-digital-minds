@@ -5,14 +5,12 @@ them and nothing requires you to use them. They exist so that a mind you
 assemble says what each part is for, and so two implementations of the same
 role are swappable.
 
-    Inspectable   hands out a view of its own state
-    Editor        turns an inspection into a replacement
-    Workspace     records what passes through, and can be read back
-    Speaker       addresses the world
-    InnerVoice    never addresses the world
+    Editor       turns a context into a replacement context
+    Workspace    records what passes through, and can be read back
+    InnerVoice   utters something unbidden, never addressing you
 
-`examples/02` pairs an `Inspectable` with an `Editor`. `examples/03` pairs a
-`Speaker` with an `InnerVoice` over a `Workspace`.
+`examples/02` uses an `Editor` as a pipeline stage. `examples/03` uses an
+`InnerVoice` as one, watched by a `Workspace`.
 """
 
 from __future__ import annotations
@@ -23,23 +21,10 @@ from ..types import Message, Payload
 
 
 @runtime_checkable
-class Inspectable(Protocol):
-    """A module that lets another module see part of its state.
-
-    The export is deliberately untyped. Hand over a whole context, one slice of
-    it, a single message, or a tensor. The reader is told what it got through
-    the payload type and, for a `Context`, through its `note`.
-    """
-
-    def export(self) -> Payload:
-        """A view of this module's state, for somebody else to read."""
-
-
-@runtime_checkable
 class Editor(Protocol):
     """Turns an inspection into a replacement.
 
-    The counterpart to `Inspectable`. An editor never mutates the other module.
+    An editor never mutates the module it edits for.
     It returns a new payload, and the inspected module decides whether to adopt
     it.
     """
@@ -64,21 +49,6 @@ class Workspace(Protocol):
 
     def render(self) -> str:
         """The workspace as readable text."""
-
-
-@runtime_checkable
-class Speaker(Protocol):
-    """The part of a mind that addresses the world.
-
-    It owns the conversation, and it has to reconcile whatever the rest of the
-    mind produces with what it was going to say anyway.
-    """
-
-    async def deliberate(self, prompt: str) -> str:
-        """Work out an answer, without input from the rest of the mind."""
-
-    async def integrate(self, draft: str, voice: str) -> str:
-        """Reconcile that draft with what the rest of the mind said."""
 
 
 @runtime_checkable

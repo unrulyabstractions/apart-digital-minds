@@ -361,3 +361,36 @@ with an assertion on the text being replaced.
 The Qwen3 fallback path in `pick` was exercised only in its negative branch:
 no Ollama server was running here, so it returned the stand-in. The branch that
 finds a pulled `qwen3` model and returns `ollama:<name>` has not run.
+
+## 2026-07-30 — api/ is the external surface only, plus a dead-code sweep
+
+`Scheduler`, `Host`, and their factories were declared in `src/api` but no
+experiment calls them, so they were machinery wearing an api badge. They moved
+to `src/dminds` beside the code that uses them. `src/api` now holds only what
+you build against: `Mind`, `Module`, `Agent`, `Ctx`, `LLM`, `ModelFactory`,
+the memory stores, the observability contracts, the shared types, and the two
+errors you are meant to catch.
+
+The sweep then measured which exported names were used in zero files outside
+their definition, and deleted them rather than keeping them for show:
+`Channel`, `EVENT_KINDS`, `Recallable`, `Inspectable`, `Speaker`, `FnModule`,
+`TracerFactory`, `causal_chain`, `SHADOWED`. Internals such as `Tape`,
+`World`, `ModuleLog`, `request_key`, `ALIASES` stay importable from their
+modules but are no longer exported package surface.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 89 | The boundary is real | `src.api` has no `Scheduler`, `Host`, `SchedulerFactory`, `TracerFactory`, or `Router` attribute; `src.dminds` has `Host` and `Scheduler`; a test pins this | VERIFIED |
+| 90 | Deletions were dead | Each deleted name was mentioned in zero non-`__init__` files before removal, measured by regex over `src/`, `examples/`, `tests/` | VERIFIED |
+| 91 | Test suite | `tests/run_tests.py` in the clean pip venv after reinstall | VERIFIED (105 passed, 0 failed) |
+| 92 | Examples | All four run | VERIFIED (4/4) |
+| 93 | Trace artifacts | Re-opened every `trace.jsonl` and per-module file | VERIFIED (26, 33, 41 events; seq contiguous; sums match) |
+| 94 | `api` purity and dead imports | AST scans across `src/` | VERIFIED (0 and 0) |
+| 95 | No stale vocabulary | Grepped for `Inspectable`, `Speaker`, `FnModule`, `SHADOWED`, `mind.wire`, `mind.watch`, `as_kind`, `user_prompt` outside this log; README code snippets executed, including the new `Critic` example | VERIFIED (only a generic-dispatch test uses `user_prompt` as an arbitrary channel name) |
+
+The README also stopped describing the old world: the contract table lost its
+`Scheduler`/`Host` rows, the roles table lost `Inspectable` and `Speaker`, and
+the module-writing example became a `Critic` stage that composes with the
+pipeline instead of a `Target` that no longer exists.

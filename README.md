@@ -14,7 +14,7 @@ you ask for that provider.
 src/api/       the contracts
 src/dminds/    the implementations
 examples/      four minds assembled from the parts
-tests/         78 tests, no dependencies
+tests/         105 tests, no dependencies
 ```
 
 `src/api` declares what each part must do. `src/dminds` provides one of each.
@@ -23,48 +23,47 @@ without disturbing the vocabulary the others speak.
 
 ```
 src/api/
+  mind.py          Mind, the thing you build and drive
+  constants.py     WORLD, WILDCARD
+  errors.py        RunawayMind, UndeclaredChannel
   types/           messages.py  payloads.py  messages_flow.py  records.py
   modules/         module.py  context.py  agent.py  roles.py
-  models/          llm.py
+  models/          llm.py  factory.py
   memory/          stores.py
   observability/   sinks.py  tracing.py  kinds.py
-  runtime/         scheduler.py  host.py  mind.py  factories.py  constants.py
 ```
+
+`src/api` is the **external** surface: only what you build against. Machinery
+you never call, the scheduler and the narrow `Host` view a module gets of its
+mind, lives in `src/dminds` beside the code that uses it.
 
 | Contract | `src/api` | Shipped implementation |
 | --- | --- | --- |
-| Takes a turn | `Module` | `BaseModule`, `FnModule` |
-| Takes a turn, with a model | `Agent` | `Agent` |
+| The thing you build and drive | `Mind` | `Mind` |
+| Takes a turn | `Module` | `BaseModule` |
+| Takes a turn, with a model | `Agent` | `Subject`, `Ego`, yours |
 | Given to a turn | `Ctx` | `Ctx` |
 | Answers a conversation | `LLM` | `BaseLLM`, the providers, `Cassette` |
-| Defines one step | `Scheduler` | `TickScheduler` |
-| Holds the modules, seen from inside | `Host` | `Mind` |
-| The whole assembly, seen from outside | `Mind` | `Mind` |
+| Builds a model from a spec | `ModelFactory` | `get_llm`, `taped(...)` |
 | A conversation | `MessageStore` | `Transcript` |
 | Working state | `KeyValueStore` | `Scratchpad` |
 | Episodic memory | `EpisodicStore` | `Journal` |
 | Fans events out | `Tracer` | `RunTracer` |
 | One module's log | `Logger` | `ModuleLog` |
 | Where events go | `Sink` | `JsonlSink`, `PerModuleSink`, `ConsoleSink`, `MemorySink` |
-| Builds a model from a spec | `ModelFactory` | `get_llm`, `taped(...)` |
-
-`Host` and `Mind` are two views of one object. A module receives a `Host`,
-which can stage an emission and nothing else. It cannot add modules, rewire the
-graph, or drive the clock. You receive a `Mind`, which can. That split is what
-makes the tick discipline enforceable rather than merely advised.
 
 Three names exist in both layers, because the implementation kept the obvious
-word: `Mind`, `Agent`, and `Ctx`. Importing from `src` gives the implementation,
-which is almost always what you want. `src.SHADOWED` lists them.
+word: `Mind`, `Agent`, and `Ctx`. Importing from `src` gives the
+implementation, which is almost always what you want.
 
 ```python
 from src import Agent            # the class
 from src.api import Agent        # the interface it satisfies
 ```
 
-`src/api/types/` holds the data that crosses every boundary: `Message`, `Link`,
-`Channel`, `ChatMessage`, `Completion`, `GenOptions`, `Event`, `Episode`, and
-the `Text` / `Context` / `Vector` payloads. Read that package first.
+`src/api/types/` holds the data that crosses every boundary: `Message`,
+`Link`, `ChatMessage`, `Completion`, `GenOptions`, `Event`, `Episode`, and the
+`Text` / `Context` / `Vector` payloads. Read that package first.
 
 ```python
 from src.api import Module, Agent, LLM, Sink   # what to implement
@@ -80,11 +79,9 @@ part is for, and so two implementations of one role are swappable.
 
 | Role | Contract | Played by |
 | --- | --- | --- |
-| `Inspectable` | `export()` | `examples/02` target |
 | `Editor` | `revise(payload)` | `examples/02` interceptor |
 | `Workspace` | `record()`, `entries()`, `render()` | `examples/03` blackboard |
-| `Speaker` | `deliberate()`, `integrate()` | `examples/03` outer |
-| `InnerVoice` | `utter(situation)` | `examples/03` inner |
+| `InnerVoice` | `utter(situation)` | `examples/03` voice |
 
 Every class in `examples/` declares the roles it plays, so each example reads
 as an implementation of a stated contract rather than an ad-hoc class.
@@ -192,8 +189,8 @@ you can build wiring before spending a token.
 | --- | --- |
 | `Module` | A queue, declared output channels, and a turn. |
 | `Message` | One thing sent on a channel, from one module to another. |
+| `Subject` | The target model at the centre of a mind. |
 | `Mind` | Where modules live, and what you drive. |
-| `Scheduler` | Runs the clock. Decides what "one step" means. |
 | `LLM` | One chat interface. Providers are chosen by a string. |
 
 Everything else is built from these.
@@ -233,21 +230,21 @@ everything that reached it before it acts, so it never decides on half the
 picture.
 
 ```python
-from src import Agent, Context, Text, user
+from src import Agent, Context, user
 
-class Target(Agent):
-    OUTPUTS = {"thought": "the draft, for inspection", "reply": "the answer"}
+class Critic(Agent):
+    INPUTS = {"context": "somebody's context window"}
+    OUTPUTS = {"context": "the same window, annotated"}
 
-    async def on_user_prompt(self, message, ctx):        # per-channel
-        self.transcript.append(user(message.payload.text))
-        completion = await self.think(tag="draft")
-        self.transcript.append(completion.as_message())
-        ctx.emit("thought", Context(self.transcript.messages))
-
-    async def on_revision(self, message, ctx):
-        self.transcript.replace_all(message.payload.messages)
-        completion = await self.think(tag="final")
-        ctx.emit("reply", Text(completion.text))
+    async def on_context(self, message, ctx):            # per-channel
+        completion = await self.think(
+            messages=[*self.transcript.messages,
+                      user(f"Critique this: {message.payload.messages[-1].content}")],
+            tag="critique",
+        )
+        revised = message.payload.copy()
+        revised.messages.append(completion.as_message(stage="critique"))
+        ctx.emit("context", revised)
 ```
 
 The default `on_input` routes to `on_<channel>` when you have written such a
@@ -280,23 +277,23 @@ so is registering against a channel that does not exist, so a typo fails at
 wiring time rather than silently dropping messages.
 
 ```python
-class Target(Agent):
-    OUTPUTS = {"thought": "what it just drafted", "reply": "the answer"}
-    INPUTS  = {"user_prompt": "a question", "revision": "a replacement context"}
+class Critic(Agent):
+    INPUTS  = {"context": "somebody's context window"}
+    OUTPUTS = {"context": "the same window, annotated"}
 ```
 
 Wiring lives on the modules. The mind has no routing table and no opinion about
 who talks to whom.
 
 ```python
-target.register(interceptor, "thought", as_channel="inspect")
-interceptor.register(target, "revision")
-target.register(mind.world, "reply")
-outer.register(blackboard, "*")        # a workspace hears everything
+mind.subject.register(critic, "context")
+critic.register(monitor, "context", as_channel="overheard")
+critic.register(mind.world, "reply")
+mind.subject.register(blackboard, "*")   # a workspace hears everything
 ```
 
-Renaming matters: the target emits `"thought"` and the interceptor hears
-`"inspect"`, so neither module knows the other's vocabulary. `"*"` forwards
+Renaming matters: the critic emits `"context"` and the monitor hears
+`"overheard"`, so neither module knows the other's vocabulary. `"*"` forwards
 every channel under its real name, which is how a monitor attaches.
 
 **Registering is the only verb.** It wires the channel *and* brings the module
@@ -396,15 +393,14 @@ Log from your own code with `ctx.log.note(...)`, and time a block with
 
 `Mind` builds nothing itself. The scheduler, the tracer, and the model factory
 are all arguments, defaulting to the shipped implementations.
-Without this the `Scheduler` contract would describe nothing.
 
 ```python
-Mind("fast",  scheduler=lambda host: MyScheduler(host))
-Mind("taped", model_factory=taped("runs/tape.jsonl"))
+Mind("fast",  "echo:", scheduler=lambda host: MyScheduler(host))
+Mind("taped", "echo:", model_factory=taped("runs/tape.jsonl"))
 ```
 
-A scheduler needs the host it will drive and a tracer needs the run id, so both
-arrive as factories rather than finished objects.
+The scheduler is internal machinery: subclass `src.dminds.Scheduler` only when
+you want a different notion of time.
 
 Channels are declared, so a mistyped one fails the moment you register or emit:
 
@@ -414,8 +410,8 @@ Declared channels: reply, thought. Add it to OUTPUTS, or register on "*"
 to receive everything.
 ```
 
-`mind.validate()` catches what is left, and `run` calls it before the first
-tick.
+`mind.validate()` catches what is left, and `process` calls it before the
+first tick.
 
 ## Replay
 
@@ -430,9 +426,9 @@ For a whole mind, attach the factory instead of wrapping models one at a time.
 Every model the mind builds goes through it:
 
 ```python
-mind = Mind("study", model_factory=taped("runs/study.jsonl"))
-mind.add(Agent("a", mind.model("openai:gpt-5")))
-mind.add(Agent("b", mind.model("ollama:qwen3:8b")))
+mind = Mind("study", "openai:gpt-5", model_factory=taped("runs/study.jsonl"))
+watcher = Agent("watcher", mind.model("ollama:qwen3:8b"))
+mind.subject.register(watcher, "context")
 ```
 
 Both cassettes share one `Tape`, so the replay cursor is global. Two agents on
@@ -445,18 +441,18 @@ event sequence, so you can diff two traces and see what a change did.
 ## Examples
 
 ```bash
-python examples/01_hello_agent.py         # one agent, and where the logs go
-python examples/02_think_interceptor.py   # target and interceptor in lock-step
-python examples/03_bicameral.py           # two hemispheres and a blackboard
-python examples/04_memory_and_replay.py   # persistence, cassettes, trace diffing
+python examples/01_hello_agent.py         # one subject, and where the logs go
+python examples/02_think_interceptor.py   # subject -> interceptor -> ego
+python examples/03_bicameral.py           # subject -> voice -> ego, watched
+python examples/04_memory_and_replay.py   # persistence, tapes, trace diffing
 ```
 
-They all run on the fake model. Point them at a real one with environment
-variables:
+Each role picks its model as: the environment variable, then a local Qwen3 if
+Ollama has one pulled, then a scripted stand-in so the examples always run.
 
 ```bash
-MODEL=ollama:qwen3:8b python examples/01_hello_agent.py
-TARGET_MODEL=anthropic:claude-opus-5 INTERCEPTOR_MODEL=ollama:qwen3:8b \
+MODEL=anthropic:claude-opus-5 python examples/01_hello_agent.py
+SUBJECT_MODEL=anthropic:claude-opus-5 INTERCEPTOR_MODEL=ollama:qwen3:8b \
     python examples/02_think_interceptor.py
 ```
 
@@ -472,7 +468,7 @@ pytest                       # also works
 Implement the contract and pass your version in. Nothing else changes.
 
 ```python
-from src.api import Sink, LLM, Scheduler
+from src.api import Sink
 
 class SlackSink(Sink):                      # a new log destination
     def write(self, event): ...
@@ -496,8 +492,9 @@ register_provider("mine", lambda model, spec, **kw: MyLLM(model, spec, **kw))
 synchronous method. Implement `api.LLM` directly when you need control over the
 async call itself, as `Cassette` does.
 
-The same holds for the rest. Subclass `api.Scheduler` for a different notion of
-time, or satisfy `api.EpisodicStore` to put memory in a real vector database.
+The same holds for the rest: satisfy `api.EpisodicStore` to put memory in a
+real vector database, or subclass `src.dminds.Scheduler` for a different
+notion of time.
 
 An agent is a module with a model and a memory. `api.Agent` is the contract:
 

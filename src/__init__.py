@@ -12,10 +12,10 @@ without disturbing the vocabulary the others speak.
     from src.dminds import Mind, Bus, BaseModule   # what to use
     from src import Mind, Agent, get_llm           # both, flat
 
-Three names exist in both layers, because the implementation kept the obvious
-word: `Mind`, `Agent`, and `Ctx`. Importing them from `src` gives you the
-implementation, which is almost always what you want. Reach for the contract
-explicitly when you mean the contract.
+A few names exist in both layers, because the implementation kept the obvious
+word. Importing them from `src` gives you the implementation, which is almost
+always what you want. Reach for the contract explicitly when you mean the
+contract. Those names are `Mind`, `Agent`, and `Ctx`.
 
     from src import Agent            # src.dminds.agents.Agent, a real class
     from src.api import Agent        # the interface it satisfies
@@ -24,8 +24,8 @@ Five ideas, and nothing else:
 
     Module      a queue, declared output channels, and a turn
     Message     one thing sent on a channel, from one module to another
+    Subject     the target model at the centre of a mind
     Mind        where modules live, and what you drive
-    Scheduler   ticks the clock; nothing emitted at t is seen before t+1
     LLM         one chat interface, many providers, chosen by a string
 
 Modules wire themselves. `producer.register(consumer, "channel")` connects them
@@ -45,7 +45,5 @@ from .dminds import *  # noqa: F401,F403
 from .dminds import __all__ as _impl_all
 from .dminds import __version__
 
-#: Names that resolve to an implementation here and to a contract in `src.api`.
-SHADOWED = tuple(sorted(set(_api_all) & set(_impl_all)))
 
-__all__ = [*dict.fromkeys([*_api_all, *_impl_all]), "api", "dminds", "SHADOWED", "__version__"]
+__all__ = [*dict.fromkeys([*_api_all, *_impl_all]), "api", "dminds", "__version__"]

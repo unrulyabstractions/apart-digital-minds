@@ -1,9 +1,9 @@
 """Interfaces for the things that live inside a mind.
 
-    module.py    Module            -> BaseModule, FnModule
+    module.py    Module            -> BaseModule
     context.py   Ctx               -> Ctx
     agent.py     Agent             -> Agent
-    roles.py     Inspectable, Editor, Workspace, Speaker, InnerVoice
+    roles.py     Editor, Workspace, InnerVoice
                                    -> the classes in examples/
 
 `Module` is the floor: a queue and a way to handle one task. `Agent` adds a
@@ -14,15 +14,13 @@ for.
 from .agent import Agent
 from .context import Ctx
 from .module import Module
-from .roles import Editor, InnerVoice, Inspectable, Speaker, Workspace
+from .roles import Editor, InnerVoice, Workspace
 
 __all__ = [
     "Module",
     "Ctx",
     "Agent",
-    "Inspectable",
     "Editor",
     "Workspace",
-    "Speaker",
     "InnerVoice",
 ]

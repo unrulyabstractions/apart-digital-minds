@@ -12,9 +12,8 @@ import tempfile
 from pathlib import Path
 
 from src import Agent, BaseModule, Ctx, Message, Mind, Text, get_llm, taped, texts
-from src.api import Host
 from src.api import Mind as MindInterface
-from src.dminds import RunTracer, TickScheduler
+from src.dminds import Host, RunTracer, TickScheduler
 
 
 def quiet(**kwargs) -> Mind:
@@ -31,13 +30,17 @@ class Echoer(BaseModule):
 # -- the interface ---------------------------------------------------------
 
 
-def test_mind_satisfies_both_its_interfaces():
+def test_mind_implements_the_external_interface():
     assert MindInterface in Mind.__mro__
-    assert Host in Mind.__mro__
 
 
-def test_host_is_narrower_than_mind():
-    """A module gets a Host, which cannot add modules or drive the clock."""
+def test_host_is_internal_and_narrower_than_mind():
+    """`Host` is the runtime's view, not part of the external api."""
+    import src.api
+
+    assert not hasattr(src.api, "Host"), "Host is machinery, not external api"
+    assert not hasattr(src.api, "Scheduler"), "so is Scheduler"
+
     host_names = {n for n in dir(Host) if not n.startswith("_")}
     mind_names = {n for n in dir(MindInterface) if not n.startswith("_")}
     assert "stage" in host_names and "deliver" in host_names

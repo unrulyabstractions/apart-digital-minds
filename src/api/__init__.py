@@ -4,27 +4,33 @@ Nothing here imports from `src.dminds`. The dependency points one way, so you
 can replace any implementation without disturbing the vocabulary the other
 parts speak.
 
+    mind.py          Mind, the thing you build and drive
+    constants.py     WORLD, WILDCARD
+    errors.py        RunawayMind, UndeclaredChannel
+
     types/           the data that crosses every boundary
       messages.py      ChatMessage, Completion, GenOptions, Usage
       payloads.py      Payload, Text, Context, Vector
-      tasks.py         Task, Route
+      messages_flow.py Message, Link
       records.py       Episode, Event
 
     modules/         the things that live inside a mind
-      module.py        Module, Handler   -> BaseModule, FnModule
+      module.py        Module            -> BaseModule
       context.py       Ctx               -> Ctx
-      agent.py         Agent             -> Agent
-      roles.py         Inspectable, Editor, Workspace, Speaker, InnerVoice
+      agent.py         Agent             -> Subject, Ego, your own
+      roles.py         Editor, Workspace, InnerVoice
 
-    models/          llm.py    LLM       -> BaseLLM, the providers, Cassette
-    memory/          stores.py MessageStore, KeyValueStore, EpisodicStore
-                                         -> Transcript, Scratchpad, Journal
-    observability/   sinks.py  Sink      -> the four sinks
+    models/          llm.py     LLM          -> BaseLLM, the providers
+                     factory.py ModelFactory -> get_llm, taped(...)
+    memory/          stores.py  MessageStore, KeyValueStore, EpisodicStore
+                                            -> Transcript, Scratchpad, Journal
+    observability/   sinks.py   Sink         -> the four sinks
                      tracing.py Logger, Tracer -> ModuleLog, RunTracer
-                     kinds.py  the event kinds
-    runtime/         router.py Router    -> Bus
-                     scheduler.py Scheduler -> TickScheduler
-                     host.py   Host      -> Mind
+                     kinds.py   the event kinds
+
+This is the external surface and nothing else. The scheduler, and the narrow
+view a module gets of its host, are machinery you never call; they live in
+`src.dminds` beside the code that uses them.
 
 Write against these when you want to swap a part.
 
@@ -33,20 +39,10 @@ Write against these when you want to swap a part.
     from src import Mind, Agent, get_llm           # both, flat
 """
 
-from .memory import EpisodicStore, KeyValueStore, MessageStore, Recallable
-from .models import LLM
-from .modules import (
-    Agent,
-    Ctx,
-    Editor,
-    InnerVoice,
-    Inspectable,
-    Module,
-    Speaker,
-    Workspace,
-)
+from .memory import EpisodicStore, KeyValueStore, MessageStore
+from .models import LLM, ModelFactory
+from .modules import Agent, Ctx, Editor, InnerVoice, Module, Workspace
 from .observability import (
-    EVENT_KINDS,
     HANDLE_END,
     HANDLE_ERROR,
     HANDLE_START,
@@ -63,17 +59,9 @@ from .observability import (
     Sink,
     Tracer,
 )
-from .runtime import (
-    WILDCARD,
-    WORLD,
-    Host,
-    Mind,
-    ModelFactory,
-    RunawayMind,
-    Scheduler,
-    SchedulerFactory,
-    TracerFactory,
-)
+from .constants import WILDCARD, WORLD
+from .errors import RunawayMind, UndeclaredChannel
+from .mind import Mind
 from .types import (
     ChatMessage,
     Completion,
@@ -82,15 +70,12 @@ from .types import (
     Event,
     GenOptions,
     Payload,
-    Role,
     Link,
     Message,
-    Channel,
     Text,
     Usage,
     Vector,
     assistant,
-    preview,
     system,
     user,
 )
@@ -101,28 +86,22 @@ __all__ = [
     "Agent",
     "Ctx",
     # roles
-    "Inspectable",
     "Editor",
     "Workspace",
-    "Speaker",
     "InnerVoice",
     # other interfaces
     "LLM",
     "MessageStore",
     "KeyValueStore",
     "EpisodicStore",
-    "Recallable",
     "Sink",
     "Logger",
     "Tracer",
-    "Scheduler",
-    "Host",
     "Mind",
     "RunawayMind",
+    "UndeclaredChannel",
     # factories
     "ModelFactory",
-    "SchedulerFactory",
-    "TracerFactory",
     # data
     "Text",
     "Context",
@@ -130,22 +109,18 @@ __all__ = [
     "Payload",
     "Message",
     "Link",
-    "Channel",
     "Event",
     "Episode",
     "ChatMessage",
     "Completion",
     "Usage",
     "GenOptions",
-    "Role",
     "system",
     "user",
     "assistant",
-    "preview",
     # constants
     "WORLD",
     "WILDCARD",
-    "EVENT_KINDS",
     "TICK_START",
     "TICK_END",
     "TASK_EMIT",

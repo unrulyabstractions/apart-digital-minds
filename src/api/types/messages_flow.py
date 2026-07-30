@@ -52,18 +52,3 @@ class Link:
             return f"{self.src} --*--> {self.dst} (every channel, named as sent)"
         renamed = f" as {self.as_channel}" if self.as_channel != self.channel else ""
         return f"{self.src} --{self.channel}--> {self.dst}{renamed}"
-
-
-@dataclass(frozen=True, slots=True)
-class Channel:
-    """One declared output of a module.
-
-    Declaring outputs is what makes a module readable without reading its
-    body, and it lets a mistyped registration fail at wiring time.
-    """
-
-    name: str
-    carries: str = ""
-
-    def describe(self) -> str:
-        return f"{self.name}: {self.carries}" if self.carries else self.name

@@ -10,7 +10,6 @@ every module and every model call is guaranteed to speak.
 """
 
 from .kinds import (
-    EVENT_KINDS,
     HANDLE_END,
     HANDLE_ERROR,
     HANDLE_START,
@@ -31,7 +30,6 @@ __all__ = [
     "Sink",
     "Logger",
     "Tracer",
-    "EVENT_KINDS",
     "TICK_START",
     "TICK_END",
     "TASK_EMIT",

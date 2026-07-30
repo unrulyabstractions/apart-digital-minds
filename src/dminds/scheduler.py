@@ -31,6 +31,7 @@ The lock-step this produces is exactly the target/interceptor protocol:
 from __future__ import annotations
 
 import asyncio
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from ..api.modules import Module
@@ -41,12 +42,36 @@ from ..api.observability import (
     TICK_END,
     TICK_START,
 )
-from ..api.runtime import RunawayMind, Scheduler
+from ..api.errors import RunawayMind
 from ..api.types import Message
 from .module import Ctx
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ..api.runtime import Host
+    from .host import Host
+
+
+class Scheduler(ABC):
+    """Internal: the clock. This is where "one step" is defined.
+
+    Not part of the external surface. You drive a mind with `process` and
+    `process_one`; this is the machinery underneath. Subclass it and pass the
+    factory as `Mind(scheduler=...)` to change what a tick means.
+    """
+
+    #: The tick about to run, or being run.
+    t: int
+
+    @abstractmethod
+    async def tick(self) -> int:
+        """Run one tick. Returns how many modules took a turn."""
+
+    @abstractmethod
+    def is_idle(self) -> bool:
+        """True when no module has work."""
+
+    @abstractmethod
+    async def run_until_idle(self, max_ticks: int | None = None) -> int:
+        """Tick until nothing has work. Returns the number of ticks run."""
 
 
 class TickScheduler(Scheduler):

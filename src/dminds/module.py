@@ -31,22 +31,18 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Mapping
 from ..api.modules import Ctx as CtxProtocol
 from ..api.modules import Module
 from ..api.observability import Logger
-from ..api.runtime import WILDCARD
+from ..api.constants import WILDCARD
+from ..api.errors import UndeclaredChannel
 from ..api.types import Link, Message, Payload
 
 if TYPE_CHECKING:  # pragma: no cover
-    from ..api.runtime import Host
+    from .host import Host
 
 
 def handler_name(channel: str) -> str:
     """`"inspect.context"` -> `"on_inspect_context"`."""
     safe = "".join(c if c.isalnum() or c == "_" else "_" for c in channel)
     return f"on_{safe}"
-
-
-class UndeclaredChannel(ValueError):
-    """A module emitted on, or was registered against, a channel it never
-    declared in `OUTPUTS`."""
 
 
 @dataclass
@@ -246,29 +242,3 @@ class BaseModule(Module):
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.name} pending={self.pending}>"
-
-
-class FnModule(BaseModule):
-    """Wraps a plain function as a module, for glue and quick probes.
-
-        FnModule("counter", lambda msg, ctx: ctx.emit("n", 1), outputs={"n": "a count"})
-
-    The function may be sync or async and is called for every message.
-    """
-
-    def __init__(
-        self,
-        name: str,
-        fn: Callable[[Message, Ctx], Any],
-        outputs: Mapping[str, str] | None = None,
-    ):
-        super().__init__(name)
-        self.fn = fn
-        if outputs is not None:
-            # Per-instance channels, so one class can serve many shapes.
-            self.OUTPUTS = dict(outputs)
-
-    async def on_input(self, message: Message, ctx: Ctx) -> None:
-        result = self.fn(message, ctx)
-        if hasattr(result, "__await__"):
-            await result
