@@ -17,13 +17,17 @@ so the simplest mind is a subject and nothing else.
 Every channel is one-directional and means one thing. No module consumes what
 it produces, so the path cannot loop and no stage has to know when to stop.
 
-    subject   reads  prompt     writes  context, reply, thought
-    stage     reads  context    writes  revision
-    ego       reads  context    writes  reply
+    subject   reads  prompt           writes  subject_context, reply, thought
+    stage     reads  subject_context  writes  ego_input
+    ego       reads  ego_input        writes  reply
 
-A stage's `revision` is renamed to `context` on the wire, so the next hop
-cannot tell an editor from the subject. The names differ at the module so
-that no module consumes what it produces.
+The two window channels are named for the ends of the path, so one stage
+between them needs no renaming at all: the subject emits `subject_context`,
+the stage emits `ego_input`, and the ego reads exactly that.
+
+Chain two stages and the middle link is renamed on the wire, because the
+second stage still reads `subject_context` when what reached it came from an
+editor. That is the price of names this direct, and `describe` shows it.
 """
 
 from __future__ import annotations
@@ -45,7 +49,7 @@ class Subject(Agent):
 
     INPUTS = {"prompt": "something to answer, as Text"}
     OUTPUTS = {
-        "context": "the whole context window after this turn, as Context",
+        "subject_context": "its whole window after this turn, as Context",
         "reply": "what it said, with reasoning stripped out, as Text",
         "thought": "the reasoning it did, if it was tagged, as Text",
     }
@@ -70,7 +74,7 @@ class Subject(Agent):
             ctx.emit("thought", Text(thoughts[-1]))
         ctx.emit("reply", Text(visible))
         ctx.emit(
-            "context",
+            "subject_context",
             Context([m.copy() for m in self.transcript.messages], note=f"after {tag}"),
         )
 
@@ -86,7 +90,7 @@ class Ego(Agent):
     from the subject.
     """
 
-    INPUTS = {"context": "a context window to speak from, as Context"}
+    INPUTS = {"ego_input": "the window to speak from, as Context"}
     OUTPUTS = {"reply": "what it says, as Text"}
 
     async def on_input(self, message: Message, ctx: Ctx) -> None:

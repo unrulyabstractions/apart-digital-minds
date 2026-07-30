@@ -468,3 +468,29 @@ tests when the count was 106. The audit was then done directly.
 | 109 | README snippets | Extracted all 21 python blocks and ran them. 12 run standalone; the other 5 are fragments naming objects the reader supplies, so each was run verbatim against real stand-ins (`Stage`, `MySubject`, `MyScheduler`, `SlackSink`, `MyLLM`) | VERIFIED (17/17 executable blocks; 4 are shell or prose) |
 | 110 | Correctness probes | Seven written and run: `intercept()` with no ego and no stages, `intercept()` before a subject exists, state leaking between prompts, `unregister` removing exactly one of two identical links, undeclared emit not bypassable through `ctx.emit`, two identical runs producing identical event sequences, and nothing emitted at tick t being visible before t+1 | VERIFIED (7/7) |
 | 111 | Suite, examples, traces | 106 tests; four examples; every trace re-opened | VERIFIED |
+
+## 2026-07-30 — window channels named for the ends of the path
+
+`revision` was the second guess and still described a transformation rather
+than a role. Named for the two ends instead, at the user's direction:
+
+    subject   reads  prompt           writes  subject_context, reply, thought
+    stage     reads  subject_context  writes  ego_input
+    ego       reads  ego_input        writes  reply
+
+The payoff is that a single stage, which is what both examples and the README
+use, needs no renaming at all. The cost, raised before the choice was made and
+accepted, is that a chain of two renames its middle link, because a second
+stage still reads `subject_context` when what reached it came from an editor.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 112 | One stage renames nothing | Ran example 02 and read its links table: `subject --subject_context--> interceptor`, `interceptor --ego_input--> ego` | VERIFIED |
+| 113 | Zero stages renames once | Built a mind with an ego and no stage: `subject --subject_context--> ego as ego_input` | VERIFIED |
+| 114 | Two stages rename the middle link only | Built it: `subject --subject_context--> one`, `one --ego_input--> two as subject_context`, `two --ego_input--> ego` | VERIFIED, and it is the documented cost rather than a surprise |
+| 115 | The atomic rule still holds | Enumerated INPUTS and OUTPUTS for `Subject`, `Ego`, and every class in every example | VERIFIED (5 classes, no overlap) |
+| 116 | Suite, examples, traces | 106 tests; four examples; every trace re-opened | VERIFIED |
+| 117 | README Critic snippet | Rewrote it to the new names and ran it through a real `intercept` pipeline | VERIFIED |
+| 118 | Real Qwen after the rename | Re-ran example 02 with `SUBJECT_MODEL=hf:Qwen/Qwen3-0.6B` | VERIFIED |

@@ -131,9 +131,9 @@ prompt -> subject -> [stages] -> ego -> world
 
 | Part | Reads | Writes |
 | --- | --- | --- |
-| `subject` | `prompt` | `context`, `reply`, `thought` |
-| stage | `context` | `revision` |
-| `ego` | `context` | `reply` |
+| `subject` | `prompt` | `subject_context`, `reply`, `thought` |
+| stage | `subject_context` | `ego_input` |
+| `ego` | `ego_input` | `reply` |
 
 **subject** is the target model, the thing an experiment is about. It thinks and
 publishes what it thought. **stages** sit in between; each takes a context and
@@ -156,16 +156,18 @@ mind.intercept(interceptor)     # prompt -> subject -> interceptor -> ego -> wor
 shorthand for `register` calls and nothing else. That one line is exactly:
 
 ```python
-mind.subject.register(interceptor, "context")
-interceptor.register(mind.ego, "revision", as_channel="context")
+mind.subject.register(interceptor, "subject_context")
+interceptor.register(mind.ego, "ego_input")
 mind.ego.register(mind.world, "reply")
 ```
 
-A stage does not own the mind's context; it proposes a version of it, which
-is why the two names differ. The rename on the wire means the ego still hears
-`context` and cannot tell an editor from the subject. Keeping the names apart
-is also what stops a module consuming what it produces, so the path cannot
-loop.
+The two window channels are named for the ends of the path, so a single stage
+between them needs no renaming at all: the wiring reads the way it runs. It is
+also what stops a module consuming what it produces, so the path cannot loop.
+
+Chain two stages and the middle link is renamed, because the second still
+reads `subject_context` when what reached it came from an editor. That is the
+price of names this direct, and `mind.describe()` shows every rename.
 
 Write those yourself when the shape is not a line. `Mind(..., autowire=False)`
 lays out nothing, and `mind.describe()` marks the laid-out links `[auto]` so
@@ -239,8 +241,8 @@ picture.
 from src import Agent, user
 
 class Critic(Agent):
-    INPUTS = {"context": "somebody's context window"}
-    OUTPUTS = {"revision": "my version of it, annotated"}
+    INPUTS = {"subject_context": "the subject's window"}
+    OUTPUTS = {"ego_input": "what the ego gets fed, annotated"}
 
     async def on_process(self, ctx):
         for message in self.take_inputs():
@@ -251,7 +253,7 @@ class Critic(Agent):
             )
             revision = message.payload.copy()
             revision.messages.append(completion.as_message(stage="critique"))
-            ctx.emit("revision", revision)
+            ctx.emit("ego_input", revision)
 ```
 
 The default `on_input` buffers into `self.inputs`; `take_inputs()` drains that
@@ -275,20 +277,20 @@ wiring time rather than silently dropping messages.
 
 ```python
 class Critic(Agent):
-    INPUTS  = {"context": "somebody's context window"}
-    OUTPUTS = {"revision": "my version of it, annotated"}
+    INPUTS  = {"subject_context": "the subject's window"}
+    OUTPUTS = {"ego_input": "what the ego gets fed, annotated"}
 ```
 
 Wiring lives on the modules. The mind has no routing table and no opinion about
 who talks to whom.
 
 ```python
-mind.subject.register(critic, "context")
-critic.register(monitor, "revision", as_channel="overheard")
+mind.subject.register(critic, "subject_context")
+critic.register(monitor, "ego_input", as_channel="overheard")
 mind.subject.register(blackboard, "*")   # a workspace hears everything
 ```
 
-Renaming matters: the critic emits `"revision"` and the monitor hears
+Renaming matters: the critic emits `"ego_input"` and the monitor hears
 `"overheard"`, so neither module knows the other's vocabulary. `"*"` forwards
 every channel under its real name, which is how a monitor attaches.
 

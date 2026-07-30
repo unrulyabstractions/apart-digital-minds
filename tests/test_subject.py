@@ -78,7 +78,7 @@ def test_a_built_model_can_be_passed_instead_of_a_spec():
 
 
 def test_the_subject_publishes_context_reply_and_thought():
-    assert set(Subject.OUTPUTS) == {"context", "reply", "thought"}
+    assert set(Subject.OUTPUTS) == {"subject_context", "reply", "thought"}
 
 
 def test_context_carries_the_whole_window():
@@ -96,7 +96,7 @@ def test_context_carries_the_whole_window():
 
     async def run():
         mind = quiet(model=get_llm("echo:", script=["ok"]), system="rules")
-        mind.subject.register(Reader("reader"), "context")
+        mind.subject.register(Reader("reader"), "subject_context")
         mind.prompt("hi")
         await mind.process()
         mind.close()
@@ -152,11 +152,11 @@ def test_a_stage_edits_the_context_on_its_way_to_the_ego():
     from src import BaseModule, Context, user
 
     class Rewriter(BaseModule):
-        INPUTS = {"context": "the subject's window"}
-        OUTPUTS = {"revision": "a replacement"}
+        INPUTS = {"subject_context": "the subject's window"}
+        OUTPUTS = {"ego_input": "a replacement"}
 
         async def on_input(self, message: Message, ctx: Ctx) -> None:
-            ctx.emit("revision", Context([user("a totally different history")]))
+            ctx.emit("ego_input", Context([user("a totally different history")]))
 
     async def run():
         mind = quiet(
@@ -299,15 +299,18 @@ def test_with_an_ego_the_reply_comes_from_the_ego():
 
     out, links = asyncio.run(run())
     assert out == ["the ego's answer"], "the subject's reply is not what reaches you"
-    assert links == ["subject --context--> ego", "ego --reply--> world"]
+    assert links == [
+        "subject --subject_context--> ego as ego_input",
+        "ego --reply--> world",
+    ]
 
 
 def test_intercept_lays_out_subject_then_stages_then_ego():
     from src import BaseModule
 
     class Stage(BaseModule):
-        INPUTS = {"context": "in"}
-        OUTPUTS = {"revision": "out"}
+        INPUTS = {"subject_context": "in"}
+        OUTPUTS = {"ego_input": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
     mind.intercept(Stage("one"), Stage("two"))
@@ -316,9 +319,9 @@ def test_intercept_lays_out_subject_then_stages_then_ego():
     mind.close()
     assert stages == ["one", "two"]
     assert links == sorted([
-        "subject --context--> one",
-        "one --revision--> two as context",
-        "two --revision--> ego as context",
+        "subject --subject_context--> one",
+        "one --ego_input--> two as subject_context",
+        "two --ego_input--> ego",
         "ego --reply--> world",
     ])
 
@@ -327,8 +330,8 @@ def test_intercepting_again_discards_the_previous_layout():
     from src import BaseModule
 
     class Stage(BaseModule):
-        INPUTS = {"context": "in"}
-        OUTPUTS = {"revision": "out"}
+        INPUTS = {"subject_context": "in"}
+        OUTPUTS = {"ego_input": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
     mind.intercept(Stage("one"))
@@ -337,8 +340,8 @@ def test_intercepting_again_discards_the_previous_layout():
     mind.close()
     assert "one" not in " ".join(links), "the old layout should be gone"
     assert links == sorted([
-        "subject --context--> two",
-        "two --revision--> ego as context",
+        "subject --subject_context--> two",
+        "two --ego_input--> ego",
         "ego --reply--> world",
     ])
 
@@ -347,8 +350,8 @@ def test_a_stage_joins_the_mind_by_being_intercepted():
     from src import BaseModule
 
     class Stage(BaseModule):
-        INPUTS = {"context": "in"}
-        OUTPUTS = {"revision": "out"}
+        INPUTS = {"subject_context": "in"}
+        OUTPUTS = {"ego_input": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
     mind.intercept(Stage("middle"))
@@ -360,7 +363,7 @@ def test_a_stage_joins_the_mind_by_being_intercepted():
 def test_the_ego_reads_context_and_writes_reply():
     from src import Ego
 
-    assert set(Ego.INPUTS) == {"context"}
+    assert set(Ego.INPUTS) == {"ego_input"}
     assert set(Ego.OUTPUTS) == {"reply"}
     assert set(Ego.INPUTS) & set(Ego.OUTPUTS) == set()
 
@@ -370,8 +373,8 @@ def test_relayout_keeps_wiring_it_did_not_create():
     from src import BaseModule
 
     class Stage(BaseModule):
-        INPUTS = {"context": "in"}
-        OUTPUTS = {"revision": "out"}
+        INPUTS = {"subject_context": "in"}
+        OUTPUTS = {"ego_input": "out"}
 
     class Spy(BaseModule):
         pass
@@ -390,8 +393,8 @@ def test_intercept_is_exactly_the_register_calls_it_documents():
     from src import BaseModule
 
     class Stage(BaseModule):
-        INPUTS = {"context": "in"}
-        OUTPUTS = {"revision": "out"}
+        INPUTS = {"subject_context": "in"}
+        OUTPUTS = {"ego_input": "out"}
 
     laid_out = quiet(model="echo:", ego="echo:")
     laid_out.intercept(Stage("interceptor"))
@@ -400,8 +403,8 @@ def test_intercept_is_exactly_the_register_calls_it_documents():
 
     by_hand = quiet(model="echo:", ego="echo:", autowire=False)
     stage = Stage("interceptor")
-    by_hand.subject.register(stage, "context")
-    stage.register(by_hand.ego, "revision", as_channel="context")
+    by_hand.subject.register(stage, "subject_context")
+    stage.register(by_hand.ego, "ego_input")
     by_hand.ego.register(by_hand.world, "reply")
     manual = sorted(ln.describe() for ln in by_hand.links())
     by_hand.close()

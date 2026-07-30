@@ -209,18 +209,20 @@ class Mind(MindInterface):
     def intercept(self, *stages: Module) -> list[Module]:
         """Put `stages` between the subject and whoever speaks.
 
-        A stage reads `context` and writes `revision`. The two names are
-        different on purpose: no module consumes what it produces, which is
-        the rule that keeps the path loop-free. On the wire, each `revision`
-        is renamed so the next hop still hears `context` and never knows it
-        was preceded by an editor rather than the subject.
+        A stage reads `subject_context` and writes `ego_input`, named for the
+        two ends of the path. With one stage the names already line up, so
+        nothing is renamed and the wiring reads exactly as it runs.
 
         Shorthand for `register` calls and nothing else: with one stage and
         an ego, `mind.intercept(editor)` is exactly
 
-            mind.subject.register(editor, "context")
-            editor.register(mind.ego, "revision", as_channel="context")
+            mind.subject.register(editor, "subject_context")
+            editor.register(mind.ego, "ego_input")
             mind.ego.register(mind.world, "reply")
+
+        With no stage the subject is renamed straight onto the ego, and with
+        two or more the middle links are renamed, since a second stage still
+        reads `subject_context`. `describe` shows every rename.
 
         Write those yourself when the shape is not a line, or pass
         `autowire=False` and wire everything with the one verb.
@@ -247,11 +249,12 @@ class Mind(MindInterface):
             chain.append(self.ego)
 
         for producer, consumer in zip(chain, chain[1:]):
-            # The subject emits `context`; every stage emits `revision`. The
-            # rename keeps what the consumer hears uniform.
-            channel = "context" if producer is self.subject else "revision"
+            # Each end uses its own name. With one stage the two already agree,
+            # so nothing is renamed; a longer chain renames the middle links.
+            emits = "subject_context" if producer is self.subject else "ego_input"
+            hears = "ego_input" if consumer is self.ego else "subject_context"
             self._auto_links.append(
-                (producer, producer.register(consumer, channel, as_channel="context"))
+                (producer, producer.register(consumer, emits, as_channel=hears))
             )
         self._auto_links.append(
             (speaker, speaker.register(self.world, "reply"))
