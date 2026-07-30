@@ -13,10 +13,12 @@ The pipeline:
 Nothing here is special-cased in the runtime. The lock-step falls out of the
 one scheduling rule: what you emit at tick t arrives at tick t+1.
 
-Every channel is one-directional. The subject reads `prompt` and writes
-`context`; the interceptor reads `context` and writes `context`; the ego reads
-`context` and writes `reply`. Nothing sends anything back, so there is no loop
-and no stage has to know when to stop.
+Every channel is one-directional and no module consumes what it produces.
+The subject reads `prompt` and writes `context`; the interceptor reads
+`context` and writes `revised`; the ego reads `context` and writes `reply`.
+On the wire the interceptor's `revised` is renamed to `context`, so the ego
+cannot tell an editor from the subject. Nothing sends anything back, so there
+is no loop and no stage has to know when to stop.
 
 Each role picks its model in this order: the environment variable, then a
 local Qwen3 if Ollama has one, then a scripted stand-in so this always runs.
@@ -64,12 +66,12 @@ class Interceptor(Agent, Editor):
     """
 
     INPUTS = {"context": "the subject's context window"}
-    OUTPUTS = {"context": "the same window, with the last thought rewritten"}
+    OUTPUTS = {"revised": "that window, with the last thought rewritten"}
 
     async def on_process(self, ctx: Ctx) -> None:
         """The turn: revise every window that arrived, pass each along."""
         for message in self.take_inputs():
-            ctx.emit("context", await self.revise(message.payload))
+            ctx.emit("revised", await self.revise(message.payload))
 
     async def revise(self, payload: Payload) -> Payload:
         """Rewrite the last thought in the window."""

@@ -132,7 +132,7 @@ prompt -> subject -> [stages] -> ego -> world
 | Part | Reads | Writes |
 | --- | --- | --- |
 | `subject` | `prompt` | `context`, `reply`, `thought` |
-| stage | `context` | `context` |
+| stage | `context` | `revised` |
 | `ego` | `context` | `reply` |
 
 **subject** is the target model, the thing an experiment is about. It thinks and
@@ -143,9 +143,9 @@ whatever context reaches it, including an edited one, and cannot tell.
 The ego is optional. Without one the subject's own reply goes straight to you, so
 the simplest mind is a subject and nothing else.
 
-Every channel is one-directional and means one thing. The subject never consumes
-what it produces, so **the pipeline cannot loop** and no stage has to know when
-to stop.
+Every channel is one-directional and means one thing. No module consumes what
+it produces, so **the path cannot loop** and no stage has to know when to
+stop.
 
 ```python
 mind = Mind("study", "openai:gpt-5", ego="ollama:qwen3:8b")
@@ -157,9 +157,14 @@ shorthand for `register` calls and nothing else. That one line is exactly:
 
 ```python
 mind.subject.register(interceptor, "context")
-interceptor.register(mind.ego, "context")
+interceptor.register(mind.ego, "revised", as_channel="context")
 mind.ego.register(mind.world, "reply")
 ```
+
+A stage reads `context` and writes `revised`: no module consumes what it
+produces, which is the rule that keeps the path loop-free. The rename on the
+wire means the ego still hears `context` and cannot tell an editor from the
+subject.
 
 Write those yourself when the shape is not a line. `Mind(..., autowire=False)`
 lays out nothing, and `mind.describe()` marks the laid-out links `[auto]` so
@@ -234,7 +239,7 @@ from src import Agent, user
 
 class Critic(Agent):
     INPUTS = {"context": "somebody's context window"}
-    OUTPUTS = {"context": "the same window, annotated"}
+    OUTPUTS = {"revised": "that window, annotated"}
 
     async def on_process(self, ctx):
         for message in self.take_inputs():
@@ -245,7 +250,7 @@ class Critic(Agent):
             )
             revised = message.payload.copy()
             revised.messages.append(completion.as_message(stage="critique"))
-            ctx.emit("context", revised)
+            ctx.emit("revised", revised)
 ```
 
 The default `on_input` buffers into `self.inputs`; `take_inputs()` drains that
@@ -270,7 +275,7 @@ wiring time rather than silently dropping messages.
 ```python
 class Critic(Agent):
     INPUTS  = {"context": "somebody's context window"}
-    OUTPUTS = {"context": "the same window, annotated"}
+    OUTPUTS = {"revised": "that window, annotated"}
 ```
 
 Wiring lives on the modules. The mind has no routing table and no opinion about
@@ -278,12 +283,11 @@ who talks to whom.
 
 ```python
 mind.subject.register(critic, "context")
-critic.register(monitor, "context", as_channel="overheard")
-critic.register(mind.world, "reply")
+critic.register(monitor, "revised", as_channel="overheard")
 mind.subject.register(blackboard, "*")   # a workspace hears everything
 ```
 
-Renaming matters: the critic emits `"context"` and the monitor hears
+Renaming matters: the critic emits `"revised"` and the monitor hears
 `"overheard"`, so neither module knows the other's vocabulary. `"*"` forwards
 every channel under its real name, which is how a monitor attaches.
 

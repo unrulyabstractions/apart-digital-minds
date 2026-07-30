@@ -63,7 +63,7 @@ class Voice(Agent, InnerVoice):
     """
 
     INPUTS = {"context": "what the subject was thinking"}
-    OUTPUTS = {"context": "the same window, with a voice in it"}
+    OUTPUTS = {"revised": "that window, with a voice in it"}
 
     async def utter(self, situation: str) -> str:
         """Say something about the situation, to no one in particular."""
@@ -91,7 +91,7 @@ class Voice(Agent, InnerVoice):
             )
             ctx.log.note("a voice spoke", said=heard[:70])
             ctx.emit(
-                "context", Context(messages, note=f"with a voice from {self.name}")
+                "revised", Context(messages, note=f"with a voice from {self.name}")
             )
 
 

@@ -63,11 +63,12 @@ class Mind(ABC):
     def intercept(self, *stages: Module) -> list[Module]:
         """Put `stages` between the subject and whoever speaks.
 
-        Shorthand for `register` calls and nothing else. With one stage and an
-        ego it is exactly:
+        A stage reads `context` and writes `revised`; no module consumes what
+        it produces. Shorthand for `register` calls and nothing else. With one
+        stage and an ego it is exactly:
 
             mind.subject.register(stage, "context")
-            stage.register(mind.ego, "context")
+            stage.register(mind.ego, "revised", as_channel="context")
             mind.ego.register(mind.world, "reply")
 
         Write those yourself when the shape is not a line.

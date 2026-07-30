@@ -14,13 +14,16 @@ A mind is a pipeline with a fixed shape:
 The ego is optional. Without one the subject's own reply goes straight to you,
 so the simplest mind is a subject and nothing else.
 
-Every channel is one-directional and means one thing. The subject never
-consumes what it produces, so the pipeline cannot loop and no stage has to know
-when to stop.
+Every channel is one-directional and means one thing. No module consumes what
+it produces, so the path cannot loop and no stage has to know when to stop.
 
     subject   reads  prompt     writes  context, reply, thought
-    stage     reads  context    writes  context
+    stage     reads  context    writes  revised
     ego       reads  context    writes  reply
+
+A stage's `revised` is renamed to `context` on the wire, so the next hop
+cannot tell an editor from the subject. The names differ at the module so
+that no module consumes what it produces.
 """
 
 from __future__ import annotations
