@@ -11,6 +11,14 @@ The protocol, one module per tick:
 Nothing here is special-cased in the runtime. The lock-step falls out of the
 one scheduling rule: what you emit at tick t arrives at tick t+1.
 
+Each half declares its role:
+
+    target        Agent + Inspectable. Hands out a view of its own state.
+    interceptor   Agent + Editor. Reads that view and returns a replacement.
+
+The editor never touches the target. It returns a payload, and the target
+decides whether to adopt it.
+
 `EXPORT` controls how much T hands over, covering the three cases you want:
 whole context, one slice of it, or just the message.
 
@@ -30,7 +38,10 @@ from src import (
     Agent,
     Context,
     Ctx,
+    Editor,
+    Inspectable,
     Mind,
+    Payload,
     Task,
     Text,
     get_llm,
@@ -46,12 +57,32 @@ INTERCEPTOR_MODEL = os.environ.get("INTERCEPTOR_MODEL", "echo:")
 EXPORT = os.environ.get("EXPORT", "context")  # context | thought | message
 
 
-class Target(Agent):
-    """The agent that talks to you. It does not know it is being edited."""
+class Target(Agent, Inspectable):
+    """The agent that talks to you. It does not know it is being edited.
+
+    As an `Inspectable` it hands out a view of its own state. What that view
+    contains is configuration, not architecture.
+    """
 
     def __init__(self, *args, export: str = "context", **kwargs):
         super().__init__(*args, **kwargs)
-        self.export = export
+        self.export_mode = export
+
+    # -- Inspectable ---------------------------------------------------
+
+    def export(self) -> Payload:
+        """Whole context, one slice, or just the message. Your choice."""
+        if self.export_mode == "context":
+            return Context(
+                [m.copy() for m in self.transcript.messages], note="full context"
+            )
+        if self.export_mode == "thought":
+            last = self.transcript.last("assistant")
+            thoughts, _ = split_think(last.content if last else "")
+            return Text(thoughts[0] if thoughts else "")
+        return Text(self.transcript.last("assistant").content)
+
+    # -- handlers ------------------------------------------------------
 
     async def on_user_prompt(self, task: Task, ctx: Ctx) -> None:
         """t=0. One iteration, then hand something to the interceptor."""
@@ -59,7 +90,7 @@ class Target(Agent):
         completion = await self.think(tag="draft")
         self.transcript.append(completion.as_message(stage="draft"))
 
-        ctx.emit("inspect", self._export_payload(), to="interceptor")
+        ctx.emit("inspect", self.export(), to="interceptor")
 
     async def on_revision(self, task: Task, ctx: Ctx) -> None:
         """t=2. Adopt the edit and run another iteration on the new context."""
@@ -70,30 +101,21 @@ class Target(Agent):
         self.transcript.append(completion.as_message(stage="final"))
         ctx.emit("reply", Text(strip_think(completion.text)), to="world")
 
-    def _export_payload(self):
-        """Whole context, one slice, or just the message. Your choice."""
-        if self.export == "context":
-            return Context(
-                [m.copy() for m in self.transcript.messages], note="full context"
-            )
-        if self.export == "thought":
-            last = self.transcript.last("assistant")
-            thoughts, _ = split_think(last.content if last else "")
-            return Text(thoughts[0] if thoughts else "")
-        return Text(self.transcript.last("assistant").content)
 
-
-class Interceptor(Agent):
+class Interceptor(Agent, Editor):
     """Reads what the target thought and writes a replacement context.
 
     It runs on its own model. A small local Qwen supervising a large hosted
     model is one line of configuration.
+
+    As an `Editor` it never touches the target. It returns a payload, and the
+    target decides whether to adopt it.
     """
 
-    async def on_inspect(self, task: Task, ctx: Ctx) -> None:
-        """t=1. Rewrite the thought, emit the whole context back."""
-        payload = task.payload
+    # -- Editor --------------------------------------------------------
 
+    async def revise(self, payload: Payload) -> Payload:
+        """Read an export and produce what should replace it."""
         if isinstance(payload, Context):
             messages = [m.copy() for m in payload.messages]
             index = self._last_thinking_index(messages)
@@ -112,25 +134,22 @@ class Interceptor(Agent):
             tag="rewrite",
         )
         new_thought = completion.text.strip()
-
-        ctx.log.note(
-            "rewrote the thought",
-            before=current[:80],
-            after=new_thought[:80],
+        self.log.note(
+            "rewrote the thought", before=current[:80], after=new_thought[:80]
         )
 
         if index is None:
-            # Nothing to splice into. Send the new thought on its own.
-            ctx.emit("revision", Context([], note="no context supplied"), to="target")
-            return
+            return Context([], note="no context supplied")
 
         messages[index].content = replace_think(messages[index].content, new_thought)
         messages[index].meta["edited_by"] = self.name
-        ctx.emit(
-            "revision",
-            Context(messages, note=f"think block rewritten by {self.name}"),
-            to="target",
-        )
+        return Context(messages, note=f"think block rewritten by {self.name}")
+
+    # -- handlers ------------------------------------------------------
+
+    async def on_inspect(self, task: Task, ctx: Ctx) -> None:
+        """t=1. Revise, and send the replacement back."""
+        ctx.emit("revision", await self.revise(task.payload), to="target")
 
     @staticmethod
     def _last_thinking_index(messages) -> int | None:

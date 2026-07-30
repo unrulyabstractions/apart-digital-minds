@@ -19,6 +19,7 @@ import re
 from typing import Sequence
 
 from ..api.models import LLM
+from ..api.modules import Agent as AgentInterface
 from ..api.observability import LLM_ERROR, LLM_REQUEST, LLM_RESPONSE
 from ..api.types import (
     ChatMessage,
@@ -33,7 +34,7 @@ from .memory import Journal, Scratchpad, Transcript
 from .module import BaseModule, Ctx
 
 
-class Agent(BaseModule):
+class Agent(BaseModule, AgentInterface):
     """A module backed by a chat model.
 
     Args:

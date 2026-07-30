@@ -98,3 +98,31 @@ side, with the plain names kept for the contracts.
 
 The UNVERIFIED provider list still stands. Those five paths were rewritten, not
 executed.
+
+## 2026-07-30 — `Agent` interface added, `api/` split into subpackages
+
+`api.Agent` now exists: a `Module` with a model, a transcript, and `think`.
+`api/modules/roles.py` names five roles the examples play. Each flat file under
+`api/` became a subpackage, so no interface file exceeds 66 lines.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 24 | The dependency still points one way | Re-parsed all 24 files under `src/api` with `ast` after the split | VERIFIED (0 `api -> dminds` imports) |
+| 25 | Every example class declares its role | Loaded all three example modules by path and checked `role in cls.__mro__` for six classes | VERIFIED (6/6: Target, Interceptor, Outer, Inner, Blackboard, Remembering) |
+| 26 | `Agent` implements the new interface | Printed the MRO of `dminds.Agent`; both `api.Agent` and `api.Module` are in it | VERIFIED |
+| 27 | Test suite after the split | Ran `tests/run_tests.py` in the clean pip venv | VERIFIED (50 passed, 0 failed) |
+| 28 | Examples after the split | Ran all four | VERIFIED (4/4 rc=0) |
+| 29 | Behaviour unchanged by the refactor | Compared example 02 and 03 output against the previous run. Same answer, same transcript, same workspace, same `model calls by tick: [(1,'outer'), (1,'inner'), (2,'outer')]` | VERIFIED (byte-identical where it matters) |
+| 30 | No dead imports after the split | AST scan across `src/` | VERIFIED (none) |
+
+### Fixed during verification
+
+- `Blackboard.entries` became a method to satisfy `Workspace`, which broke
+  `render`. Caught by running the example, not by reading.
+- A first pass at `Outer.on_voice` contained an `__import__("src")` expression
+  behind a dead `if False`. Replaced with the `assistant` helper.
+
+The UNVERIFIED provider list still stands. Those five paths were untouched by
+this change.

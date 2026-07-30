@@ -20,9 +20,20 @@ tests/         50 tests, no dependencies
 Nothing in `src/api` imports from `src/dminds`, so you can replace any part
 without disturbing the vocabulary the others speak.
 
+```
+src/api/
+  types/           messages.py  payloads.py  tasks.py  records.py
+  modules/         module.py  context.py  agent.py  roles.py
+  models/          llm.py
+  memory/          stores.py
+  observability/   sinks.py  tracing.py  kinds.py
+  runtime/         router.py  scheduler.py  host.py  constants.py
+```
+
 | Contract | `src/api` | Shipped implementation |
 | --- | --- | --- |
-| Handles tasks | `Module` | `BaseModule`, `FnModule`, `Agent` |
+| Handles tasks | `Module` | `BaseModule`, `FnModule` |
+| Handles tasks, with a model | `Agent` | `Agent` |
 | Given to a handler | `Ctx` | `Ctx` |
 | Answers a conversation | `LLM` | `BaseLLM`, the providers, `Cassette` |
 | Decides who hears what | `Router` | `Bus` |
@@ -35,15 +46,32 @@ without disturbing the vocabulary the others speak.
 | One module's log | `Logger` | `ModuleLog` |
 | Where events go | `Sink` | `JsonlSink`, `PerModuleSink`, `ConsoleSink`, `MemorySink` |
 
-`src/api/types.py` holds the data that crosses every boundary: `Task`,
+`src/api/types/` holds the data that crosses every boundary: `Task`,
 `ChatMessage`, `Completion`, `GenOptions`, `Event`, `Route`, `Episode`, and the
-`Text` / `Context` / `Vector` payloads. Read that file first.
+`Text` / `Context` / `Vector` payloads. Read that package first.
 
 ```python
-from src.api import Module, LLM, Sink        # what to implement
-from src.dminds import Mind, Agent, Bus      # what to use
-from src import Mind, Agent, Module, LLM     # both, flat
+from src.api import Module, Agent, LLM, Sink   # what to implement
+from src.dminds import Mind, Bus, BaseModule   # what to use
+from src import Mind, Agent, get_llm           # both, flat
 ```
+
+### Roles
+
+`src/api/modules/roles.py` names the seams the examples are built on. The
+runtime never checks for them. They exist so a mind you assemble says what each
+part is for, and so two implementations of one role are swappable.
+
+| Role | Contract | Played by |
+| --- | --- | --- |
+| `Inspectable` | `export()` | `examples/02` target |
+| `Editor` | `revise(payload)` | `examples/02` interceptor |
+| `Workspace` | `record()`, `entries()`, `render()` | `examples/03` blackboard |
+| `Speaker` | `deliberate()`, `integrate()` | `examples/03` outer |
+| `InnerVoice` | `utter(situation)` | `examples/03` inner |
+
+Every class in `examples/` declares the roles it plays, so each example reads
+as an implementation of a stated contract rather than an ad-hoc class.
 
 ## Install
 
@@ -300,6 +328,23 @@ async call itself, as `Cassette` does.
 The same holds for the rest. Subclass `api.Scheduler` for a different notion of
 time, satisfy `api.Router` for different routing, or satisfy `api.EpisodicStore`
 to put memory in a real vector database.
+
+An agent is a module with a model and a memory. `api.Agent` is the contract:
+
+```python
+class Agent(Module):
+    llm: LLM
+    transcript: MessageStore
+    scratch: KeyValueStore
+    journal: EpisodicStore | None
+
+    def prompt_messages(self) -> list[ChatMessage]: ...
+    async def think(self, messages=None, opts=None, tag="") -> Completion: ...
+    async def say(self, text, tag="say") -> Completion: ...
+```
+
+Override `prompt_messages` to change context assembly. Pass `messages=` to
+`think` to reason over somebody else's context, which is how a monitor works.
 
 ## What is deliberately absent
 

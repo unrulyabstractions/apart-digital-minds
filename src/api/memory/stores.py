@@ -1,17 +1,15 @@
-"""Interfaces for the three kinds of memory.
+"""The three memory contracts.
 
 They share no base class on purpose. A conversation is a sequence, working
 state is a mapping, and episodic memory is a searchable log. One interface over
 all three would hide what each is for.
-
-Implemented in `src.dminds.memory` by `Transcript`, `Scratchpad`, and `Journal`.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Protocol, Sequence, runtime_checkable
 
-from .types import ChatMessage, Episode
+from ..types import ChatMessage, Episode
 
 
 @runtime_checkable
@@ -78,7 +76,10 @@ class KeyValueStore(Protocol):
 
 @runtime_checkable
 class EpisodicStore(Protocol):
-    """Memory that outlives the process and can be searched."""
+    """Memory that outlives the process and can be searched.
+
+    Satisfy this with a vector database and nothing else has to change.
+    """
 
     def __len__(self) -> int: ...
 

@@ -1,23 +1,19 @@
-"""The interface every chat model satisfies.
-
-One method matters: `chat`. Everything the runtime does with a model goes
-through it, so a provider, a fake, a cache, and a recorder are interchangeable.
-
-Implemented in `src.dminds.llm` by `BaseLLM`, which handles timing and thread
-offload so a provider only writes the synchronous call. Subclass `BaseLLM`
-unless you need something it does not do.
-"""
+"""The interface every chat model satisfies."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Sequence
 
-from .types import ChatMessage, Completion, GenOptions
+from ..types import ChatMessage, Completion, GenOptions
 
 
 class LLM(ABC):
     """A chat model.
+
+    One method matters. Everything the runtime does with a model goes through
+    `chat`, so a hosted provider, a local model, a fake, and a recorder are
+    interchangeable.
 
     Attributes:
         model: the provider's own name for the weights, e.g. `"gpt-5"`.
@@ -35,7 +31,7 @@ class LLM(ABC):
     ) -> Completion:
         """Answer a conversation.
 
-        Must not mutate `messages`. Must set `Completion.model` and should set
+        Must not mutate `messages`. Must set `Completion.model`, and should set
         `latency_s`.
         """
 

@@ -1,31 +1,51 @@
 """The contracts. `src.dminds` implements every one of them.
 
 Nothing here imports from `src.dminds`. The dependency points one way, so you
-can replace any implementation without touching the vocabulary the other parts
-speak.
+can replace any implementation without disturbing the vocabulary the other
+parts speak.
 
-    types.py           the data that crosses every boundary
-    modules.py         Module, Ctx        -> BaseModule, Ctx
-    models.py          LLM                -> BaseLLM and the providers
-    memory.py          MessageStore, KeyValueStore, EpisodicStore
-                                          -> Transcript, Scratchpad, Journal
-    observability.py   Sink, Logger, Tracer
-                                          -> JsonlSink and friends, ModuleLog,
-                                             RunTracer
-    runtime.py         Router, Scheduler, Host
-                                          -> Bus, TickScheduler, Mind
+    types/           the data that crosses every boundary
+      messages.py      ChatMessage, Completion, GenOptions, Usage
+      payloads.py      Payload, Text, Context, Vector
+      tasks.py         Task, Route
+      records.py       Episode, Event
 
-Write against these when you want to swap a part. Import the implementations
-from `src.dminds`, or import both from `src`.
+    modules/         the things that live inside a mind
+      module.py        Module, Handler   -> BaseModule, FnModule
+      context.py       Ctx               -> Ctx
+      agent.py         Agent             -> Agent
+      roles.py         Inspectable, Editor, Workspace, Speaker, InnerVoice
 
-    from src.api import Module, LLM, Sink      # what to implement
-    from src.dminds import Mind, Agent, Bus    # what to use
-    from src import Mind, Agent, Module, LLM   # both, flat
+    models/          llm.py    LLM       -> BaseLLM, the providers, Cassette
+    memory/          stores.py MessageStore, KeyValueStore, EpisodicStore
+                                         -> Transcript, Scratchpad, Journal
+    observability/   sinks.py  Sink      -> the four sinks
+                     tracing.py Logger, Tracer -> ModuleLog, RunTracer
+                     kinds.py  the event kinds
+    runtime/         router.py Router    -> Bus
+                     scheduler.py Scheduler -> TickScheduler
+                     host.py   Host      -> Mind
+
+Write against these when you want to swap a part.
+
+    from src.api import Module, Agent, LLM, Sink   # what to implement
+    from src.dminds import Mind, Bus, BaseModule   # what to use
+    from src import Mind, Agent, get_llm           # both, flat
 """
 
 from .memory import EpisodicStore, KeyValueStore, MessageStore, Recallable
 from .models import LLM
-from .modules import Ctx, Handler, Module
+from .modules import (
+    Agent,
+    Ctx,
+    Editor,
+    Handler,
+    InnerVoice,
+    Inspectable,
+    Module,
+    Speaker,
+    Workspace,
+)
 from .observability import (
     EVENT_KINDS,
     HANDLE_END,
@@ -66,10 +86,18 @@ from .types import (
 )
 
 __all__ = [
-    # interfaces
+    # module interfaces
     "Module",
+    "Agent",
     "Ctx",
     "Handler",
+    # roles
+    "Inspectable",
+    "Editor",
+    "Workspace",
+    "Speaker",
+    "InnerVoice",
+    # other interfaces
     "LLM",
     "MessageStore",
     "KeyValueStore",
