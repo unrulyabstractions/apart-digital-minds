@@ -572,3 +572,34 @@ for hours advertised `ticks 0`. It is now rewritten after every prompt.
 Example 04 passed its run id as the mind name, producing
 `out/runs/loose-0/loose-0/`. Its attempts now share the name `replay-study`,
 so they group.
+
+## 2026-07-30 — playback: pick a recorded run and step through it
+
+A run directory was already a recording. The UI now lists every run under
+`out/runs/` and replays it: play at four speeds, step one event, step to the
+end of a tick, or scrub. The trace, the conversation, and every context window
+are rebuilt from `trace.jsonl` alone.
+
+That last part needed a change to the trace itself. Summaries truncate at 60
+characters, so a trace described a run rather than recording it. Text payloads
+are now stored in full on `task.emit`, and a `memory.write` carries the content
+appended or the whole window replaced. A trace is now a complete recording.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 132 | Traces are complete | Ran example 02 and pulled the prompt, the reply, the 3 appended messages, and the replaced 3-message window straight out of `trace.jsonl` | VERIFIED |
+| 133 | The cost of that completeness | Compared trace sizes before and after | VERIFIED (10888 -> 11942 bytes, about 10%) |
+| 134 | `/recordings` lists runs | Ran all four examples plus the server, then read the endpoint | VERIFIED (10 runs, each with mind, id, ticks, events, models) |
+| 135 | `/recording` returns one | Fetched a run by mind and id | VERIFIED (meta plus 33 events) |
+| 136 | Path traversal is refused | Asked for `mind=../../..` | VERIFIED (404, resolved path checked against `out/runs`) |
+| 137 | Playback reconstructs the truth | Replayed a recording headlessly with the exact logic the page uses, and compared: the prompt, the reply, subject 2 messages, ego 4 messages with 1 marked edited, and the rewritten thought | VERIFIED |
+| 138 | The playback view renders | Screenshotted `?play=...&at=20` and `&at=33` and **looked at both**. Playbar, position counter, tick-grouped trace, rebuilt conversation, and rebuilt windows all correct | VERIFIED |
+| 139 | Suite, examples, imports | 106 tests, four examples, AST scan | VERIFIED |
+
+### Found by looking at the first playback screenshot
+
+The header picker still read `● live` and the pane still read `LIVE TRACE`
+while a recording was on screen: the UI was misreporting its own state. Both
+now switch, and the picker selects the run being shown.

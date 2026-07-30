@@ -96,6 +96,7 @@ class Transcript(MessageStore):
                 MEMORY_WRITE,
                 store="transcript",
                 op="replace_all",
+                window=[m.to_dict() for m in self.messages],
                 summary=f"context replaced: {before} -> {len(self.messages)} messages",
             )
 
@@ -110,6 +111,12 @@ class Transcript(MessageStore):
         )
 
     def _record(self, op: str, message: ChatMessage, **extra: Any) -> None:
+        """Log the write, in full.
+
+        The content is here rather than only in the summary so that a trace is
+        a recording of the window, not a description of one. That is what
+        makes a run playable afterwards.
+        """
         if self.log is None:
             return
         self.log.event(
@@ -117,6 +124,8 @@ class Transcript(MessageStore):
             store="transcript",
             op=op,
             role=message.role,
+            content=message.content,
+            meta=dict(message.meta),
             summary=f"{op} {message.role}: {message.content[:80]}",
             **extra,
         )

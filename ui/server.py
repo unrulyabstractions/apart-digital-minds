@@ -25,7 +25,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -33,6 +33,7 @@ sys.path.insert(0, str(ROOT / "examples"))
 
 import demo_models  # noqa: E402
 from src import Mind, texts  # noqa: E402
+from src.dminds import paths  # noqa: E402
 from src.api import Sink  # noqa: E402
 from src.api.types import Event  # noqa: E402
 
@@ -183,6 +184,52 @@ def windows(mind: Mind) -> list[dict]:
     return out
 
 
+# -- recordings --------------------------------------------------------------
+#
+# A run directory is already a recording: meta.json says what the mind was,
+# trace.jsonl holds every event in order. Playback is reading them back.
+
+
+def recordings(base: Path = paths.RUNS) -> list[dict]:
+    """Every run on disk, newest first."""
+    found = []
+    for meta_path in base.glob("*/*/meta.json"):
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        trace = meta_path.parent / "trace.jsonl"
+        found.append(
+            {
+                "mind": meta_path.parent.parent.name,
+                "run_id": meta_path.parent.name,
+                "started": meta.get("started"),
+                "ticks": meta.get("ticks", 0),
+                "events": meta.get("events", 0),
+                "models": sorted(
+                    {m["model"] for m in meta.get("modules", []) if m.get("model")}
+                ),
+                "size": trace.stat().st_size if trace.exists() else 0,
+            }
+        )
+    return sorted(found, key=lambda r: (r["started"] or "", r["run_id"]), reverse=True)
+
+
+def recording(mind: str, run_id: str, base: Path = paths.RUNS) -> dict | None:
+    """One recording: its meta, and every event it captured."""
+    folder = (base / mind / run_id).resolve()
+    if base.resolve() not in folder.parents or not folder.is_dir():
+        return None  # never read outside out/runs
+    meta_path, trace_path = folder / "meta.json", folder / "trace.jsonl"
+    if not trace_path.exists():
+        return None
+    events = [
+        json.loads(line) for line in trace_path.read_text().splitlines() if line.strip()
+    ]
+    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    return {"meta": meta, "events": events}
+
+
 # -- the server --------------------------------------------------------------
 
 
@@ -284,6 +331,16 @@ def make_handler(app: App):
                     default=str,
                 ).encode()
                 self._send(200, body, "application/json")
+            elif route == "/recordings":
+                self._send(200, json.dumps(recordings()).encode(), "application/json")
+            elif route == "/recording":
+                q = parse_qs(urlsplit(self.path).query)
+                found = recording(q.get("mind", [""])[0], q.get("run", [""])[0])
+                if found is None:
+                    self._send(404, b'{"error":"no such recording"}', "application/json")
+                else:
+                    self._send(200, json.dumps(found, default=str).encode(),
+                               "application/json")
             elif route == "/events":
                 self.stream()
             else:

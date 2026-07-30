@@ -478,6 +478,12 @@ inspector showing every module's channels and every context window. Click a
 model call to read the exact prompt and completion. Tick *step mode* before
 sending and `Step 1 tick` walks the mind forward one tick at a time.
 
+The header picker lists every run under `out/runs/`. Choose one and the UI
+replays it: play, pause, step an event, step a tick, or scrub. The trace, the
+conversation, and every context window are rebuilt from `trace.jsonl` alone,
+because a trace records Text payloads and memory writes in full rather than in
+summary.
+
 The whole integration is one line, because `Sink` already receives everything
 a mind emits:
 

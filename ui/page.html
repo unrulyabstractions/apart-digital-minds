@@ -110,6 +110,25 @@
   .mod-stage{color:var(--stage)} .mod-world{color:var(--world)}
   .mod-runtime{color:var(--runtime)} .mod-other{color:var(--other)}
 
+  /* ---- playback ---- */
+  #source {
+    background:#16202e; color:var(--fg); border:1px solid var(--line2);
+    border-radius:7px; padding:4px 8px; font:12px inherit; max-width:340px;
+  }
+  .playbar {
+    display:flex; align-items:center; gap:8px; padding:8px 14px;
+    border-bottom:1px solid var(--line); background:#0e1621;
+  }
+  .playbar button { padding:4px 10px; font-size:12px; }
+  .playbar select {
+    background:#16202e; color:var(--dim); border:1px solid var(--line2);
+    border-radius:6px; padding:3px 6px; font:11px inherit;
+  }
+  .playbar input[type=range] { flex:1; accent-color:var(--you); min-width:80px; }
+  .pbpos { font-size:11px; color:var(--dim); min-width:74px; text-align:right; }
+  body.playback .composer { opacity:.35; pointer-events:none; }
+  body.playback .dot { background:var(--other); }
+
   /* ---- inspector ---- */
   .tabs { display:flex; gap:4px; }
   .tab {
@@ -149,6 +168,9 @@
     <div>tick <b id="hTick">0</b></div>
     <div>events <b id="hCount">0</b></div>
   </div>
+  <select id="source" title="live, or a recorded run">
+    <option value="">● live</option>
+  </select>
   <div class="status"><span class="dot idle" id="hDot"></span><span id="hState">idle</span></div>
 </header>
 
@@ -171,12 +193,26 @@
   <!-- trace -->
   <section class="pane">
     <div class="pane-head">
-      live trace
+      <span id="traceLabel">live trace</span>
       <div class="spacer"></div>
       <label class="check"><input type="checkbox" id="fLlm" checked> llm</label>
       <label class="check"><input type="checkbox" id="fFlow" checked> messages</label>
       <label class="check"><input type="checkbox" id="fTurns"> turns</label>
       <button id="clear" style="padding:2px 9px;font-size:11px">clear</button>
+    </div>
+    <div class="playbar" id="playbar" hidden>
+      <button id="pbReset" title="back to the start">⏮</button>
+      <button id="pbPlay" class="primary">▶ play</button>
+      <button id="pbEvent" title="one event">step</button>
+      <button id="pbTick" title="to the end of this tick">tick ⏭</button>
+      <select id="pbSpeed">
+        <option value="400">slow</option>
+        <option value="120" selected>normal</option>
+        <option value="30">fast</option>
+        <option value="0">instant</option>
+      </select>
+      <input type="range" id="pbScrub" min="0" value="0" step="1">
+      <span class="pbpos mono" id="pbPos">0 / 0</span>
     </div>
     <div class="scroll mono" id="trace"><div class="empty">Waiting for the first prompt.</div></div>
   </section>
@@ -325,18 +361,134 @@ function setStatus(s, extra) {
 }
 
 function handle(p) {
+  if (document.body.classList.contains("playback")) return;  // watching a recording
   if (p.type === "event")   addEvent(p);
   else if (p.type === "you")   say("you", p.text);
   else if (p.type === "mind")  say("mind", p.text);
   else if (p.type === "error") say("err", p.text);
   else if (p.type === "wiring")  { state.wiring = p.wiring; $("hMind").textContent = p.wiring.run_id; renderInspector(); }
   else if (p.type === "windows") { state.windows = p.windows; renderInspector(); }
-  else if (p.type === "status")  setStatus(p.state, p.ticks != null ? `${p.ticks} ticks` : (p.turns != null ? `${p.turns} turns` : null));
+  else if (p.type === "status") {
+    setStatus(p.state, p.ticks != null ? `${p.ticks} ticks` : (p.turns != null ? `${p.turns} turns` : null));
+    if (p.state === "idle") refreshRecordings();
+  }
 }
 
 // `?still` renders from /state alone, so the page settles and can be captured.
 const still = new URLSearchParams(location.search).has("still");
 if (!still) new EventSource("/events").onmessage = (m) => handle(JSON.parse(m.data));
+
+/* ---------- playback ---------- */
+const pb = { events:[], i:0, timer:null, meta:null };
+
+function pbStop() { clearInterval(pb.timer); pb.timer = null; $("pbPlay").textContent = "▶ play"; }
+function pbAt(n) {
+  // Rendering is cumulative, so going backwards means replaying from zero.
+  if (n < pb.i) { resetPanes(); pb.i = 0; }
+  while (pb.i < n) { renderRecorded(pb.events[pb.i]); pb.i++; }
+  $("pbScrub").value = pb.i;
+  $("pbPos").textContent = `${pb.i} / ${pb.events.length}`;
+  if (pb.i >= pb.events.length) pbStop();
+}
+function renderRecorded(e) {
+  addEvent(e);
+  const d = e.data || {};
+  // The trace carries Text payloads in full, so the conversation replays too.
+  if (e.kind === "task.emit" && d.text !== undefined) {
+    if (d.channel === "prompt") say("you", d.text);
+    else if (d.dst === "world") say("mind", d.text);
+  }
+  if (e.kind === "memory.write" && d.op === "replace_all" && d.window) {
+    upsertWindow(e.module, d.window);
+  }
+  if (e.kind === "memory.write" && d.op === "append" && d.content !== undefined) {
+    appendWindow(e.module, {role:d.role, content:d.content, meta:d.meta || {}});
+  }
+}
+function upsertWindow(name, messages) {
+  const w = state.windows.find(x => x.module === name);
+  if (w) w.messages = messages; else state.windows.push({module:name, messages});
+  renderInspector();
+}
+function appendWindow(name, msg) {
+  let w = state.windows.find(x => x.module === name);
+  if (!w) { w = {module:name, messages:[]}; state.windows.push(w); }
+  w.messages.push(msg);
+  renderInspector();
+}
+function resetPanes() {
+  $("trace").innerHTML = ""; $("chat").innerHTML = "";
+  state.tick = -1; state.count = 0; state.windows = [];
+  $("hCount").textContent = "0"; $("hTick").textContent = "0";
+  renderInspector();
+}
+
+async function loadRecording(value) {
+  pbStop();
+  if (!value) {   // back to live
+    document.body.classList.remove("playback");
+    $("playbar").hidden = true;
+    $("source").value = "";
+    $("traceLabel").textContent = "live trace";
+    resetPanes();
+    const s = await (await fetch("/state")).json();
+    (s.backlog || []).forEach(handle);
+    state.wiring = s.wiring; state.windows = s.windows; renderInspector();
+    setStatus("idle");
+    return;
+  }
+  const [mind, run] = value.split("|");
+  const r = await fetch(`/recording?mind=${encodeURIComponent(mind)}&run=${encodeURIComponent(run)}`);
+  if (!r.ok) { say("err", "could not load that recording"); return; }
+  const data = await r.json();
+  pb.events = data.events; pb.meta = data.meta; pb.i = 0;
+  document.body.classList.add("playback");
+  $("playbar").hidden = false;
+  $("source").value = value;          // the picker must show what is on screen
+  $("traceLabel").textContent = "recorded trace";
+  resetPanes();
+  state.wiring = data.meta; renderInspector();
+  $("hMind").textContent = `${mind} · ${run}`;
+  const sub = (data.meta.modules || []).find(m => m.role === "subject");
+  const ego = (data.meta.modules || []).find(m => m.role === "ego");
+  $("hSubject").textContent = sub?.model || "—";
+  $("hEgo").textContent = ego?.model || "none";
+  $("pbScrub").max = pb.events.length;
+  $("hState").textContent = "recorded";
+  $("hDot").className = "dot";
+  pbAt(0);
+}
+
+$("pbReset").onclick = () => { pbStop(); resetPanes(); pb.i = 0; pbAt(0); };
+$("pbEvent").onclick = () => { pbStop(); pbAt(pb.i + 1); };
+$("pbTick").onclick = () => {
+  pbStop();
+  if (pb.i >= pb.events.length) return;
+  const t = pb.events[pb.i].tick;
+  let n = pb.i;
+  while (n < pb.events.length && pb.events[n].tick === t) n++;
+  pbAt(n);
+};
+$("pbScrub").oninput = (e) => { pbStop(); pbAt(+e.target.value); };
+$("pbPlay").onclick = () => {
+  if (pb.timer) { pbStop(); return; }
+  if (pb.i >= pb.events.length) { resetPanes(); pb.i = 0; }
+  $("pbPlay").textContent = "⏸ pause";
+  const ms = +$("pbSpeed").value;
+  if (ms === 0) { pbAt(pb.events.length); return; }
+  pb.timer = setInterval(() => pbAt(pb.i + 1), ms);
+};
+$("pbSpeed").onchange = () => { if (pb.timer) { pbStop(); $("pbPlay").click(); } };
+$("source").onchange = (e) => loadRecording(e.target.value);
+
+async function refreshRecordings() {
+  const rs = await (await fetch("/recordings")).json();
+  const sel = $("source"), keep = sel.value;
+  sel.innerHTML = `<option value="">● live</option>` + rs.map(r =>
+    `<option value="${r.mind}|${r.run_id}">${r.mind} · ${r.run_id} · ${r.events} events</option>`
+  ).join("");
+  sel.value = keep;
+}
 
 async function post(path, body) {
   await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
@@ -373,6 +525,13 @@ fetch("/state").then(r => r.json()).then(s => {
   $("hSubject").textContent = sub?.model || "—";
   $("hEgo").textContent = ego?.model || "none";
   renderInspector();
+});
+refreshRecordings().then(() => {
+  // `?play=<mind>|<run>&at=<n>` opens a recording stepped to a position, which
+  // is how a still of the playback view gets captured.
+  const q = new URLSearchParams(location.search);
+  const rec = q.get("play");
+  if (rec) loadRecording(rec).then(() => pbAt(+(q.get("at") || 0)));
 });
 $("input").focus();
 </script>

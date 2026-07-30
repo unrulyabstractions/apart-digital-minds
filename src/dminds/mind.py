@@ -415,8 +415,14 @@ class Mind(MindInterface):
             self.tracer.emit(
                 src.name,
                 TASK_EMIT,
-                {"channel": as_channel, "dst": consumer.name,
-                 "summary": message.describe()},
+                {
+                    "channel": as_channel,
+                    "dst": consumer.name,
+                    "summary": message.describe(),
+                    # Text is small, and carrying it in full is what lets a
+                    # trace be replayed rather than merely skimmed.
+                    **({"text": payload.text} if isinstance(payload, Text) else {}),
+                },
                 task_id=message.id,
                 cause=cause,
             )
@@ -476,7 +482,12 @@ class Mind(MindInterface):
             self.tracer.emit(
                 WORLD,
                 TASK_EMIT,
-                {"channel": channel, "dst": name, "summary": message.describe()},
+                {
+                    "channel": channel,
+                    "dst": name,
+                    "summary": message.describe(),
+                    **({"text": payload.text} if isinstance(payload, Text) else {}),
+                },
                 task_id=message.id,
             )
             if self.deliver(message):

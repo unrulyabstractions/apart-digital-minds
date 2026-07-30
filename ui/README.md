@@ -44,6 +44,29 @@ mind.tracer.add_sink(WebSink(broadcast))
 The sink forwards each event to connected browsers over server-sent events.
 Standard library only, no dependencies.
 
+## Playback
+
+The picker in the header lists every run under `out/runs/`. Choose one and the
+UI switches from live to playback: the trace, the conversation, and each
+module's context window are rebuilt from `trace.jsonl` alone.
+
+    ⏮      back to the start
+    ▶      play, at slow / normal / fast / instant
+    step   one event
+    tick ⏭ to the end of the current tick
+    slider scrub anywhere
+
+Stepping a tick at a time is the useful one: you watch the subject think, then
+the stage rewrite what it thought, then the ego speak from the rewrite, one
+tick per click.
+
+This works because a trace is a complete recording rather than a summary. Text
+payloads are stored in full, and a `memory.write` carries the content that was
+written, so the conversation and the windows replay exactly. Sending is
+disabled while a recording is on screen; pick `● live` to come back.
+
+`?play=<mind>|<run-id>&at=<n>` opens a recording stepped to a position.
+
 ## Where the data goes
 
 Every run writes to `out/runs/ui/<run-id>/`: `meta.json` describing the mind
