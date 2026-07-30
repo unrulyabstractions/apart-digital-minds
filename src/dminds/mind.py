@@ -209,9 +209,9 @@ class Mind(MindInterface):
     def intercept(self, *stages: Module) -> list[Module]:
         """Put `stages` between the subject and whoever speaks.
 
-        A stage reads `context` and writes `revised`. The two names are
+        A stage reads `context` and writes `revision`. The two names are
         different on purpose: no module consumes what it produces, which is
-        the rule that keeps the path loop-free. On the wire, each `revised`
+        the rule that keeps the path loop-free. On the wire, each `revision`
         is renamed so the next hop still hears `context` and never knows it
         was preceded by an editor rather than the subject.
 
@@ -219,7 +219,7 @@ class Mind(MindInterface):
         an ego, `mind.intercept(editor)` is exactly
 
             mind.subject.register(editor, "context")
-            editor.register(mind.ego, "revised", as_channel="context")
+            editor.register(mind.ego, "revision", as_channel="context")
             mind.ego.register(mind.world, "reply")
 
         Write those yourself when the shape is not a line, or pass
@@ -247,9 +247,9 @@ class Mind(MindInterface):
             chain.append(self.ego)
 
         for producer, consumer in zip(chain, chain[1:]):
-            # The subject emits `context`; every stage emits `revised`. The
+            # The subject emits `context`; every stage emits `revision`. The
             # rename keeps what the consumer hears uniform.
-            channel = "context" if producer is self.subject else "revised"
+            channel = "context" if producer is self.subject else "revision"
             self._auto_links.append(
                 (producer, producer.register(consumer, channel, as_channel="context"))
             )

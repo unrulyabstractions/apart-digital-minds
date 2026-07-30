@@ -9,7 +9,7 @@ Nothing in `src.api` imports from `src.dminds`, so you can replace any part
 without disturbing the vocabulary the others speak.
 
     from src.api import Module, Agent, LLM, Sink   # what to implement
-    from src.dminds import Mind, Bus, BaseModule   # what to use
+    from src.dminds import Mind, Subject, BaseModule  # what to use
     from src import Mind, Agent, get_llm           # both, flat
 
 A few names exist in both layers, because the implementation kept the obvious

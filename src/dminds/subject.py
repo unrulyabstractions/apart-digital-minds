@@ -18,10 +18,10 @@ Every channel is one-directional and means one thing. No module consumes what
 it produces, so the path cannot loop and no stage has to know when to stop.
 
     subject   reads  prompt     writes  context, reply, thought
-    stage     reads  context    writes  revised
+    stage     reads  context    writes  revision
     ego       reads  context    writes  reply
 
-A stage's `revised` is renamed to `context` on the wire, so the next hop
+A stage's `revision` is renamed to `context` on the wire, so the next hop
 cannot tell an editor from the subject. The names differ at the module so
 that no module consumes what it produces.
 """

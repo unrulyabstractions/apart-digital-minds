@@ -153,10 +153,10 @@ def test_a_stage_edits_the_context_on_its_way_to_the_ego():
 
     class Rewriter(BaseModule):
         INPUTS = {"context": "the subject's window"}
-        OUTPUTS = {"revised": "a replacement"}
+        OUTPUTS = {"revision": "a replacement"}
 
         async def on_input(self, message: Message, ctx: Ctx) -> None:
-            ctx.emit("revised", Context([user("a totally different history")]))
+            ctx.emit("revision", Context([user("a totally different history")]))
 
     async def run():
         mind = quiet(
@@ -307,7 +307,7 @@ def test_intercept_lays_out_subject_then_stages_then_ego():
 
     class Stage(BaseModule):
         INPUTS = {"context": "in"}
-        OUTPUTS = {"revised": "out"}
+        OUTPUTS = {"revision": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
     mind.intercept(Stage("one"), Stage("two"))
@@ -317,8 +317,8 @@ def test_intercept_lays_out_subject_then_stages_then_ego():
     assert stages == ["one", "two"]
     assert links == sorted([
         "subject --context--> one",
-        "one --revised--> two as context",
-        "two --revised--> ego as context",
+        "one --revision--> two as context",
+        "two --revision--> ego as context",
         "ego --reply--> world",
     ])
 
@@ -328,7 +328,7 @@ def test_intercepting_again_discards_the_previous_layout():
 
     class Stage(BaseModule):
         INPUTS = {"context": "in"}
-        OUTPUTS = {"revised": "out"}
+        OUTPUTS = {"revision": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
     mind.intercept(Stage("one"))
@@ -338,7 +338,7 @@ def test_intercepting_again_discards_the_previous_layout():
     assert "one" not in " ".join(links), "the old layout should be gone"
     assert links == sorted([
         "subject --context--> two",
-        "two --revised--> ego as context",
+        "two --revision--> ego as context",
         "ego --reply--> world",
     ])
 
@@ -348,7 +348,7 @@ def test_a_stage_joins_the_mind_by_being_intercepted():
 
     class Stage(BaseModule):
         INPUTS = {"context": "in"}
-        OUTPUTS = {"revised": "out"}
+        OUTPUTS = {"revision": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
     mind.intercept(Stage("middle"))
@@ -371,7 +371,7 @@ def test_relayout_keeps_wiring_it_did_not_create():
 
     class Stage(BaseModule):
         INPUTS = {"context": "in"}
-        OUTPUTS = {"revised": "out"}
+        OUTPUTS = {"revision": "out"}
 
     class Spy(BaseModule):
         pass
@@ -391,7 +391,7 @@ def test_intercept_is_exactly_the_register_calls_it_documents():
 
     class Stage(BaseModule):
         INPUTS = {"context": "in"}
-        OUTPUTS = {"revised": "out"}
+        OUTPUTS = {"revision": "out"}
 
     laid_out = quiet(model="echo:", ego="echo:")
     laid_out.intercept(Stage("interceptor"))
@@ -401,7 +401,7 @@ def test_intercept_is_exactly_the_register_calls_it_documents():
     by_hand = quiet(model="echo:", ego="echo:", autowire=False)
     stage = Stage("interceptor")
     by_hand.subject.register(stage, "context")
-    stage.register(by_hand.ego, "revised", as_channel="context")
+    stage.register(by_hand.ego, "revision", as_channel="context")
     by_hand.ego.register(by_hand.world, "reply")
     manual = sorted(ln.describe() for ln in by_hand.links())
     by_hand.close()

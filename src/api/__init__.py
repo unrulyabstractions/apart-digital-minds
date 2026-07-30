@@ -35,7 +35,7 @@ view a module gets of its host, are machinery you never call; they live in
 Write against these when you want to swap a part.
 
     from src.api import Module, Agent, LLM, Sink   # what to implement
-    from src.dminds import Mind, Bus, BaseModule   # what to use
+    from src.dminds import Mind, Subject, BaseModule  # what to use
     from src import Mind, Agent, get_llm           # both, flat
 """
 

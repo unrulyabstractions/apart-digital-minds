@@ -426,3 +426,45 @@ Three complaints, three cuts.
 Fixed along the way: example 04's `Remembering` subclassed `Subject` but only
 emits `reply`; after the dispatch removal it inherited `Subject.on_input` and
 broke. It is an `Agent`, and now says so. Caught by running, not reading.
+
+## 2026-07-30 — `revision` channel, real Qwen, and a self-audit
+
+A stage declared `context` as both input and output. That is the same shape
+that made loops possible before the forward pipeline, so it had to go. A stage
+now reads `context` and writes `revision`: it does not own the mind's context,
+it proposes a version of it. `intercept` renames `revision` to `context` on the
+wire, so the next hop cannot tell an editor from the subject.
+
+`revised` was a first attempt and was wrong twice over: a participle rather
+than a noun, and overfit to editing, when example 03's voice adds and the
+README's critic annotates.
+
+### VERIFIED — the `hf:` provider, previously UNVERIFIED since day one
+
+Installed torch 2.13 and transformers 5.14, then ran `hf:Qwen/Qwen3-0.6B` on
+MPS.
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 102 | A real model answers through the provider | Direct `llm.chat`, read the text, tokens 21 -> 134, 28.6s on MPS | VERIFIED |
+| 103 | Example 01 on real Qwen | `MODEL=hf:Qwen/Qwen3-0.6B`. Two prompts, coherent answers, second one recalled the first | VERIFIED |
+| 104 | Example 02 on real Qwen | `SUBJECT_MODEL=hf:Qwen/Qwen3-0.6B`. The subject produced its own `<think>` block, the interceptor rewrote that real thought, and the ego spoke from the edited window. 3 ticks | VERIFIED |
+
+The other four providers (openai, anthropic, gemini, ollama) remain UNVERIFIED:
+no keys, and no Ollama server on this machine.
+
+### VERIFIED — self-audit
+
+Two subagents were dispatched to audit correctness and cleanliness. Both died
+on a session limit before reporting. One had flagged that the README said 105
+tests when the count was 106. The audit was then done directly.
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 105 | `api` never imports `dminds` | AST scan | VERIFIED (0) |
+| 106 | No leftover removed API | Grep for `mind.wire`, `mind.watch`, `Bus`, `Router`, `.pipeline(`, `handler_name`, `find_handler`, `soul` | VERIFIED after fixing two docstrings that still showed `from src.dminds import Mind, Bus, BaseModule`, an import line that would have failed for anyone who copied it |
+| 107 | Unused imports | AST scan over `src/`, `examples/`, `tests/` | VERIFIED (0) |
+| 108 | `__all__` resolves | `hasattr` over all three packages, and over every name `examples/` and `tests/` import from `src` | VERIFIED (81 + 46 + 36 names, 0 missing) |
+| 109 | README snippets | Extracted all 21 python blocks and ran them. 12 run standalone; the other 5 are fragments naming objects the reader supplies, so each was run verbatim against real stand-ins (`Stage`, `MySubject`, `MyScheduler`, `SlackSink`, `MyLLM`) | VERIFIED (17/17 executable blocks; 4 are shell or prose) |
+| 110 | Correctness probes | Seven written and run: `intercept()` with no ego and no stages, `intercept()` before a subject exists, state leaking between prompts, `unregister` removing exactly one of two identical links, undeclared emit not bypassable through `ctx.emit`, two identical runs producing identical event sequences, and nothing emitted at tick t being visible before t+1 | VERIFIED (7/7) |
+| 111 | Suite, examples, traces | 106 tests; four examples; every trace re-opened | VERIFIED |
