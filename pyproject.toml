@@ -1,0 +1,24 @@
+[project]
+name = "dmind"
+version = "0.1.0"
+description = "A small, deterministic runtime for digital-mind experiments."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.40"]
+gemini = ["google-genai>=1.0"]
+hf = ["transformers>=4.44", "torch>=2.2"]
+all = ["openai>=1.0", "anthropic>=0.40", "google-genai>=1.0", "transformers>=4.44", "torch>=2.2"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dmind"]
+
+[tool.pytest.ini_options]
+# Tests drive the event loop with asyncio.run themselves, so no plugin is needed.
+testpaths = ["tests"]
