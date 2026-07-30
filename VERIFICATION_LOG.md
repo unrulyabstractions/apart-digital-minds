@@ -528,3 +528,47 @@ missed it; viewing the image did not.
 Two smaller things the screenshots forced: `/state` now carries the event
 backlog, so a page reload or a still capture shows the conversation rather
 than an empty pane, and `?tab=` deep-links a tab.
+
+## 2026-07-30 — every run collects into out/, organised by lifetime
+
+`runs/` became `out/`, split three ways by how long a thing lives:
+
+    out/runs/<mind>/<run-id>/   meta.json, trace.jsonl, modules/<name>.jsonl
+    out/memory/<name>.jsonl     journals, which outlive the run that wrote them
+    out/tapes/<name>.jsonl      cassettes, likewise
+
+A run directory is disposable; memory and tapes are what you keep. Runs are
+grouped by mind name so one project's `out/` stays readable across many
+experiments. `src/dminds/paths.py` holds the layout, `out/` is gitignored.
+
+New: `meta.json` makes a run folder self-describing, and `Mind.summary()`
+produces it. The UI had a hand-written copy of that logic, which is now
+deleted in favour of the method.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 126 | Every run lands in the right place | Ran all four examples and the server, then walked `out/` | VERIFIED (8 run folders, correct nesting) |
+| 127 | Run folders are internally consistent | For each of the 8: parsed `meta.json`, confirmed `meta.events` equals the trace line count, `seq` contiguous, per-module counts summing to the total, and the directory path matching `meta.name`/`meta.run_id` | VERIFIED (8/8, 0 failures) |
+| 128 | Nothing writes to `runs/` any more | Removed it, re-ran everything, checked it was not recreated | VERIFIED |
+| 129 | `meta.json` stays current for a long-lived server | Sent two prompts to the running UI and re-read the file | VERIFIED (ticks 6, events 66, matching live state) |
+| 130 | Suite and examples | 106 tests, four examples | VERIFIED |
+| 131 | No unused imports, `api` still pure | AST scans over `src/`, `examples/`, `tests/`, `ui/` | VERIFIED (0 and 0) |
+
+### Two bugs found while doing it
+
+The UI stopped processing prompts entirely. A rename missed one call site,
+`wiring(self.mind)`, and `asyncio.run_coroutine_threadsafe` **discards the
+exception unless the future is read**, so a `NameError` became a UI that
+silently did nothing. Fixed the call, then fixed the real problem: scheduled
+coroutines now attach a done-callback that pushes any exception to the browser
+as an error. Proved it by breaking a mind's `entry` and watching the
+`ValueError` arrive over the event stream.
+
+`meta.json` was written only at construction and close, so a server running
+for hours advertised `ticks 0`. It is now rewritten after every prompt.
+
+Example 04 passed its run id as the mind name, producing
+`out/runs/loose-0/loose-0/`. Its attempts now share the name `replay-study`,
+so they group.

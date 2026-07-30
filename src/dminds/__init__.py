@@ -27,6 +27,7 @@ these parts.
     replies = await mind.prompt("hello")
 """
 
+from . import paths
 from .agents import Agent, has_think, replace_think, split_think, strip_think
 from .llm import (
     ALIASES,
@@ -64,6 +65,7 @@ from .trace import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "paths",
     # runtime
     "Mind",
     "BaseModule",

@@ -16,6 +16,7 @@ src/dminds/    the implementations
 examples/      four minds assembled from the parts
 ui/            talk to a mind in a browser and watch it think
 tests/         106 tests, no dependencies
+out/           everything a run produces (gitignored)
 ```
 
 `src/api` declares what each part must do. `src/dminds` provides one of each.
@@ -354,7 +355,7 @@ agent.transcript.tagged("stage", "draft")    # find messages by meta
 
 agent.scratch["draft"] = text
 
-journal = Journal(path="runs/journal.jsonl")
+journal = Journal(path=paths.memory("octopuses"))
 journal.remember("octopuses are curious")
 journal.recall("octopuses", k=3)
 ```
@@ -368,9 +369,19 @@ Every module and every model call is instrumented. There is no flag to turn it
 on. A run writes:
 
 ```
-runs/<run_id>/trace.jsonl           every event, in order
-runs/<run_id>/modules/<name>.jsonl  the same events, split per module
+out/
+  runs/<mind>/<run-id>/       one directory per run, grouped by mind
+    meta.json                 what the run was: models, wiring, counts
+    trace.jsonl               every event, in order
+    modules/<name>.jsonl      the same events, split per module
+  memory/<name>.jsonl         journals, which outlive the run that wrote them
+  tapes/<name>.jsonl          cassettes, likewise
 ```
+
+Three buckets, divided by how long the thing lives. A run directory is
+disposable: delete it and you lose a recording, not an experiment. Memory and
+tapes are what you keep, so they sit outside any single run. `src.dminds.paths`
+holds the layout, and `out/` is gitignored.
 
 Each event carries a logical tick, a UTC timestamp, the module name, the event
 kind, and a duration where one applies. Model calls record the provider spec,
@@ -395,7 +406,7 @@ are all arguments, defaulting to the shipped implementations.
 
 ```python
 Mind("fast",  "echo:", scheduler=lambda host: MyScheduler(host))
-Mind("taped", "echo:", model_factory=taped("runs/tape.jsonl"))
+Mind("taped", "echo:", model_factory=taped(paths.tape("study")))
 ```
 
 The scheduler is internal machinery: subclass `src.dminds.Scheduler` only when
@@ -418,14 +429,14 @@ The model call is the only place non-determinism enters. Capture it there and
 the whole run reproduces.
 
 ```python
-llm = Cassette(get_llm("openai:gpt-5"), "runs/tape.jsonl")   # one model
+llm = Cassette(get_llm("openai:gpt-5"), paths.tape("study"))   # one model
 ```
 
 For a whole mind, attach the factory instead of wrapping models one at a time.
 Every model the mind builds goes through it:
 
 ```python
-mind = Mind("study", "openai:gpt-5", model_factory=taped("runs/study.jsonl"))
+mind = Mind("study", "openai:gpt-5", model_factory=taped(paths.tape("study")))
 watcher = Agent("watcher", mind.model("ollama:qwen3:8b"))
 mind.subject.register(watcher, "context")
 ```

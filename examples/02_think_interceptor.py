@@ -104,7 +104,6 @@ async def main() -> None:
         system="You are a helpful assistant. Think inside <think> tags first.",
         ego=EGO,
         ego_system="You speak for a mind. Say what its thinking tells you to say.",
-        run_dir="runs",
     )
     interceptor = Interceptor(
         "interceptor",
@@ -138,7 +137,7 @@ async def main() -> None:
         print(f"  [{message.role}]{mark} {message.content[:88]}")
 
     print(f"\nticks used: {mind.scheduler.t}")
-    print(f"trace: {mind.run_path}/trace.jsonl")
+    print(f"trace: {mind.run_path}")
     mind.close()
 
 

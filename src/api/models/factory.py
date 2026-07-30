@@ -14,7 +14,7 @@ class ModelFactory(Protocol):
     function changes them all at once. `get_llm` is the default; `taped(...)`
     is the interesting one.
 
-        mind = Mind("study", "openai:gpt-5", model_factory=taped("runs/tape.jsonl"))
+        mind = Mind("study", "openai:gpt-5", model_factory=taped("out/tapes/study.jsonl"))
 
     Wrap it to record every call, add a rate limiter, pin a temperature, or
     redirect a spec to a cheaper model while you develop.

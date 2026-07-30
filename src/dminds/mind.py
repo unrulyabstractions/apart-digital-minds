@@ -23,7 +23,8 @@ work, `get_replies` drains what reached you.
 
 from __future__ import annotations
 
-from datetime import datetime
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
@@ -36,6 +37,7 @@ from ..api.models import ModelFactory
 from .host import SchedulerFactory
 from .scheduler import Scheduler, TickScheduler
 from ..api.types import Link, Message, Payload, Text
+from . import paths
 from .llm import get_llm
 from .module import BaseModule
 from .subject import Ego, Subject
@@ -59,16 +61,15 @@ def _build_ego(spec, system: str | None, model: Callable[[str], LLM]) -> Module:
     return Ego("ego", llm, system=system)
 
 
-def _fresh_run_id(run_dir: str | Path | None) -> str:
+def _fresh_run_id(base: Path | None) -> str:
     """A run id that never collides with an existing run directory.
 
-    Two experiments started in the same second must not write into one trace
-    file, so the id carries milliseconds and is checked against the directory.
+    Two experiments started in the same millisecond must not write into one
+    trace file, so a colliding id gets a counter.
     """
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3]
-    if run_dir is None:
+    if base is None:
         return stamp
-    base = Path(run_dir)
     candidate, n = stamp, 1
     while (base / candidate).exists():
         candidate = f"{stamp}-{n}"
@@ -121,7 +122,7 @@ class Mind(MindInterface):
 
         Mind("study", "openai:gpt-5", system="Think first.")
         Mind("halves", "ollama:qwen3:8b", subject=Outer)
-        Mind("taped", "echo:", model_factory=taped("runs/tape.jsonl"))
+        Mind("taped", "echo:", model_factory=taped(paths.tape("study")))
     """
 
     def __init__(
@@ -134,7 +135,7 @@ class Mind(MindInterface):
         ego_system: str | None = None,
         autowire: bool = True,
         run_id: str | None = None,
-        run_dir: str | Path | None = "runs",
+        run_dir: str | Path | None = paths.RUNS,
         console: bool = True,
         max_ticks: int = 200,
         scheduler: SchedulerFactory | None = None,
@@ -142,7 +143,10 @@ class Mind(MindInterface):
         model_factory: ModelFactory | None = None,
     ):
         self.name = name
-        self.run_id = run_id or _fresh_run_id(run_dir)
+        # Runs are grouped by which mind made them, so one project's out/
+        # stays readable across many experiments.
+        home = None if run_dir is None else Path(run_dir) / name
+        self.run_id = run_id or _fresh_run_id(home)
         self.modules: dict[str, Module] = {}
         self.outbox: list[Message] = []
         self.model_factory: ModelFactory = (
@@ -151,6 +155,7 @@ class Mind(MindInterface):
         self._message_counter = 0
         self._read_mark = 0
         self._validated = False
+        self._started = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
         #: Where `prompt` delivers, unless you say otherwise. Defaults to the
         #: first module added. Set it directly to change the front door.
@@ -161,8 +166,8 @@ class Mind(MindInterface):
         self.events = MemorySink()
         self.tracer.add_sink(self.events)
         self.run_path: Path | None = None
-        if run_dir is not None:
-            self.run_path = Path(run_dir) / self.run_id
+        if home is not None:
+            self.run_path = paths.run_dir(name, self.run_id, run_dir)
             self.tracer.add_sink(JsonlSink(self.run_path / "trace.jsonl"))
             self.tracer.add_sink(PerModuleSink(self.run_path / "modules"))
         if console:
@@ -192,6 +197,7 @@ class Mind(MindInterface):
             self.ego = self.adopt(_build_ego(ego, ego_system, self.model))
         if autowire:
             self.intercept()  # with no stages: subject -> ego -> world
+        self.write_meta()
 
     # -- models ----------------------------------------------------------
 
@@ -526,6 +532,62 @@ class Mind(MindInterface):
 
     # -- inspection --------------------------------------------------------
 
+    def summary(self) -> dict:
+        """The run as data: what it is, what it is made of, how it is wired.
+
+        `describe` is this for a human. Anything that renders a mind, the UI
+        included, reads this instead of taking the text apart.
+        """
+        laid_out = {id(link) for link in self.auto_links}
+        return {
+            "name": self.name,
+            "run_id": self.run_id,
+            "started": self._started,
+            "entry": self.entry,
+            "ticks": self.scheduler.t,
+            "events": len(self.events.events),
+            "modules": [
+                {
+                    "name": m.name,
+                    "kind": type(m).__name__,
+                    "role": (
+                        "subject" if m is self.subject
+                        else "ego" if m is self.ego
+                        else "stage" if m in self._stages
+                        else "other"
+                    ),
+                    "model": getattr(getattr(m, "llm", None), "spec", None),
+                    "inputs": dict(m.INPUTS),
+                    "outputs": dict(m.OUTPUTS),
+                }
+                for m in self.modules.values()
+            ],
+            "links": [
+                {
+                    "src": link.src,
+                    "channel": link.channel,
+                    "dst": link.dst,
+                    "as_channel": link.as_channel,
+                    "auto": id(link) in laid_out,
+                    "text": link.describe(),
+                }
+                for m in self.modules.values()
+                for link in m.links()
+            ],
+        }
+
+    def write_meta(self) -> Path | None:
+        """Drop `meta.json` beside the trace, so a run folder explains itself.
+
+        Written when the mind is built and again when it closes, so a run that
+        was killed still leaves something readable.
+        """
+        if self.run_path is None:
+            return None
+        path = self.run_path / "meta.json"
+        path.write_text(json.dumps(self.summary(), indent=2, default=str))
+        return path
+
     def describe(self) -> str:
         lines = [f"Mind {self.name!r} (run {self.run_id})", f"  entry: {self.entry}"]
         lines.append("  modules:")
@@ -545,6 +607,7 @@ class Mind(MindInterface):
         return "\n".join(lines)
 
     def close(self) -> None:
+        self.write_meta()
         for module in self.modules.values():
             module.close()
         self.tracer.close()

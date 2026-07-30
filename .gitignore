@@ -8,7 +8,8 @@ build/
 .pytest_cache/
 .DS_Store
 
-# Run artifacts. Traces are reproducible; keep them out of git.
-runs/
+# Everything a run produces. Traces are reproducible; memory and tapes
+# are yours to keep or delete.
+out/
 tmp/
 .backups/

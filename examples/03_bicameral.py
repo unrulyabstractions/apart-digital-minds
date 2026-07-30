@@ -138,7 +138,6 @@ async def main() -> None:
         system="You are the half of a mind that thinks. You never speak to anyone.",
         ego=EGO,
         ego_system="You are the half of a mind that speaks.",
-        run_dir="runs",
     )
     voice = Voice(
         "voice",

@@ -4,11 +4,11 @@ A run is only replayable if every non-deterministic thing is captured at its
 boundary. In this runtime there is exactly one such boundary, the model call,
 so wrapping it is enough to make a whole experiment reproducible.
 
-    llm = Cassette(get_llm("openai:gpt-5"), "runs/tape.jsonl")
+    llm = Cassette(get_llm("openai:gpt-5"), paths.tape("study"))
 
 For a whole mind, attach a factory instead of wrapping models one at a time:
 
-    mind = Mind("study", model_factory=taped("runs/study.jsonl"))
+    mind = Mind("study", "openai:gpt-5", model_factory=taped(paths.tape("study")))
 
 Modes:
     "auto"    replay a matching call, otherwise call the model and record it
@@ -190,7 +190,7 @@ def taped(
     calling `get_llm` directly. One argument makes a whole experiment
     reproducible, however many agents it has and whichever providers they use.
 
-        mind = Mind("study", model_factory=taped("runs/study.jsonl"))
+        mind = Mind("study", "openai:gpt-5", model_factory=taped(paths.tape("study")))
         mind.add(Agent("a", mind.model("openai:gpt-5")))
         mind.add(Agent("b", mind.model("ollama:qwen3:8b")))
 

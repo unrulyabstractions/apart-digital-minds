@@ -43,7 +43,6 @@ async def main() -> None:
         "hello",
         MODEL,
         system="You are a careful assistant. Answer in two sentences.",
-        run_dir="runs",
     )
     print(mind.describe(), "\n")
 
@@ -55,8 +54,8 @@ async def main() -> None:
 
     # The transcript is ordinary data. Read it, edit it, save it.
     print(f"transcript holds {len(mind.subject.transcript)} messages")
-    print(f"trace written to {mind.run_path}/trace.jsonl")
-    print(f"per-module logs in {mind.run_path}/modules/")
+    print(f"this run: {mind.run_path}")
+    print("  meta.json, trace.jsonl, modules/<name>.jsonl")
 
     mind.close()
 

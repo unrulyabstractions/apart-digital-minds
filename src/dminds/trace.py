@@ -7,8 +7,9 @@ The trace is append-only and totally ordered by `seq`, which makes it an event
 log you can diff between two runs. Each event carries both a logical tick and a
 wall-clock timestamp. Logic must only ever read the tick. Wall time is for you.
 
-A run writes two things under `runs/<run_id>/`:
+A run writes three things under `out/runs/<mind>/<run-id>/`:
 
+    meta.json                what the run was: models, wiring, counts
     trace.jsonl              every event, in order
     modules/<name>.jsonl     the same events, split per module
 """

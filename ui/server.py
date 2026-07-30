@@ -102,7 +102,7 @@ def _load_example(name: str):
 def build_mind(kind: str, model: str) -> Mind:
     """One of the shipped architectures. Attach the sink to whatever it
     returns; nothing here knows about the UI."""
-    common = dict(run_dir="runs", console=False)
+    common = dict(console=False)  # out/runs/<mind>/<run-id>/ by default
 
     if kind == "plain":
         return Mind(
@@ -164,46 +164,6 @@ def build_mind(kind: str, model: str) -> Mind:
 # -- what the inspector shows ------------------------------------------------
 
 
-def wiring(mind: Mind) -> dict:
-    laid_out = {id(link) for link in mind.auto_links}
-    return {
-        "name": mind.name,
-        "run_id": mind.run_id,
-        "entry": mind.entry,
-        "modules": [
-            {
-                "name": m.name,
-                "kind": type(m).__name__,
-                "inputs": dict(m.INPUTS),
-                "outputs": dict(m.OUTPUTS),
-                "model": getattr(getattr(m, "llm", None), "spec", None),
-                "role": (
-                    "subject"
-                    if m is mind.subject
-                    else "ego"
-                    if m is mind.ego
-                    else "stage"
-                    if m in mind.stages
-                    else "other"
-                ),
-            }
-            for m in mind.modules.values()
-        ],
-        "links": [
-            {
-                "src": link.src,
-                "channel": link.channel,
-                "dst": link.dst,
-                "as_channel": link.as_channel,
-                "auto": id(link) in laid_out,
-                "text": link.describe(),
-            }
-            for m in mind.modules.values()
-            for link in m.links()
-        ],
-    }
-
-
 def windows(mind: Mind) -> list[dict]:
     """Each agent's context window, so you can see what was edited."""
     out = []
@@ -234,8 +194,9 @@ class App:
         self.busy = False
 
     def snapshot(self) -> None:
+        self.mind.write_meta()  # keep out/.../meta.json current while we run
         self.broadcast.push({"type": "windows", "windows": windows(self.mind)})
-        self.broadcast.push({"type": "wiring", "wiring": wiring(self.mind)})
+        self.broadcast.push({"type": "wiring", "wiring": self.mind.summary()})
 
     async def prompt(self, text: str, step: bool) -> None:
         self.broadcast.push({"type": "you", "text": text})
@@ -280,6 +241,22 @@ class App:
 
 
 def make_handler(app: App):
+    def spawn(coro) -> None:
+        """Run a coroutine on the mind's loop, and report anything it raises.
+
+        `run_coroutine_threadsafe` drops exceptions unless the future is read,
+        which is how a broken handler becomes a UI that silently does nothing.
+        """
+        future = asyncio.run_coroutine_threadsafe(coro, app.loop)
+
+        def report(f):
+            exc = f.exception()
+            if exc is not None:
+                app.broadcast.push({"type": "error", "text": repr(exc)})
+                app.broadcast.push({"type": "status", "state": "idle"})
+
+        future.add_done_callback(report)
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -300,7 +277,7 @@ def make_handler(app: App):
             elif route == "/state":
                 body = json.dumps(
                     {
-                        "wiring": wiring(app.mind),
+                        "wiring": app.mind.summary(),
                         "windows": windows(app.mind),
                         "backlog": list(app.broadcast.backlog),
                     },
@@ -338,14 +315,11 @@ def make_handler(app: App):
             payload = json.loads(self.rfile.read(length) or b"{}")
             route = urlsplit(self.path).path
             if route == "/prompt":
-                asyncio.run_coroutine_threadsafe(
-                    app.prompt(payload.get("text", ""), payload.get("step", False)),
-                    app.loop,
-                )
+                spawn(app.prompt(payload.get("text", ""), payload.get("step", False)))
             elif route == "/step":
-                asyncio.run_coroutine_threadsafe(app.step(), app.loop)
+                spawn(app.step())
             elif route == "/run":
-                asyncio.run_coroutine_threadsafe(app.run(), app.loop)
+                spawn(app.run())
             self._send(200, b'{"ok":true}', "application/json")
 
     return Handler
@@ -383,7 +357,7 @@ def main() -> None:
     print(f"  subject   {model}")
     if mind.ego is not None:
         print(f"  ego       {mind.ego.llm.spec}")
-    print(f"  trace     {mind.run_path}/trace.jsonl")
+    print(f"  out       {mind.run_path}")
     print(f"\n  open      {url}\n")
     if not args.no_open:
         webbrowser.open(url)

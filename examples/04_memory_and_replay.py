@@ -40,7 +40,7 @@ demo_models.install()
 
 JITTERY = pick("MODEL", "jittery")
 
-WORK = Path("runs/example04")
+from src.dminds import paths
 
 
 class Remembering(Agent):
@@ -96,7 +96,7 @@ async def part1_memory_survives() -> Path:
     print("1. a journal outlives its mind")
     print("=" * 70)
 
-    journal_path = WORK / "journal.jsonl"
+    journal_path = paths.memory("octopuses")
 
     mind_a = remembering_mind(journal_path, get_llm(JITTERY),
                               name="session-a", run_dir=None)
@@ -126,12 +126,13 @@ async def run_once(tape: Path, mode: str, run_id: str) -> tuple[str, list]:
     on five providers is made reproducible by this one argument.
     """
     factory = taped(tape, mode=mode)
+    # One mind name, one run id per attempt, so every attempt at this study
+    # lands together under out/runs/replay-study/.
     mind = remembering_mind(
-        WORK / f"journal-{run_id}.jsonl",
+        paths.memory(f"replay-{run_id}"),
         factory(JITTERY),
-        name=run_id,
+        name="replay-study",
         run_id=run_id,
-        run_dir=WORK / "traces",
         model_factory=factory,
     )
     mind.prompt("what are octopuses like?")
@@ -150,12 +151,12 @@ async def part2_replay(journal_path: Path) -> None:
 
     # Without a cassette the answer moves every time.
     loose = [
-        (await run_once(WORK / "throwaway.jsonl", "record", f"loose-{i}"))[0]
+        (await run_once(paths.tape(f"throwaway-{i}"), "record", f"loose-{i}"))[0]
         for i in range(2)
     ]
     print("no cassette:", loose, "->", "differ" if loose[0] != loose[1] else "same")
 
-    tape = WORK / "tape.jsonl"
+    tape = paths.tape("octopuses")
     recorded, trace_1 = await run_once(tape, "record", "record")
     print(f"recorded   : {recorded}   (tape: {tape})")
 
@@ -188,14 +189,14 @@ async def part2_replay(journal_path: Path) -> None:
 
 
 async def main() -> None:
-    if WORK.exists():
-        shutil.rmtree(WORK)
-    WORK.mkdir(parents=True)
+    for stale in (paths.MEMORY, paths.TAPES):
+        if stale.exists():
+            shutil.rmtree(stale)
 
     journal_path = await part1_memory_survives()
     await part2_replay(journal_path)
 
-    print(f"\nartifacts under {WORK}/")
+    print(f"\n  memory  {paths.MEMORY}/\n  tapes   {paths.TAPES}/\n  runs    {paths.RUNS}/")
 
 
 if __name__ == "__main__":

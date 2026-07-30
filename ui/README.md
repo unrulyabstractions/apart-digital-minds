@@ -44,5 +44,12 @@ mind.tracer.add_sink(WebSink(broadcast))
 The sink forwards each event to connected browsers over server-sent events.
 Standard library only, no dependencies.
 
-`?still` on the URL loads the page without opening the event stream, which is
-how it gets screenshotted.
+## Where the data goes
+
+Every run writes to `out/runs/ui/<run-id>/`: `meta.json` describing the mind
+and its models, `trace.jsonl`, and `modules/<name>.jsonl`. `meta.json` is
+rewritten after every prompt, so it stays current while the server is up.
+
+`?still` on the URL loads the page from `/state` alone without opening the
+event stream, which is how it gets screenshotted. `?tab=windows` opens on a
+particular tab.
