@@ -18,16 +18,18 @@ Run it:
 from __future__ import annotations
 
 import asyncio
-import random
 import shutil
 from pathlib import Path
+
+import demo_models
+from demo_models import pick
 
 from src import (
     Ctx,
     Journal,
     Message,
     Mind,
-    Soul,
+    Subject,
     Text,
     get_llm,
     taped,
@@ -35,10 +37,14 @@ from src import (
     user,
 )
 
+demo_models.install()
+
+JITTERY = pick("MODEL", "jittery")
+
 WORK = Path("runs/example04")
 
 
-class Remembering(Soul):
+class Remembering(Subject):
     """An agent that consults its journal before answering, and writes to it after."""
 
     OUTPUTS = {"reply": "the answer, informed by what it remembered"}
@@ -69,27 +75,17 @@ class Remembering(Soul):
 
 
 def remembering_mind(journal_path: Path, llm, **kwargs) -> Mind:
-    """A mind whose soul consults a journal before answering."""
+    """A mind whose subject consults a journal before answering."""
     return Mind(
         model=llm,
         system="You are an assistant with a long memory.",
-        soul=lambda built: Remembering(
-            "soul", built, system="You are an assistant with a long memory.",
+        subject=lambda built: Remembering(
+            "subject", built, system="You are an assistant with a long memory.",
             journal_path=journal_path,
         ),
         console=False,
         **kwargs,
     )
-
-
-def jittery_rule(messages, opts) -> str:
-    """A model that answers differently every time. Nothing is seeded."""
-    memory_line = next(
-        (line for m in messages for line in m.content.splitlines() if line.startswith("- ")),
-        None,
-    )
-    seen = " I recall we spoke before." if memory_line else ""
-    return f"Answer #{random.randint(1000, 9999)}.{seen}"
 
 
 async def part1_memory_survives() -> Path:
@@ -99,22 +95,22 @@ async def part1_memory_survives() -> Path:
 
     journal_path = WORK / "journal.jsonl"
 
-    mind_a = remembering_mind(journal_path, get_llm("echo:", rule=jittery_rule),
+    mind_a = remembering_mind(journal_path, get_llm(JITTERY),
                               name="session-a", run_dir=None)
     mind_a.prompt("what are octopuses like?")
     await mind_a.process()
     print("session A:", texts(mind_a.get_replies())[0])
-    print(f"  journal now holds {len(mind_a.soul.journal)} episodes")
+    print(f"  journal now holds {len(mind_a.subject.journal)} episodes")
     mind_a.close()
 
     # A brand new process would do the same thing: the file is the memory.
-    mind_b = remembering_mind(journal_path, get_llm("echo:", rule=jittery_rule),
+    mind_b = remembering_mind(journal_path, get_llm(JITTERY),
                               name="session-b", run_dir=None)
-    print(f"session B loaded {len(mind_b.soul.journal)} episodes from disk")
+    print(f"session B loaded {len(mind_b.subject.journal)} episodes from disk")
     mind_b.prompt("tell me about octopuses")
     await mind_b.process()
     print("session B:", texts(mind_b.get_replies())[0])
-    print(f"  recall hit: {[e.text for e in mind_b.soul.journal.recall('octopuses')]}")
+    print(f"  recall hit: {[e.text for e in mind_b.subject.journal.recall('octopuses')]}")
     mind_b.close()
     return journal_path
 
@@ -129,7 +125,7 @@ async def run_once(tape: Path, mode: str, run_id: str) -> tuple[str, list]:
     factory = taped(tape, mode=mode)
     mind = remembering_mind(
         WORK / f"journal-{run_id}.jsonl",
-        factory("echo:", rule=jittery_rule),
+        factory(JITTERY),
         name=run_id,
         run_id=run_id,
         run_dir=WORK / "traces",

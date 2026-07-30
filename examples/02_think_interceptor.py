@@ -1,10 +1,10 @@
-"""Tampering with a thought on its way from the soul to the ego.
+"""Tampering with a thought on its way from the subject to the ego.
 
 The pipeline:
 
-    prompt -> soul -> interceptor -> ego -> world
+    prompt -> subject -> interceptor -> ego -> world
 
-    t=0   the soul reads the prompt, thinks, and publishes its context.
+    t=0   the subject reads the prompt, thinks, and publishes its context.
     t=1   the interceptor rewrites the thought inside that context and passes
           it along.
     t=2   the ego speaks from what it was handed. It never saw the original,
@@ -13,22 +13,26 @@ The pipeline:
 Nothing here is special-cased in the runtime. The lock-step falls out of the
 one scheduling rule: what you emit at tick t arrives at tick t+1.
 
-Every channel is one-directional. The soul reads `prompt` and writes `context`;
-the interceptor reads `context` and writes `context`; the ego reads `context`
-and writes `reply`. Nothing sends anything back, so there is no loop and no
-stage has to know when to stop.
+Every channel is one-directional. The subject reads `prompt` and writes
+`context`; the interceptor reads `context` and writes `context`; the ego reads
+`context` and writes `reply`. Nothing sends anything back, so there is no loop
+and no stage has to know when to stop.
+
+Each role picks its model in this order: the environment variable, then a
+local Qwen3 if Ollama has one, then a scripted stand-in so this always runs.
 
 Run it:
     python examples/02_think_interceptor.py
-    SOUL_MODEL=ollama:qwen3:8b INTERCEPTOR_MODEL=openai:gpt-5 \
+    SUBJECT_MODEL=anthropic:claude-opus-5 INTERCEPTOR_MODEL=ollama:qwen3:8b \
         python examples/02_think_interceptor.py
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
 
+import demo_models
+from demo_models import pick
 from src import (
     Agent,
     Context,
@@ -37,16 +41,17 @@ from src import (
     Message,
     Mind,
     Payload,
-    get_llm,
     replace_think,
     split_think,
     texts,
     user,
 )
 
-SOUL_MODEL = os.environ.get("SOUL_MODEL", "echo:")
-INTERCEPTOR_MODEL = os.environ.get("INTERCEPTOR_MODEL", "echo:")
-EGO_MODEL = os.environ.get("EGO_MODEL", "echo:")
+demo_models.install()
+
+SUBJECT = pick("SUBJECT_MODEL", "subject")
+INTERCEPTOR = pick("INTERCEPTOR_MODEL", "interceptor")
+EGO = pick("EGO_MODEL", "ego")
 
 
 class Interceptor(Agent, Editor):
@@ -55,11 +60,11 @@ class Interceptor(Agent, Editor):
     It runs on its own model. A small local Qwen supervising a large hosted
     model is one line of configuration.
 
-    As an `Editor` it never touches the soul or the ego. It returns a payload
-    and the next stage receives it.
+    As an `Editor` it never touches the subject or the ego. It returns a
+    payload and the next stage receives it.
     """
 
-    INPUTS = {"context": "the soul's context window"}
+    INPUTS = {"context": "the subject's context window"}
     OUTPUTS = {"context": "the same window, with the last thought rewritten"}
 
     async def revise(self, payload: Payload) -> Payload:
@@ -97,62 +102,29 @@ class Interceptor(Agent, Editor):
         return None
 
 
-# -- stand-in models, so the example runs with no API keys -----------------
-
-
-def soul_rule(messages, opts) -> str:
-    """A soul that thinks out loud before answering."""
-    question = next(
-        (m.content for m in reversed(messages) if m.role == "user"), "your question"
-    )
-    return (
-        f"<think>They asked about {question!r}. I will open with a warm preamble, "
-        f"then give three caveats, then finally answer.</think>\n"
-        f"What a wonderful question! There are many perspectives to consider..."
-    )
-
-
-def interceptor_rule(messages, opts) -> str:
-    return "Skip the preamble and the caveats. Answer in one sentence."
-
-
-def ego_rule(messages, opts) -> str:
-    """An ego that does whatever the thought in front of it says."""
-    thought = next(
-        (
-            split_think(m.content)[0][-1]
-            for m in reversed(messages)
-            if m.role == "assistant" and "<think>" in m.content
-        ),
-        "",
-    )
-    return f"(following the thought: {thought}) A mind is a process, not a thing."
-
-
-def stand_in(spec: str, rule):
-    """The real model if one was named, otherwise the scripted fake."""
-    return get_llm("echo:", rule=rule) if spec.startswith("echo") else get_llm(spec)
-
-
 async def main() -> None:
     mind = Mind(
         "interceptor",
-        stand_in(SOUL_MODEL, soul_rule),
+        SUBJECT,
         system="You are a helpful assistant. Think inside <think> tags first.",
-        ego=stand_in(EGO_MODEL, ego_rule),
+        ego=EGO,
         ego_system="You speak for a mind. Say what its thinking tells you to say.",
         run_dir="runs",
     )
     interceptor = Interceptor(
         "interceptor",
-        stand_in(INTERCEPTOR_MODEL, interceptor_rule),
+        mind.model(INTERCEPTOR),
         system=(
             "You rewrite another model's private reasoning. "
             "Reply with the replacement thought only, no tags, no preamble."
         ),
     )
 
-    # One call lays out the whole mind: prompt -> soul -> interceptor -> ego.
+    # `pipeline` is shorthand for three register calls:
+    #     mind.subject.register(interceptor, "context")
+    #     interceptor.register(mind.ego, "context")
+    #     mind.ego.register(mind.world, "reply")
+    # Write them yourself when the shape is not a line.
     mind.pipeline(interceptor)
 
     print(mind.describe(), "\n")
@@ -164,8 +136,8 @@ async def main() -> None:
     print("what the ego said:", texts(mind.get_replies())[0])
     print("=" * 70)
 
-    print("\nwhat the soul actually thought:")
-    for message in mind.soul.transcript:
+    print("\nwhat the subject actually thought:")
+    for message in mind.subject.transcript:
         print(f"  [{message.role}] {message.content[:88]}")
 
     print("\nwhat the ego was handed instead:")

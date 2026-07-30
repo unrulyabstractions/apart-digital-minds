@@ -1,7 +1,7 @@
 # dmind
 
 A small runtime for digital-mind experiments. A mind is one target model, its
-**soul**, plus whatever you attach to it: something reading its context,
+**subject**, plus whatever you attach to it: something reading its context,
 something rewriting its thoughts, something speaking beside it. Everything runs
 on a clock you control. No cognitive architecture is built in.
 
@@ -111,7 +111,7 @@ async def main():
 asyncio.run(main())
 ```
 
-No wiring. The soul is the front door in both directions: `prompt` reaches it
+No wiring. The subject is the front door in both directions: `prompt` reaches it
 because it is the entry, and its `reply` reaches you because the mind connected
 it.
 
@@ -124,49 +124,62 @@ Driving a mind is three steps, kept apart on purpose.
 | `await mind.process_one()` | Run exactly one tick, for stepping through a run. |
 | `mind.get_replies()` | Read what came out. Reading drains. |
 
-## The soul, the stages, and the ego
+## The subject, the stages, and the ego
 
 A mind is a pipeline with a fixed shape.
 
 ```
-prompt -> soul -> [stages] -> ego -> world
+prompt -> subject -> [stages] -> ego -> world
 ```
 
 | Part | Reads | Writes |
 | --- | --- | --- |
-| `soul` | `prompt` | `context`, `reply`, `thought` |
+| `subject` | `prompt` | `context`, `reply`, `thought` |
 | stage | `context` | `context` |
 | `ego` | `context` | `reply` |
 
-**soul** is the target model, the thing an experiment is about. It thinks and
+**subject** is the target model, the thing an experiment is about. It thinks and
 publishes what it thought. **stages** sit in between; each takes a context and
 passes a context along, which is where interception lives. **ego** speaks from
 whatever context reaches it, including an edited one, and cannot tell.
 
-The ego is optional. Without one the soul's own reply goes straight to you, so
-the simplest mind is a soul and nothing else.
+The ego is optional. Without one the subject's own reply goes straight to you, so
+the simplest mind is a subject and nothing else.
 
-Every channel is one-directional and means one thing. The soul never consumes
+Every channel is one-directional and means one thing. The subject never consumes
 what it produces, so **the pipeline cannot loop** and no stage has to know when
 to stop.
 
 ```python
 mind = Mind("study", "openai:gpt-5", ego="ollama:qwen3:8b")
-mind.pipeline(interceptor)      # prompt -> soul -> interceptor -> ego -> world
+mind.pipeline(interceptor)      # prompt -> subject -> interceptor -> ego -> world
 ```
 
-`mind.pipeline` is the one thing the mind wires, because soul, stages, and ego
-are its own anatomy. Everything else still registers itself, and a relayout
-leaves those hand-made links alone.
+`mind.pipeline` is shorthand for `register` calls and nothing else. That one
+line is exactly:
 
 ```python
-mind.soul.register(blackboard, "*")   # a monitor, wired by hand, survives
+mind.subject.register(interceptor, "context")
+interceptor.register(mind.ego, "context")
+mind.ego.register(mind.world, "reply")
+```
+
+Write those yourself when the shape is not a line. `Mind(..., autowire=False)`
+lays out nothing, and `mind.describe()` marks which links came from the
+pipeline so nothing is hidden.
+
+The mind offers this because subject, stages, and ego are its own anatomy. It
+has no routing table. Everything else registers itself, and a relayout leaves
+those hand-made links alone.
+
+```python
+mind.subject.register(blackboard, "*")   # a monitor, wired by hand, survives
 ```
 
 Put something else at either end:
 
 ```python
-Mind("halves", "ollama:qwen3:8b", soul=MySoul)   # a subclass, or a factory
+Mind("halves", "ollama:qwen3:8b", subject=MySubject)   # a subclass, or a factory
 Mind("halves", "openai:gpt-5", ego=MyEgo("ego", get_llm("echo:")))
 ```
 
@@ -368,10 +381,12 @@ kind, and a duration where one applies. Model calls record the provider spec,
 token counts, latency, and the full text.
 
 ```
-t=0     0.001s target         llm.request    -> echo:echo [draft] 2 msgs: What is a digital mind?
-t=0     0.002s target         llm.response   <- echo:echo [draft] <think>They asked about...
-t=0     0.002s target         task.emit      target -> interceptor [inspect] <3 messages>
-t=1     0.002s interceptor    handle.start   target -> interceptor [inspect] <3 messages>
+t=0  0.000s world     task.emit     world --prompt--> subject What is a digital mind?
+t=0  0.001s subject   handle.start  1 in: prompt
+t=0  0.001s subject   llm.request   -> demo:subject [answer] 2 msgs: What is a digital mind?
+t=0  0.002s subject   llm.response  <- demo:subject [answer] <think>They asked about ...
+t=0  0.002s subject   task.emit     subject --context--> interceptor <3 messages: after answer>
+t=1  0.003s intercep. handle.start  1 in: context
 ```
 
 Log from your own code with `ctx.log.note(...)`, and time a block with

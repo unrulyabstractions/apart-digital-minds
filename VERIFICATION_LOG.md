@@ -315,3 +315,49 @@ the links it created. `test_relayout_keeps_wiring_it_did_not_create` covers it.
 
 The interceptor's "have I already edited this" guard, and the loop-termination
 paragraph that explained it. With a forward pipeline neither is needed.
+
+## 2026-07-30 — soul renamed to subject; demo models moved behind the registry
+
+`Soul` is now `Subject` and `mind.soul` is `mind.subject`. Entries above this
+line use the old name and the old file path `src/dminds/soul.py`; they record
+what was true when they were written and have not been rewritten.
+
+Two other things, both prompted by the examples being unclean:
+
+- `stand_in(SUBJECT_MODEL, subject_rule)` and its rule functions were scaffolding
+  sitting in every example. They now live in `examples/demo_models.py` behind a
+  `demo:` provider, so an example names a role and gets a model. Examples 02 and
+  03 lost 38 and 103 lines.
+- Every example now picks its model as: the environment variable, then a local
+  Qwen3 if Ollama has one pulled, then the scripted stand-in.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 80 | The rename is complete | Grepped every `.py` and `.md` outside this log for `soul`, `Soul`, `SOUL` | VERIFIED (0 remaining) |
+| 81 | Test suite | `tests/run_tests.py` in the clean pip venv | VERIFIED (105 passed, 0 failed) |
+| 82 | `pipeline` hides no wiring | Built the same mind twice, once with `pipeline` and once with three `register` calls under `autowire=False`, and compared the link sets | VERIFIED (identical) |
+| 83 | `describe` marks pipeline links | Two links carry `[pipeline]`; a `subject --*--> spy` link registered by hand does not | VERIFIED |
+| 84 | The demo provider | `get_llm("demo:subject").spec` reads `demo:subject`, and it answers with the scripted text | VERIFIED |
+| 85 | Model selection order | With no env var and no Ollama, `pick` returns `demo:subject`; with `SUBJECT_MODEL` set, the env var wins | VERIFIED |
+| 86 | Examples | All four run and behave as before. Example 02 still settles in 3 ticks and still prints the subject's real thought beside the edited one | VERIFIED (4/4) |
+| 87 | Trace artifacts | Re-opened every `trace.jsonl` and per-module file | VERIFIED (26, 33, 41 events; seq contiguous; sums match) |
+| 88 | `api` purity | AST scan over `src/api` | VERIFIED (0) |
+
+### Fixed
+
+The README carried a **stale trace sample** from before the channel redesign,
+showing `target`, `inspect`, and `<3 messages>`. Replaced with output captured
+from a real run.
+
+An edit to `src/dminds/mind.py` silently did nothing because the shell cwd had
+leaked into `examples/`, so `pathlib` wrote nowhere. Caught by reading the
+output rather than the exit code. The edit was reapplied from the repo root
+with an assertion on the text being replaced.
+
+### UNVERIFIED
+
+The Qwen3 fallback path in `pick` was exercised only in its negative branch:
+no Ollama server was running here, so it returned the stand-in. The branch that
+finds a pulled `qwen3` model and returns `ollama:<name>` has not run.

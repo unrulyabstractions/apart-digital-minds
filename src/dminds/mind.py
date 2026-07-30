@@ -1,6 +1,6 @@
 """`Mind`: the standard implementation of `api.Mind`.
 
-A mind is one target model, called its **soul**, plus whatever you attach to
+A mind is one target model, called its **subject**, plus whatever you attach to
 it. It holds modules and time. It does not wire them and has no routing table,
 because a module registers consumers onto its own channels.
 
@@ -9,11 +9,11 @@ because a module registers consumers onto its own channels.
     await mind.process()
     print(texts(mind.get_replies()))
 
-The soul is wired to you in both directions already: `prompt` reaches it
+The subject is wired to you in both directions already: `prompt` reaches it
 because it is the entry, and its `reply` reaches you because the mind
 connected it. Put a module in between to preprocess either side.
 
-`mind.soul` publishes `context`, `reply`, and `thought`. Register anything you
+`mind.subject` publishes `context`, `reply`, and `thought`. Register anything you
 like onto those, and register back onto its `context` to rewrite what it
 remembers.
 
@@ -35,19 +35,19 @@ from ..api.runtime import Mind as MindInterface
 from ..api.types import Link, Message, Payload, Text
 from .llm import get_llm
 from .module import BaseModule
-from .soul import Ego, Soul
+from .subject import Ego, Subject
 from .scheduler import TickScheduler
 from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
 
-def _build_soul(spec, llm: LLM, system: str | None) -> Module:
+def _build_subject(spec, llm: LLM, system: str | None) -> Module:
     """The module at the centre. A class, a factory, or a finished module."""
     if isinstance(spec, Module):
         return spec
     if spec is None:
-        return Soul("soul", llm, system=system)
+        return Subject("subject", llm, system=system)
     if isinstance(spec, type):
-        return spec("soul", llm, system=system)
+        return spec("subject", llm, system=system)
     return spec(llm)
 
 
@@ -107,12 +107,12 @@ class Mind(MindInterface):
 
     Args:
         model: the target model, as a spec string or a built `LLM`. The mind
-            wraps it in a soul and holds it as `mind.soul`. Leave it out for a
+            wraps it in a subject and holds it as `mind.subject`. Leave it out for a
             mind that is only a graph of modules.
-        system: the soul's system prompt.
-        soul: something other than the default `Soul` at the centre. A
+        system: the subject's system prompt.
+        subject: something other than the default `Subject` at the centre. A
             subclass, or a callable taking the `LLM` and returning a module.
-        autowire: connect the soul's `reply` channel to `world`, so a mind
+        autowire: connect the subject's `reply` channel to `world`, so a mind
             answers you without any wiring at all. Turn it off to put a filter
             in between.
 
@@ -120,7 +120,7 @@ class Mind(MindInterface):
     alone they are `TickScheduler`, `RunTracer`, and `get_llm`.
 
         Mind("study", "openai:gpt-5", system="Think first.")
-        Mind("halves", "ollama:qwen3:8b", soul=Outer)
+        Mind("halves", "ollama:qwen3:8b", subject=Outer)
         Mind("taped", "echo:", model_factory=taped("runs/tape.jsonl"))
     """
 
@@ -129,7 +129,7 @@ class Mind(MindInterface):
         name: str = "mind",
         model: str | LLM | None = None,
         system: str | None = None,
-        soul: type[Module] | Callable[[LLM], Module] | None = None,
+        subject: type[Module] | Callable[[LLM], Module] | None = None,
         ego: str | LLM | Module | None = None,
         ego_system: str | None = None,
         autowire: bool = True,
@@ -187,15 +187,15 @@ class Mind(MindInterface):
 
         #: The target model, as a module. None if the mind was given no model.
         #: The target model, as a module. None if the mind was given no model.
-        self.soul: Module | None = None
-        #: The part that speaks, if there is one. Otherwise the soul speaks.
+        self.subject: Module | None = None
+        #: The part that speaks, if there is one. Otherwise the subject speaks.
         self.ego: Module | None = None
         self._stages: list[Module] = []
         self._pipeline_links: list[tuple[Module, Link]] = []
 
         if model is not None:
             llm = model if isinstance(model, LLM) else self.model(model)
-            self.soul = self.adopt(_build_soul(soul, llm, system))
+            self.subject = self.adopt(_build_subject(subject, llm, system))
         if ego is not None:
             self.ego = self.adopt(_build_ego(ego, ego_system, self.model))
         if autowire:
@@ -215,20 +215,26 @@ class Mind(MindInterface):
     # -- the pipeline ----------------------------------------------------
 
     def pipeline(self, *stages: Module) -> list[Module]:
-        """Lay out `prompt -> soul -> stages -> ego -> world`.
+        """Lay out `prompt -> subject -> stages -> ego -> world`.
 
-        The mind owns this because soul, stages, and ego are its own anatomy,
-        not arbitrary modules. Everything else still registers itself.
+        This is shorthand for `register` calls and nothing else. With one stage
+        and an ego, `mind.pipeline(interceptor)` is exactly:
 
-        Each stage takes a `context` and passes a `context` along, so an
-        interceptor is just a stage. Call it again to change the order; the
-        previous layout is discarded.
+            mind.subject.register(interceptor, "context")
+            interceptor.register(mind.ego, "context")
+            mind.ego.register(mind.world, "reply")
 
-            mind.pipeline(interceptor)      # soul -> interceptor -> ego
+        Write those yourself when the shape is not a line. Pass
+        `autowire=False` so nothing is laid out for you, then wire whatever
+        graph you want with the same one verb.
 
-        With no ego, the soul's own reply is what reaches you.
+        The mind offers this because subject, stages, and ego are its own
+        anatomy. It has no routing table and no say in anything else.
+
+        Calling it again discards the previous layout and only that: links you
+        made by hand are left alone. `describe` marks what came from here.
         """
-        if self.soul is None:
+        if self.subject is None:
             return []
 
         # Undo exactly what a previous layout put down, and nothing else. A
@@ -241,8 +247,8 @@ class Mind(MindInterface):
         for stage in self._stages:
             self.adopt(stage)
 
-        chain: list[Module] = [self.soul, *self._stages]
-        speaker = self.ego if self.ego is not None else self.soul
+        chain: list[Module] = [self.subject, *self._stages]
+        speaker = self.ego if self.ego is not None else self.subject
         if self.ego is not None:
             chain.append(self.ego)
 
@@ -257,7 +263,7 @@ class Mind(MindInterface):
 
     @property
     def stages(self) -> list[Module]:
-        """The modules currently sitting between the soul and the ego."""
+        """The modules currently sitting between the subject and the ego."""
         return list(self._stages)
 
     # -- assembly ------------------------------------------------------
@@ -518,9 +524,11 @@ class Mind(MindInterface):
             channels = ", ".join(sorted(module.OUTPUTS)) or "no outputs"
             lines.append(f"    {module.name:<16} {type(module).__name__:<14} {channels}")
         links = self.links()
+        laid_out = {id(link) for _, link in self._pipeline_links}
         lines.append("  links:")
         for link in links:
-            lines.append(f"    {link.describe()}")
+            mark = "  [pipeline]" if id(link) in laid_out else ""
+            lines.append(f"    {link.describe()}{mark}")
         if not links:
             lines.append("    (nothing registered)")
         if self.run_path:

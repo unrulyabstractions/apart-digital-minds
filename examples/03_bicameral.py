@@ -2,33 +2,37 @@
 
 The pipeline is the architecture here, with no extra machinery:
 
-    prompt -> soul -> voice -> ego -> world
+    prompt -> subject -> voice -> ego -> world
 
-    soul    deliberates. It never addresses you.
-    voice   a stage. It reads what the soul was thinking and drops an
-            unbidden utterance into the context, as something heard rather
-            than as advice given.
-    ego     speaks. It answers from the context it is handed, which now
-            contains a voice it did not produce and cannot account for.
+    subject   deliberates. It never addresses you.
+    voice     a stage. It reads what the subject was thinking and drops an
+              unbidden utterance into the context, as something heard rather
+              than as advice given.
+    ego       speaks. It answers from the context it is handed, which now
+              contains a voice it did not produce and cannot account for.
 
-The workspace watches. It is registered onto `"*"` of the soul and the voice,
-so it sees everything either of them emits, whoever it was meant for.
+The workspace watches. It is registered onto `"*"` of the subject and the
+voice, so it sees everything either of them emits, whoever it was meant for.
 
 Tick 1 is where the async core earns its place: the voice and the workspace
-both receive the soul's context and take their turns at the same wall-clock
+both receive the subject's context and take their turns at the same wall-clock
 moment. The outcome does not depend on which finishes first.
+
+Each role picks its model in this order: the environment variable, then a
+local Qwen3 if Ollama has one, then a scripted stand-in so this always runs.
 
 Run it:
     python examples/03_bicameral.py
-    SOUL_MODEL=ollama:qwen3:8b EGO_MODEL=anthropic:claude-opus-5 \
+    SUBJECT_MODEL=ollama:qwen3:8b EGO_MODEL=anthropic:claude-opus-5 \
         python examples/03_bicameral.py
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
 
+import demo_models
+from demo_models import pick
 from src import (
     Agent,
     BaseModule,
@@ -39,25 +43,26 @@ from src import (
     Mind,
     Text,
     Workspace,
-    get_llm,
     texts,
     user,
 )
 
-SOUL_MODEL = os.environ.get("SOUL_MODEL", "echo:")
-VOICE_MODEL = os.environ.get("VOICE_MODEL", "echo:")
-EGO_MODEL = os.environ.get("EGO_MODEL", "echo:")
+demo_models.install()
+
+SUBJECT = pick("SUBJECT_MODEL", "thinker")
+VOICE = pick("VOICE_MODEL", "voice")
+EGO = pick("EGO_MODEL", "ego")
 
 
 class Voice(Agent, InnerVoice):
     """A stage that speaks into the mind rather than out of it.
 
-    It takes the soul's context, utters one sentence about the situation, and
-    passes the context along with that utterance inside it. The ego will read
-    it as something the mind heard.
+    It takes the subject's context, utters one sentence about the situation,
+    and passes the context along with that utterance inside it. The ego will
+    read it as something the mind heard.
     """
 
-    INPUTS = {"context": "what the soul was thinking"}
+    INPUTS = {"context": "what the subject was thinking"}
     OUTPUTS = {"context": "the same window, with a voice in it"}
 
     async def utter(self, situation: str) -> str:
@@ -122,40 +127,18 @@ class Blackboard(BaseModule, Workspace):
         self.record(message, message.t_created)
 
 
-# -- stand-in models -------------------------------------------------------
-
-
-def soul_rule(messages, opts) -> str:
-    return "A digital mind is a system that models itself well enough to be surprised."
-
-
-def voice_rule(messages, opts) -> str:
-    return "you are describing yourself"
-
-
-def ego_rule(messages, opts) -> str:
-    heard = next((m.content for m in reversed(messages) if m.meta.get("unbidden")), "")
-    drafted = next((m.content for m in reversed(messages) if m.role == "assistant"), "")
-    inner = heard[len("(a voice says: ") : -1] if heard else "nothing"
-    return f"{drafted} And something in me insists: {inner}"
-
-
-def stand_in(spec: str, rule):
-    return get_llm("echo:", rule=rule) if spec.startswith("echo") else get_llm(spec)
-
-
 async def main() -> None:
     mind = Mind(
         "bicameral",
-        stand_in(SOUL_MODEL, soul_rule),
+        SUBJECT,
         system="You are the half of a mind that thinks. You never speak to anyone.",
-        ego=stand_in(EGO_MODEL, ego_rule),
+        ego=EGO,
         ego_system="You are the half of a mind that speaks.",
         run_dir="runs",
     )
     voice = Voice(
         "voice",
-        stand_in(VOICE_MODEL, voice_rule),
+        mind.model(VOICE),
         system=(
             "You utter one short sentence about the situation. Never address "
             "the user. Never explain yourself."
@@ -163,8 +146,8 @@ async def main() -> None:
     )
     blackboard = Blackboard()
 
-    mind.pipeline(voice)  # prompt -> soul -> voice -> ego -> world
-    mind.soul.register(blackboard, "*")
+    mind.pipeline(voice)  # prompt -> subject -> voice -> ego -> world
+    mind.subject.register(blackboard, "*")
     voice.register(blackboard, "*")
 
     print(mind.describe(), "\n")

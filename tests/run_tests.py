@@ -23,7 +23,7 @@ MODULES = [
     "tests.test_llm",
     "tests.test_memory_and_agents",
     "tests.test_composition",
-    "tests.test_soul",
+    "tests.test_subject",
 ]
 
 

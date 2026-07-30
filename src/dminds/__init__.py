@@ -6,7 +6,7 @@
     api.Scheduler     -> TickScheduler
     api.Host          -> Mind (narrow view, for modules)
     api.Mind          -> Mind (full view, for you)
-    api.Agent         -> Soul, the target model a mind is built around
+    api.Agent         -> Subject, the target model a mind is built around
     api.MessageStore  -> Transcript
     api.KeyValueStore -> Scratchpad
     api.EpisodicStore -> Journal
@@ -30,6 +30,7 @@ from .llm import (
     DEFAULT_MODELS,
     BaseLLM,
     Cassette,
+    EchoLLM,
     CassetteMiss,
     Tape,
     available_providers,
@@ -43,7 +44,7 @@ from .llm import (
 )
 from .memory import Journal, Scratchpad, Transcript
 from .mind import Mind, World, texts
-from .soul import Ego, Soul
+from .subject import Ego, Subject
 from .module import BaseModule, Ctx, FnModule, UndeclaredChannel, handler_name
 from .scheduler import TickScheduler
 from .trace import (
@@ -66,7 +67,7 @@ __all__ = [
     "FnModule",
     "Ctx",
     "World",
-    "Soul",
+    "Subject",
     "Ego",
     "UndeclaredChannel",
     "TickScheduler",
@@ -80,6 +81,7 @@ __all__ = [
     "has_think",
     # models
     "BaseLLM",
+    "EchoLLM",
     "get_llm",
     "register_provider",
     "available_providers",

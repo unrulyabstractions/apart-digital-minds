@@ -1,10 +1,10 @@
-"""The soul: the target model a mind is built around, and how you drive it."""
+"""The subject: the target model a mind is built around, and how you drive it."""
 
 from __future__ import annotations
 
 import asyncio
 
-from src import Ctx, Message, Mind, Soul, Text, get_llm, texts
+from src import Ctx, Message, Mind, Subject, Text, get_llm, texts
 from src.api import Agent as AgentInterface
 from src.api import Module
 
@@ -13,29 +13,29 @@ def quiet(**kwargs) -> Mind:
     return Mind("test", run_dir=None, console=False, **kwargs)
 
 
-# -- the soul exists and is wired --------------------------------------------
+# -- the subject exists and is wired --------------------------------------------
 
 
-def test_a_mind_with_a_model_has_a_soul():
+def test_a_mind_with_a_model_has_a_subject():
     mind = quiet(model="echo:")
-    soul = mind.soul
+    subject = mind.subject
     mind.close()
-    assert isinstance(soul, Soul)
-    assert soul.name == "soul"
+    assert isinstance(subject, Subject)
+    assert subject.name == "subject"
 
 
-def test_a_mind_without_a_model_has_no_soul():
+def test_a_mind_without_a_model_has_no_subject():
     mind = quiet()
-    assert mind.soul is None
+    assert mind.subject is None
     mind.close()
 
 
-def test_soul_is_a_module_and_an_agent():
-    assert Module in Soul.__mro__
-    assert AgentInterface in Soul.__mro__
+def test_subject_is_a_module_and_an_agent():
+    assert Module in Subject.__mro__
+    assert AgentInterface in Subject.__mro__
 
 
-def test_the_soul_is_the_entry_and_speaks_without_wiring():
+def test_the_subject_is_the_entry_and_speaks_without_wiring():
     """No register call anywhere. A mind answers out of the box."""
 
     async def run():
@@ -49,8 +49,8 @@ def test_the_soul_is_the_entry_and_speaks_without_wiring():
 
     out, entry, links = asyncio.run(run())
     assert out == ["hello back"]
-    assert entry == "soul"
-    assert links == ["soul --reply--> world"]
+    assert entry == "subject"
+    assert links == ["subject --reply--> world"]
 
 
 def test_autowire_can_be_turned_off():
@@ -74,17 +74,17 @@ def test_a_built_model_can_be_passed_instead_of_a_spec():
     assert asyncio.run(run()) == ["from a built model"]
 
 
-# -- what the soul publishes -------------------------------------------------
+# -- what the subject publishes -------------------------------------------------
 
 
-def test_the_soul_publishes_context_reply_and_thought():
-    assert set(Soul.OUTPUTS) == {"context", "reply", "thought"}
+def test_the_subject_publishes_context_reply_and_thought():
+    assert set(Subject.OUTPUTS) == {"context", "reply", "thought"}
 
 
 def test_context_carries_the_whole_window():
     seen = {}
 
-    class Watcher(Soul):
+    class Watcher(Subject):
         pass
 
     from src import BaseModule
@@ -96,7 +96,7 @@ def test_context_carries_the_whole_window():
 
     async def run():
         mind = quiet(model=get_llm("echo:", script=["ok"]), system="rules")
-        mind.soul.register(Reader("reader"), "context")
+        mind.subject.register(Reader("reader"), "context")
         mind.prompt("hi")
         await mind.process()
         mind.close()
@@ -118,7 +118,7 @@ def test_thought_is_published_only_when_there_is_one():
 
     async def run(script):
         mind = quiet(model=get_llm("echo:", script=script))
-        mind.soul.register(Reader("reader"), "thought")
+        mind.subject.register(Reader("reader"), "thought")
         mind.prompt("hi")
         await mind.process()
         mind.close()
@@ -141,10 +141,10 @@ def test_reply_has_the_reasoning_stripped_out():
     assert asyncio.run(run()) == ["Visible."]
 
 
-def test_the_soul_cannot_consume_what_it_produces():
+def test_the_subject_cannot_consume_what_it_produces():
     """Atomic channels. No name is both an input and an output, so no cycle."""
-    assert set(Soul.INPUTS) & set(Soul.OUTPUTS) == set()
-    assert set(Soul.INPUTS) == {"prompt"}
+    assert set(Subject.INPUTS) & set(Subject.OUTPUTS) == set()
+    assert set(Subject.INPUTS) == {"prompt"}
 
 
 def test_a_stage_edits_the_context_on_its_way_to_the_ego():
@@ -152,7 +152,7 @@ def test_a_stage_edits_the_context_on_its_way_to_the_ego():
     from src import BaseModule, Context, user
 
     class Rewriter(BaseModule):
-        INPUTS = {"context": "the soul's window"}
+        INPUTS = {"context": "the subject's window"}
         OUTPUTS = {"context": "a replacement"}
 
         async def on_input(self, message: Message, ctx: Ctx) -> None:
@@ -160,41 +160,41 @@ def test_a_stage_edits_the_context_on_its_way_to_the_ego():
 
     async def run():
         mind = quiet(
-            model=get_llm("echo:", script=["what the soul thought"]),
+            model=get_llm("echo:", script=["what the subject thought"]),
             ego=get_llm("echo:", script=["what the ego said"]),
         )
         mind.pipeline(Rewriter("rewriter"))
         mind.prompt("hi")
         await mind.process()
-        soul_history = [m.content for m in mind.soul.transcript]
+        subject_history = [m.content for m in mind.subject.transcript]
         ego_history = [m.content for m in mind.ego.transcript]
         out = texts(mind.get_replies())
         mind.close()
-        return soul_history, ego_history, out
+        return subject_history, ego_history, out
 
-    soul_history, ego_history, out = asyncio.run(run())
-    assert "hi" in soul_history, "the soul kept its own window"
+    subject_history, ego_history, out = asyncio.run(run())
+    assert "hi" in subject_history, "the subject kept its own window"
     assert ego_history[0] == "a totally different history", "the ego got the edit"
     assert out == ["what the ego said"], "the reply comes from the ego"
 
 
-def test_a_custom_soul_class_goes_at_the_centre():
-    class Terse(Soul):
+def test_a_custom_subject_class_goes_at_the_centre():
+    class Terse(Subject):
         OUTPUTS = {"reply": "just the answer"}
 
-    mind = quiet(model="echo:", soul=Terse)
-    soul = mind.soul
+    mind = quiet(model="echo:", subject=Terse)
+    subject = mind.subject
     mind.close()
-    assert isinstance(soul, Terse)
-    assert soul.name == "soul"
+    assert isinstance(subject, Terse)
+    assert subject.name == "subject"
 
 
-def test_a_soul_factory_is_also_accepted():
-    class Named(Soul):
+def test_a_subject_factory_is_also_accepted():
+    class Named(Subject):
         pass
 
-    mind = quiet(model="echo:", soul=lambda llm: Named("soul", llm, system="via factory"))
-    content = mind.soul.transcript[0].content
+    mind = quiet(model="echo:", subject=lambda llm: Named("subject", llm, system="via factory"))
+    content = mind.subject.transcript[0].content
     mind.close()
     assert content == "via factory"
 
@@ -206,7 +206,7 @@ def test_prompt_does_not_run_the_mind():
     mind = quiet(model="echo:")
     mind.prompt("hi")
     assert mind.scheduler.t == 0, "prompt only delivers"
-    assert mind.soul.pending == 1, "and the soul is holding it"
+    assert mind.subject.pending == 1, "and the subject is holding it"
     mind.close()
 
 
@@ -275,19 +275,19 @@ def test_get_replies_drains():
 # -- the ego and the pipeline -------------------------------------------------
 
 
-def test_without_an_ego_the_soul_speaks():
+def test_without_an_ego_the_subject_speaks():
     mind = quiet(model="echo:")
     links = [ln.describe() for ln in mind.links()]
     ego = mind.ego
     mind.close()
     assert ego is None
-    assert links == ["soul --reply--> world"]
+    assert links == ["subject --reply--> world"]
 
 
 def test_with_an_ego_the_reply_comes_from_the_ego():
     async def run():
         mind = quiet(
-            model=get_llm("echo:", script=["the soul's answer"]),
+            model=get_llm("echo:", script=["the subject's answer"]),
             ego=get_llm("echo:", script=["the ego's answer"]),
         )
         mind.prompt("hi")
@@ -298,11 +298,11 @@ def test_with_an_ego_the_reply_comes_from_the_ego():
         return out, links
 
     out, links = asyncio.run(run())
-    assert out == ["the ego's answer"], "the soul's reply is not what reaches you"
-    assert links == ["soul --context--> ego", "ego --reply--> world"]
+    assert out == ["the ego's answer"], "the subject's reply is not what reaches you"
+    assert links == ["subject --context--> ego", "ego --reply--> world"]
 
 
-def test_pipeline_lays_out_soul_then_stages_then_ego():
+def test_pipeline_lays_out_subject_then_stages_then_ego():
     from src import BaseModule
 
     class Stage(BaseModule):
@@ -316,7 +316,7 @@ def test_pipeline_lays_out_soul_then_stages_then_ego():
     mind.close()
     assert stages == ["one", "two"]
     assert links == sorted([
-        "soul --context--> one",
+        "subject --context--> one",
         "one --context--> two",
         "two --context--> ego",
         "ego --reply--> world",
@@ -337,7 +337,7 @@ def test_relaying_out_the_pipeline_discards_the_previous_one():
     mind.close()
     assert "one" not in " ".join(links), "the old layout should be gone"
     assert links == sorted([
-        "soul --context--> two",
+        "subject --context--> two",
         "two --context--> ego",
         "ego --reply--> world",
     ])
@@ -354,7 +354,7 @@ def test_a_stage_joins_the_mind_by_being_in_the_pipeline():
     mind.pipeline(Stage("middle"))
     names = sorted(mind.modules)
     mind.close()
-    assert names == ["ego", "middle", "soul"]
+    assert names == ["ego", "middle", "subject"]
 
 
 def test_the_ego_reads_context_and_writes_reply():
@@ -377,9 +377,49 @@ def test_relayout_keeps_wiring_it_did_not_create():
         pass
 
     mind = quiet(model="echo:", ego="echo:")
-    mind.soul.register(Spy("spy"), "*")
+    mind.subject.register(Spy("spy"), "*")
     mind.pipeline(Stage("one"))
     mind.pipeline(Stage("two"))
     links = [ln.describe() for ln in mind.links()]
     mind.close()
     assert any("spy" in ln for ln in links), "the hand-made link was destroyed"
+
+
+def test_pipeline_is_exactly_the_register_calls_it_documents():
+    """No hidden wiring. `pipeline` is shorthand, and this pins it down."""
+    from src import BaseModule
+
+    class Stage(BaseModule):
+        INPUTS = {"context": "in"}
+        OUTPUTS = {"context": "out"}
+
+    laid_out = quiet(model="echo:", ego="echo:")
+    laid_out.pipeline(Stage("interceptor"))
+    automatic = sorted(ln.describe() for ln in laid_out.links())
+    laid_out.close()
+
+    by_hand = quiet(model="echo:", ego="echo:", autowire=False)
+    stage = Stage("interceptor")
+    by_hand.subject.register(stage, "context")
+    stage.register(by_hand.ego, "context")
+    by_hand.ego.register(by_hand.world, "reply")
+    manual = sorted(ln.describe() for ln in by_hand.links())
+    by_hand.close()
+
+    assert automatic == manual
+
+
+def test_describe_marks_which_links_the_pipeline_made():
+    from src import BaseModule
+
+    class Spy(BaseModule):
+        pass
+
+    mind = quiet(model="echo:", ego="echo:")
+    mind.subject.register(Spy("spy"), "*")
+    text = mind.describe()
+    mind.close()
+    marked = [ln for ln in text.splitlines() if "[pipeline]" in ln]
+    unmarked = [ln for ln in text.splitlines() if "spy" in ln]
+    assert len(marked) == 2, "subject -> ego and ego -> world came from the pipeline"
+    assert unmarked and "[pipeline]" not in unmarked[0], "the hand-made link is not"

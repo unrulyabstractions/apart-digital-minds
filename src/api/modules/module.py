@@ -12,16 +12,16 @@ channels itself, and handles a turn in two steps.
 Wiring lives here, not on the mind. A module owns its output channels, so a
 consumer is attached by the module that will do the emitting:
 
-    soul.register(monitor, "thought", as_channel="overheard")
+    subject.register(monitor, "thought", as_channel="overheard")
 
-When `soul` emits on `"thought"`, `monitor.on_input` is called with a message
+When `subject` emits on `"thought"`, `monitor.on_input` is called with a message
 whose channel reads `"overheard"`. Neither module names the other's
 vocabulary.
 
 Keep channels atomic: one name, one direction, one meaning. A module that both
 consumes and produces the same channel name can be wired into a cycle, and a
 cycle in a mind is something a human has to reason about at every tick. The
-shipped `Soul` reads `prompt` and writes `context`, so it cannot loop.
+shipped `Subject` reads `prompt` and writes `context`, so it cannot loop.
 """
 
 from __future__ import annotations

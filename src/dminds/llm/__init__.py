@@ -1,6 +1,7 @@
 """Model implementations. The interface they satisfy is `src.api.models.LLM`."""
 
 from .base import BaseLLM, merge_consecutive, split_system
+from .providers.echo import EchoLLM
 from .record import Cassette, CassetteMiss, Tape, request_key, taped
 from .registry import (
     ALIASES,
@@ -13,6 +14,7 @@ from .registry import (
 
 __all__ = [
     "BaseLLM",
+    "EchoLLM",
     "get_llm",
     "register_provider",
     "available_providers",

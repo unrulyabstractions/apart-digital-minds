@@ -1,26 +1,26 @@
-"""`Soul` and `Ego`: the two named parts a mind can be built around.
+"""`Subject` and `Ego`: the two named parts a mind can be built around.
 
 A mind is a pipeline with a fixed shape:
 
-    prompt -> soul -> [stages] -> ego -> world
+    prompt -> subject -> [stages] -> ego -> world
 
-    soul    the target model. It reads the prompt, thinks, and publishes what
-            it thought. It is the thing an experiment is about.
-    stages  anything you put in between. Each one takes a context and passes a
-            context along. This is where interception lives.
-    ego     the part that speaks. It is given a context, possibly an edited
-            one, and produces the reply you see.
+    subject   the target model. It reads the prompt, thinks, and publishes
+              what it thought. It is the thing an experiment is about.
+    stages    anything you put in between. Each one takes a context and passes
+              a context along. This is where interception lives.
+    ego       the part that speaks. It is given a context, possibly an edited
+              one, and produces the reply you see.
 
-The ego is optional. Without one the soul's own reply goes straight to you, so
-the simplest mind is a soul and nothing else.
+The ego is optional. Without one the subject's own reply goes straight to you,
+so the simplest mind is a subject and nothing else.
 
-Every channel is one-directional and means one thing. The soul never consumes
-what it produces, so the pipeline cannot loop and no stage has to know when to
-stop.
+Every channel is one-directional and means one thing. The subject never
+consumes what it produces, so the pipeline cannot loop and no stage has to know
+when to stop.
 
-    soul     reads  prompt            writes  context, reply, thought
-    stage    reads  context           writes  context
-    ego      reads  context           writes  reply
+    subject   reads  prompt     writes  context, reply, thought
+    stage     reads  context    writes  context
+    ego       reads  context    writes  reply
 """
 
 from __future__ import annotations
@@ -30,14 +30,14 @@ from .agents import Agent, split_think
 from .module import Ctx
 
 
-class Soul(Agent):
+class Subject(Agent):
     """The target model, as a module.
 
     Reads a prompt, takes one turn, and publishes three separate things. What
     happens to them afterwards is not its concern, and it has no way to find
     out.
 
-    Subclass it and pass the subclass as `Mind(..., soul=MySoul)`.
+    Subclass it and pass the subclass as `Mind(..., subject=MySubject)`.
     """
 
     INPUTS = {"prompt": "something to answer, as Text"}
@@ -76,7 +76,7 @@ class Ego(Agent):
     anything was changed.
 
     Give a mind an ego and the reply you receive comes from here instead of
-    from the soul.
+    from the subject.
     """
 
     INPUTS = {"context": "a context window to speak from, as Context"}

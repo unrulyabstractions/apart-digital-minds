@@ -10,11 +10,11 @@
 Wiring is absent from both. Modules register consumers on each other, so a
 mind holds modules and time, and has no opinion about who talks to whom.
 
-A mind is one target model, its **soul**, plus whatever you attach to it.
+A mind is one target model, its **subject**, plus whatever you attach to it.
 
     mind = Mind("demo", "openai:gpt-5", system="Be terse.")
-    mind.soul.register(mind.world, "reply")     # hear what it says
-    mind.soul.register(monitor, "context")      # read what it remembers
+    mind.subject.register(mind.world, "reply")     # hear what it says
+    mind.subject.register(monitor, "context")      # read what it remembers
 
 There is no separate step for adding a module. Wiring it in is adding it.
 
@@ -41,9 +41,9 @@ class Mind(Host):
 
     #: The target model, as a module. The thing a mind is built around, and
     #: the thing an experiment is about. None if the mind was given no model.
-    soul: Module | None
+    subject: Module | None
 
-    #: The part that speaks, if there is one. Without an ego the soul's own
+    #: The part that speaks, if there is one. Without an ego the subject's own
     #: reply is what reaches you.
     ego: Module | None
 
@@ -61,9 +61,9 @@ class Mind(Host):
 
     @abstractmethod
     def pipeline(self, *stages: Module) -> list[Module]:
-        """Lay out `prompt -> soul -> stages -> ego -> world`.
+        """Lay out `prompt -> subject -> stages -> ego -> world`.
 
-        The mind owns this because soul, stages, and ego are its own anatomy.
+        The mind owns this because subject, stages, and ego are its own anatomy.
         Each stage takes a `context` and passes a `context` along, so an
         interceptor is just a stage.
         """
