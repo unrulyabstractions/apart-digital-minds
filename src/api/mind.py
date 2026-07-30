@@ -93,6 +93,11 @@ class Mind(ABC):
     def links(self) -> list[Link]:
         """Every registration in the mind, gathered from its modules."""
 
+    @property
+    @abstractmethod
+    def auto_links(self) -> list[Link]:
+        """The subset of `links` that `intercept` laid out, rather than you."""
+
     @abstractmethod
     def validate(self) -> list[str]:
         """Every problem with the assembly, as readable lines.

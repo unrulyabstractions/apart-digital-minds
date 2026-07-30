@@ -494,3 +494,37 @@ stage still reads `subject_context` when what reached it came from an editor.
 | 116 | Suite, examples, traces | 106 tests; four examples; every trace re-opened | VERIFIED |
 | 117 | README Critic snippet | Rewrote it to the new names and ran it through a real `intercept` pipeline | VERIFIED |
 | 118 | Real Qwen after the rename | Re-ran example 02 with `SUBJECT_MODEL=hf:Qwen/Qwen3-0.6B` | VERIFIED |
+
+## 2026-07-30 — a browser UI, verified by looking at it
+
+`ui/server.py` plus `ui/page.html`: talk to a mind, watch every tick. Standard
+library only. The integration is one line, `mind.tracer.add_sink(WebSink(...))`,
+because `Sink` already receives every event a mind emits. The runtime did not
+change to accommodate it, which is the point.
+
+One small addition to the runtime: `Mind.auto_links`, publishing as data the
+same fact `describe()` already printed as text, so the UI renders the graph
+without reaching into a private attribute.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 119 | The server serves and streams | Started it, then drove it exactly as the browser does: opened `/events`, POSTed a prompt, read the stream. Got 33 trace events, the prompt echo, the reply, and two window snapshots | VERIFIED |
+| 120 | Model calls carry their full text | Asserted every `llm.response` payload has `data.text`, which is what click-to-expand shows | VERIFIED (3 calls) |
+| 121 | The windows view shows the interception | The snapshot reports subject 3 messages 0 edited, ego 4 messages 1 edited | VERIFIED |
+| 122 | The page actually renders | Screenshotted headless Chrome at 1600x1000 and **looked at the image**. Conversation, tick-grouped trace, and the wiring panel all render | VERIFIED |
+| 123 | The windows tab renders the experiment | Screenshotted `?still&tab=windows` and looked. The subject's real thought and the ego's window sit side by side, the edited message marked `ASSISTANT · EDITED` | VERIFIED |
+| 124 | Suite and examples after `auto_links` | 106 tests, four examples | VERIFIED |
+| 125 | No unused imports in `ui/` | AST scan | VERIFIED |
+
+### Bug found by looking at the screenshot
+
+The first capture came back as a black page reading `not found`. `do_GET`
+matched `self.path == "/"` exactly, so **any query string 404'd**. Fixed by
+routing on `urlsplit(self.path).path`. Reading the response body would have
+missed it; viewing the image did not.
+
+Two smaller things the screenshots forced: `/state` now carries the event
+backlog, so a page reload or a still capture shows the conversation rather
+than an empty pane, and `?tab=` deep-links a tab.

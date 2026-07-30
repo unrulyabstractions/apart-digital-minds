@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dmind</title>
+<style>
+  :root {
+    --bg:#0b0f14; --panel:#111823; --line:#1e2836; --line2:#2a3648;
+    --fg:#dbe4f0; --dim:#7d8fa6; --dimmer:#556478;
+    --you:#5aa9e6; --mind:#7ee0a8; --warn:#f0b866; --bad:#f07878;
+    --subject:#7aa2f7; --ego:#9ece6a; --stage:#e0af68; --other:#bb9af7;
+    --world:#7dcfff; --runtime:#5a6a80;
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; margin:0; }
+  body {
+    background:var(--bg); color:var(--fg);
+    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",sans-serif;
+    display:grid; grid-template-rows:auto 1fr; overflow:hidden;
+  }
+  code,pre,.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+
+  /* ---- header ---- */
+  header {
+    display:flex; align-items:center; gap:18px; padding:10px 16px;
+    background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  .brand { font-weight:650; letter-spacing:.3px; }
+  .brand span { color:var(--dim); font-weight:400; }
+  .meta { display:flex; gap:16px; font-size:12px; color:var(--dim); flex:1; flex-wrap:wrap; }
+  .meta b { color:var(--fg); font-weight:500; }
+  .status { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--dim); }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--dimmer); }
+  .dot.thinking { background:var(--warn); animation:pulse 1s ease-in-out infinite; }
+  .dot.stepping { background:var(--you); }
+  .dot.idle { background:var(--mind); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  /* ---- layout ---- */
+  main { display:grid; grid-template-columns:360px 1fr 380px; min-height:0; }
+  .pane { display:flex; flex-direction:column; min-height:0; min-width:0; }
+  .pane + .pane { border-left:1px solid var(--line); }
+  .pane-head {
+    display:flex; align-items:center; gap:8px; padding:9px 14px;
+    font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--dim);
+    border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .pane-head .spacer { flex:1; }
+  .scroll { overflow-y:auto; overflow-x:hidden; flex:1; padding:12px 14px; }
+  .scroll::-webkit-scrollbar { width:9px; }
+  .scroll::-webkit-scrollbar-thumb { background:var(--line2); border-radius:5px; }
+
+  /* ---- chat ---- */
+  .msg { margin-bottom:12px; }
+  .msg .who { font-size:11px; color:var(--dim); margin-bottom:3px; }
+  .msg .body {
+    padding:9px 12px; border-radius:9px; background:#16202e;
+    border:1px solid var(--line2); white-space:pre-wrap; word-wrap:break-word;
+  }
+  .msg.you .who { color:var(--you); }
+  .msg.you .body { background:#132132; border-color:#22384f; }
+  .msg.mind .who { color:var(--mind); }
+  .msg.err .body { border-color:var(--bad); color:var(--bad); }
+  .composer { border-top:1px solid var(--line); padding:10px 12px; background:var(--panel); }
+  .composer textarea {
+    width:100%; resize:none; min-height:62px; padding:9px 11px; color:var(--fg);
+    background:#0d141d; border:1px solid var(--line2); border-radius:8px;
+    font:14px/1.45 inherit; outline:none;
+  }
+  .composer textarea:focus { border-color:#31506e; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  button {
+    padding:7px 13px; border-radius:7px; cursor:pointer; font:500 13px inherit;
+    background:#1d2a3b; color:var(--fg); border:1px solid var(--line2);
+  }
+  button:hover:not(:disabled) { background:#243449; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:#1f4a72; border-color:#2b6499; }
+  button.primary:hover:not(:disabled) { background:#265b8c; }
+  label.check { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); cursor:pointer; }
+
+  /* ---- trace ---- */
+  .tick-sep {
+    display:flex; align-items:center; gap:10px; margin:14px 0 8px;
+    font-size:11px; letter-spacing:1px; color:var(--dimmer);
+  }
+  .tick-sep::after { content:""; flex:1; height:1px; background:var(--line); }
+  .tick-sep b { color:var(--you); font-weight:600; }
+  .ev {
+    display:grid; grid-template-columns:78px 96px 1fr auto; gap:10px;
+    padding:3px 6px; border-radius:5px; font-size:12.5px; align-items:baseline;
+  }
+  .ev:hover { background:#141d29; }
+  .ev .mod { font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+  .ev .kind { color:var(--dimmer); font-size:11.5px; }
+  .ev .sum { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ev .dur { color:var(--dimmer); font-size:11px; }
+  .ev.open .sum { white-space:normal; }
+  .ev.click { cursor:pointer; }
+  .ev.llm .sum { color:var(--fg); }
+  .ev.emit .sum { color:#a3c9ea; }
+  .ev.err .sum { color:var(--bad); }
+  .detail {
+    grid-column:2 / -1; margin:5px 0 8px; padding:9px 11px; border-radius:7px;
+    background:#0d141d; border:1px solid var(--line2); color:var(--fg);
+    white-space:pre-wrap; word-wrap:break-word; font-size:12.5px; max-height:340px; overflow:auto;
+  }
+  .mod-subject{color:var(--subject)} .mod-ego{color:var(--ego)}
+  .mod-stage{color:var(--stage)} .mod-world{color:var(--world)}
+  .mod-runtime{color:var(--runtime)} .mod-other{color:var(--other)}
+
+  /* ---- inspector ---- */
+  .tabs { display:flex; gap:4px; }
+  .tab {
+    padding:3px 10px; border-radius:6px; cursor:pointer; font-size:11px;
+    text-transform:uppercase; letter-spacing:.8px; color:var(--dim);
+  }
+  .tab.on { background:#1d2a3b; color:var(--fg); }
+  .card {
+    border:1px solid var(--line2); border-radius:9px; padding:10px 12px;
+    margin-bottom:10px; background:#0f1620;
+  }
+  .card h4 { margin:0 0 6px; font-size:13px; display:flex; align-items:center; gap:7px; }
+  .pill {
+    font-size:10px; padding:1px 7px; border-radius:20px; background:#1d2a3b;
+    color:var(--dim); text-transform:uppercase; letter-spacing:.6px; font-weight:500;
+  }
+  .chan { font-size:11.5px; color:var(--dim); margin:2px 0; }
+  .chan b { color:#a3c9ea; font-weight:500; }
+  .link { font-size:12px; padding:3px 0; color:var(--dim); }
+  .link b { color:var(--fg); font-weight:500; }
+  .link .auto { color:var(--dimmer); font-size:10.5px; }
+  .win-msg { border-left:2px solid var(--line2); padding:4px 0 4px 9px; margin:6px 0; font-size:12.5px; }
+  .win-msg .role { font-size:10.5px; color:var(--dimmer); text-transform:uppercase; letter-spacing:.7px; }
+  .win-msg .txt { white-space:pre-wrap; word-wrap:break-word; color:var(--fg); }
+  .win-msg.edited { border-left-color:var(--warn); }
+  .win-msg.edited .role::after { content:" · edited"; color:var(--warn); }
+  .empty { color:var(--dimmer); font-size:12.5px; padding:14px 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">dmind <span id="hMind"></span></div>
+  <div class="meta">
+    <div>subject <b id="hSubject">—</b></div>
+    <div>ego <b id="hEgo">—</b></div>
+    <div>tick <b id="hTick">0</b></div>
+    <div>events <b id="hCount">0</b></div>
+  </div>
+  <div class="status"><span class="dot idle" id="hDot"></span><span id="hState">idle</span></div>
+</header>
+
+<main>
+  <!-- conversation -->
+  <section class="pane">
+    <div class="pane-head">conversation</div>
+    <div class="scroll" id="chat"></div>
+    <div class="composer">
+      <textarea id="input" placeholder="Say something to the mind…  (Enter to send, Shift+Enter for a newline)"></textarea>
+      <div class="row">
+        <button class="primary" id="send">Send</button>
+        <button id="step" disabled>Step 1 tick</button>
+        <button id="runout" disabled>Run out</button>
+        <label class="check"><input type="checkbox" id="stepMode"> step mode</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- trace -->
+  <section class="pane">
+    <div class="pane-head">
+      live trace
+      <div class="spacer"></div>
+      <label class="check"><input type="checkbox" id="fLlm" checked> llm</label>
+      <label class="check"><input type="checkbox" id="fFlow" checked> messages</label>
+      <label class="check"><input type="checkbox" id="fTurns"> turns</label>
+      <button id="clear" style="padding:2px 9px;font-size:11px">clear</button>
+    </div>
+    <div class="scroll mono" id="trace"><div class="empty">Waiting for the first prompt.</div></div>
+  </section>
+
+  <!-- inspector -->
+  <section class="pane">
+    <div class="pane-head">
+      <div class="tabs">
+        <div class="tab on" data-tab="wiring">wiring</div>
+        <div class="tab" data-tab="windows">windows</div>
+      </div>
+    </div>
+    <div class="scroll" id="inspector"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = {
+  tab: new URLSearchParams(location.search).get("tab") || "wiring",
+  wiring:null, windows:[], tick:-1, count:0, busy:false,
+};
+
+const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const roleOf = (name) => {
+  const m = (state.wiring?.modules || []).find(x => x.name === name);
+  if (name === "world") return "world";
+  if (name === "runtime") return "runtime";
+  return m ? m.role : "other";
+};
+
+/* ---------- chat ---------- */
+function say(kind, text) {
+  const who = kind === "you" ? "you" : kind === "err" ? "error" : "mind";
+  const el = document.createElement("div");
+  el.className = "msg " + kind;
+  el.innerHTML = `<div class="who">${who}</div><div class="body">${esc(text)}</div>`;
+  $("chat").appendChild(el);
+  $("chat").scrollTop = $("chat").scrollHeight;
+}
+
+/* ---------- trace ---------- */
+const KEEP = {
+  "llm.request":"llm", "llm.response":"llm", "llm.error":"llm",
+  "task.emit":"flow", "task.deliver":"flow",
+  "handle.start":"turns", "handle.end":"turns", "handle.error":"turns",
+  "tick.start":"turns", "tick.end":"turns",
+  "note":"llm", "memory.write":"turns",
+};
+function visible(kind) {
+  const group = KEEP[kind] || "turns";
+  if (group === "llm")   return $("fLlm").checked;
+  if (group === "flow")  return $("fFlow").checked;
+  return $("fTurns").checked;
+}
+
+function addEvent(e) {
+  state.count++; $("hCount").textContent = state.count;
+  if (e.tick > state.tick) { $("hTick").textContent = e.tick; }
+  const box = $("trace");
+  if (box.firstElementChild?.classList.contains("empty")) box.innerHTML = "";
+
+  if (e.tick !== state.tick) {
+    state.tick = e.tick;
+    const sep = document.createElement("div");
+    sep.className = "tick-sep";
+    sep.innerHTML = `<span>tick <b>${e.tick}</b></span>`;
+    box.appendChild(sep);
+  }
+  if (!visible(e.kind)) return;
+
+  const row = document.createElement("div");
+  const cls = e.kind.startsWith("llm") ? "llm" : e.kind.startsWith("task") ? "emit"
+            : e.kind.includes("error") ? "err" : "";
+  row.className = `ev ${cls}`;
+  const full = e.data?.text || "";
+  if (full) row.classList.add("click");
+  const dur = e.duration_s != null ? `${(e.duration_s*1000).toFixed(0)}ms` : "";
+  row.innerHTML =
+    `<span class="mod mod-${roleOf(e.module)}">${esc(e.module)}</span>` +
+    `<span class="kind">${esc(e.kind)}</span>` +
+    `<span class="sum">${esc(e.data?.summary || "")}</span>` +
+    `<span class="dur">${dur}</span>`;
+  box.appendChild(row);
+
+  if (full) {
+    row.onclick = () => {
+      const open = row.nextElementSibling?.classList.contains("detail");
+      if (open) { row.nextElementSibling.remove(); row.classList.remove("open"); return; }
+      const d = document.createElement("div");
+      d.className = "detail mono";
+      d.textContent = full;
+      row.after(d); row.classList.add("open");
+    };
+  }
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 140;
+  if (near) box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- inspector ---------- */
+function renderInspector() {
+  const box = $("inspector");
+  if (state.tab === "wiring") {
+    const w = state.wiring;
+    if (!w) { box.innerHTML = `<div class="empty">No mind yet.</div>`; return; }
+    box.innerHTML =
+      w.modules.map(m => `
+        <div class="card">
+          <h4><span class="mod-${m.role}">${esc(m.name)}</span>
+              <span class="pill">${esc(m.role)}</span></h4>
+          ${m.model ? `<div class="chan">model <b>${esc(m.model)}</b></div>` : ""}
+          ${Object.entries(m.inputs).map(([k,v]) =>
+            `<div class="chan">reads <b>${esc(k)}</b> — ${esc(v)}</div>`).join("")}
+          ${Object.entries(m.outputs).map(([k,v]) =>
+            `<div class="chan">writes <b>${esc(k)}</b> — ${esc(v)}</div>`).join("")}
+        </div>`).join("") +
+      `<div class="card"><h4>links</h4>` +
+      w.links.map(l => `<div class="link"><b>${esc(l.src)}</b> —${esc(l.channel)}→ <b>${esc(l.dst)}</b>` +
+        (l.as_channel !== l.channel ? ` <span class="auto">as ${esc(l.as_channel)}</span>` : "") +
+        (l.auto ? ` <span class="auto">[auto]</span>` : "") + `</div>`).join("") +
+      `</div>`;
+  } else {
+    if (!state.windows.length) { box.innerHTML = `<div class="empty">Nothing said yet.</div>`; return; }
+    box.innerHTML = state.windows.map(w => `
+      <div class="card">
+        <h4><span class="mod-${roleOf(w.module)}">${esc(w.module)}</span>
+            <span class="pill">${w.messages.length} msgs</span></h4>
+        ${w.messages.map(m => `
+          <div class="win-msg ${m.meta && m.meta.edited_by ? "edited" : ""}">
+            <div class="role">${esc(m.role)}</div>
+            <div class="txt">${esc(m.content)}</div>
+          </div>`).join("")}
+      </div>`).join("");
+  }
+}
+
+/* ---------- wire it up ---------- */
+function setStatus(s, extra) {
+  state.busy = (s === "thinking");
+  $("hDot").className = "dot " + s;
+  $("hState").textContent = extra != null ? `${s} · ${extra}` : s;
+  $("send").disabled = state.busy;
+  const stepping = (s === "stepping");
+  $("step").disabled = !stepping;
+  $("runout").disabled = !stepping;
+}
+
+function handle(p) {
+  if (p.type === "event")   addEvent(p);
+  else if (p.type === "you")   say("you", p.text);
+  else if (p.type === "mind")  say("mind", p.text);
+  else if (p.type === "error") say("err", p.text);
+  else if (p.type === "wiring")  { state.wiring = p.wiring; $("hMind").textContent = p.wiring.run_id; renderInspector(); }
+  else if (p.type === "windows") { state.windows = p.windows; renderInspector(); }
+  else if (p.type === "status")  setStatus(p.state, p.ticks != null ? `${p.ticks} ticks` : (p.turns != null ? `${p.turns} turns` : null));
+}
+
+// `?still` renders from /state alone, so the page settles and can be captured.
+const still = new URLSearchParams(location.search).has("still");
+if (!still) new EventSource("/events").onmessage = (m) => handle(JSON.parse(m.data));
+
+async function post(path, body) {
+  await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+                     body: JSON.stringify(body || {})});
+}
+function send() {
+  const t = $("input").value.trim();
+  if (!t || state.busy) return;
+  $("input").value = "";
+  post("/prompt", {text:t, step:$("stepMode").checked});
+}
+$("send").onclick = send;
+$("step").onclick = () => post("/step");
+$("runout").onclick = () => post("/run");
+$("clear").onclick = () => { $("trace").innerHTML = `<div class="empty">Cleared.</div>`; state.tick = -1; };
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+document.querySelectorAll(".tab").forEach(t => {
+  t.classList.toggle("on", t.dataset.tab === state.tab);
+});
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+  t.classList.add("on"); state.tab = t.dataset.tab; renderInspector();
+});
+["fLlm","fFlow","fTurns"].forEach(id => $(id).onchange = () => {});
+
+fetch("/state").then(r => r.json()).then(s => {
+  if (still) (s.backlog || []).forEach(handle);
+  state.wiring = s.wiring; state.windows = s.windows;
+  $("hMind").textContent = s.wiring.run_id;
+  const sub = s.wiring.modules.find(m => m.role === "subject");
+  const ego = s.wiring.modules.find(m => m.role === "ego");
+  $("hSubject").textContent = sub?.model || "—";
+  $("hEgo").textContent = ego?.model || "none";
+  renderInspector();
+});
+$("input").focus();
+</script>
+</body>
+</html>

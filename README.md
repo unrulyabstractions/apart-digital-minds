@@ -14,6 +14,7 @@ you ask for that provider.
 src/api/       the contracts
 src/dminds/    the implementations
 examples/      four minds assembled from the parts
+ui/            talk to a mind in a browser and watch it think
 tests/         106 tests, no dependencies
 ```
 
@@ -453,6 +454,27 @@ MODEL=anthropic:claude-opus-5 python examples/01_hello_agent.py
 SUBJECT_MODEL=anthropic:claude-opus-5 INTERCEPTOR_MODEL=ollama:qwen3:8b \
     python examples/02_think_interceptor.py
 ```
+
+## Watching a mind think
+
+```bash
+python ui/server.py                    # subject -> interceptor -> ego
+python ui/server.py --mind bicameral   # a voice speaks into the window
+```
+
+A browser opens on the conversation, the live trace grouped by tick, and an
+inspector showing every module's channels and every context window. Click a
+model call to read the exact prompt and completion. Tick *step mode* before
+sending and `Step 1 tick` walks the mind forward one tick at a time.
+
+The whole integration is one line, because `Sink` already receives everything
+a mind emits:
+
+```python
+mind.tracer.add_sink(WebSink(broadcast))
+```
+
+See `ui/README.md`.
 
 ## Tests
 

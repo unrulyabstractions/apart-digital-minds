@@ -266,6 +266,15 @@ class Mind(MindInterface):
         """The modules currently sitting between the subject and the ego."""
         return list(self._stages)
 
+    @property
+    def auto_links(self) -> list[Link]:
+        """The links `intercept` laid out, as opposed to your own.
+
+        `describe` marks these `[auto]`; this is the same fact, structured,
+        for anything that renders the graph itself.
+        """
+        return [link for _, link in self._auto_links]
+
     # -- assembly ------------------------------------------------------
 
     def adopt(self, module: Module) -> Module:
@@ -524,7 +533,7 @@ class Mind(MindInterface):
             channels = ", ".join(sorted(module.OUTPUTS)) or "no outputs"
             lines.append(f"    {module.name:<16} {type(module).__name__:<14} {channels}")
         links = self.links()
-        laid_out = {id(link) for _, link in self._auto_links}
+        laid_out = {id(link) for link in self.auto_links}
         lines.append("  links:")
         for link in links:
             mark = "  [auto]" if id(link) in laid_out else ""
