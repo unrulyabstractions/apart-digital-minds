@@ -60,8 +60,8 @@ class Mind(ABC):
     # -- assembly ------------------------------------------------------
 
     @abstractmethod
-    def pipeline(self, *stages: Module) -> list[Module]:
-        """Lay out `prompt -> subject -> stages -> ego -> world`.
+    def intercept(self, *stages: Module) -> list[Module]:
+        """Put `stages` between the subject and whoever speaks.
 
         Shorthand for `register` calls and nothing else. With one stage and an
         ego it is exactly:

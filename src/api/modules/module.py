@@ -6,8 +6,8 @@ channels itself, and handles a turn in two steps.
     OUTPUTS      what this module can emit, and what each channel carries
     INPUTS       what it expects to receive, for the reader
     register     attach a consumer to one of my channels
-    on_input     something arrived
-    on_process   take a step
+    on_input     something arrived; buffer it or react to it
+    on_process   take a step, once per turn
 
 Wiring lives here, not on the mind. A module owns its output channels, so a
 consumer is attached by the module that will do the emitting:

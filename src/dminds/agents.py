@@ -8,11 +8,12 @@ methods. None of them is baked in here.
     class Assistant(Agent):
         OUTPUTS = {"reply": "the answer"}
 
-        async def on_prompt(self, message, ctx):
-            self.transcript.append(user(message.payload.text))
-            completion = await self.think(tag="answer")
-            self.transcript.append(completion.as_message())
-            ctx.emit("reply", Text(completion.text))
+        async def on_process(self, ctx):
+            for message in self.take_inputs():
+                self.transcript.append(user(message.payload.text))
+                completion = await self.think(tag="answer")
+                self.transcript.append(completion.as_message())
+                ctx.emit("reply", Text(completion.text))
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ from ..api.types import (
     ChatMessage,
     Completion,
     GenOptions,
-    Message,
     Text,
     system as system_msg,
     user,
@@ -146,16 +146,17 @@ class Agent(BaseModule, AgentInterface):
 
     # -- default handler ---------------------------------------------------
 
-    async def on_prompt(self, message: Message, ctx: Ctx) -> None:
-        """Answer a prompt and emit it on the `reply` channel.
+    async def on_process(self, ctx: Ctx) -> None:
+        """Answer everything that arrived, emitting on `reply`.
 
-        Whoever registered onto `"reply"` hears it. Nobody does by default, so
-        a bare agent is silent until you say `agent.register(mind.world, "reply")`.
+        The default turn: each buffered message becomes a user turn and gets
+        one answer. Override this for any other behaviour.
         """
-        payload = message.payload
-        text = payload.text if isinstance(payload, Text) else str(payload)
-        completion = await self.say(text, tag="reply")
-        ctx.emit("reply", Text(completion.text))
+        for message in self.take_inputs():
+            payload = message.payload
+            text = payload.text if isinstance(payload, Text) else str(payload)
+            completion = await self.say(text, tag="reply")
+            ctx.emit("reply", Text(completion.text))
 
     def close(self) -> None:
         self.llm.close()

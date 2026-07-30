@@ -149,11 +149,11 @@ to stop.
 
 ```python
 mind = Mind("study", "openai:gpt-5", ego="ollama:qwen3:8b")
-mind.pipeline(interceptor)      # prompt -> subject -> interceptor -> ego -> world
+mind.intercept(interceptor)     # prompt -> subject -> interceptor -> ego -> world
 ```
 
-`mind.pipeline` is shorthand for `register` calls and nothing else. That one
-line is exactly:
+`mind.intercept` puts stages between the subject and whoever speaks. It is
+shorthand for `register` calls and nothing else. That one line is exactly:
 
 ```python
 mind.subject.register(interceptor, "context")
@@ -162,12 +162,12 @@ mind.ego.register(mind.world, "reply")
 ```
 
 Write those yourself when the shape is not a line. `Mind(..., autowire=False)`
-lays out nothing, and `mind.describe()` marks which links came from the
-pipeline so nothing is hidden.
+lays out nothing, and `mind.describe()` marks the laid-out links `[auto]` so
+nothing is hidden.
 
 The mind offers this because subject, stages, and ego are its own anatomy. It
-has no routing table. Everything else registers itself, and a relayout leaves
-those hand-made links alone.
+has no routing table. Everything else registers itself, and intercepting again
+leaves those hand-made links alone.
 
 ```python
 mind.subject.register(blackboard, "*")   # a monitor, wired by hand, survives
@@ -230,36 +230,27 @@ everything that reached it before it acts, so it never decides on half the
 picture.
 
 ```python
-from src import Agent, Context, user
+from src import Agent, user
 
 class Critic(Agent):
     INPUTS = {"context": "somebody's context window"}
     OUTPUTS = {"context": "the same window, annotated"}
 
-    async def on_context(self, message, ctx):            # per-channel
-        completion = await self.think(
-            messages=[*self.transcript.messages,
-                      user(f"Critique this: {message.payload.messages[-1].content}")],
-            tag="critique",
-        )
-        revised = message.payload.copy()
-        revised.messages.append(completion.as_message(stage="critique"))
-        ctx.emit("context", revised)
-```
-
-The default `on_input` routes to `on_<channel>` when you have written such a
-method, and buffers into `self.inputs` when you have not. So a module can react
-per channel, as above, or absorb everything and act once:
-
-```python
-class Batcher(BaseModule):
-    OUTPUTS = {"summary": "one summary of everything that arrived"}
-
     async def on_process(self, ctx):
-        batch = self.take_inputs()
-        if batch:
-            ctx.emit("summary", summarise(batch))
+        for message in self.take_inputs():
+            completion = await self.think(
+                messages=[*self.transcript.messages,
+                          user(f"Critique this: {message.payload.messages[-1].content}")],
+                tag="critique",
+            )
+            revised = message.payload.copy()
+            revised.messages.append(completion.as_message(stage="critique"))
+            ctx.emit("context", revised)
 ```
+
+The default `on_input` buffers into `self.inputs`; `take_inputs()` drains that
+buffer. There is no other dispatch. Override `on_input` only when a module
+should react to each message as it is absorbed, the way a workspace records.
 
 Return True from `wants_process` to take a turn with an empty queue, which is
 how a module acts unprompted.

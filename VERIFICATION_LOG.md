@@ -394,3 +394,35 @@ The README also stopped describing the old world: the contract table lost its
 `Scheduler`/`Host` rows, the roles table lost `Inspectable` and `Speaker`, and
 the module-writing example became a `Critic` stage that composes with the
 pipeline instead of a `Target` that no longer exists.
+
+## 2026-07-30 — de-engineering pass: mind.py, intercept, and the two-method turn
+
+Three complaints, three cuts.
+
+- `Mind.__init__` lost `keep_events`, `sinks`, and `strict`, none of which any
+  caller passed. Events are always kept; extra sinks attach through
+  `mind.tracer.add_sink`. Also removed: a duplicated comment, a stale
+  docstring claiming `prompt` runs the mind, and the `subject=` branch that
+  accepted a finished module while silently discarding the model built for it.
+- `pipeline()` became `intercept()`. The name now says what it does: put
+  stages between the subject and whoever speaks. `describe` marks laid-out
+  links `[auto]`.
+- The `on_<channel>` dispatch magic is gone. A turn is `on_input` then
+  `on_process`, nothing else; the default `on_input` buffers. `Subject`,
+  `Ego`, `Agent`'s default turn, and every example now use that shape, so the
+  contract you read in `api.Module` is the shape you see everywhere.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 96 | Removed knobs were unused | Grepped `examples/` and `tests/` for `keep_events`, `sinks=`, `strict=` before removal | VERIFIED (0 uses) |
+| 97 | Test suite | `tests/run_tests.py` after reinstall in the clean venv | VERIFIED (105 passed, 0 failed) |
+| 98 | Examples | All four run; example 02 output is unchanged after its rewrite into the two-method shape | VERIFIED (4/4) |
+| 99 | No dispatch remains | `handler_name` and `find_handler` deleted; a test now pins that the default `on_input` buffers arbitrary channels | VERIFIED |
+| 100 | README snippets | Ran the rewritten `Critic` example; one turn, reply intact | VERIFIED |
+| 101 | Purity, imports, traces | AST scans clean; all four trace sets re-opened, seq contiguous, per-module sums match | VERIFIED |
+
+Fixed along the way: example 04's `Remembering` subclassed `Subject` but only
+emits `reply`; after the dispatch removal it inherited `Subject.on_input` and
+broke. It is an `Agent`, and now says so. Caught by running, not reading.

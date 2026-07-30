@@ -16,17 +16,16 @@ Declare what you emit, register who hears it, and write a turn.
     writer.register(critic, "draft")
     critic.register(writer, "verdict")
 
-The default `on_input` routes to `on_<channel>` when you have written such a
-method, and buffers into `self.inputs` when you have not. So a module can react
-per channel or absorb everything and act once. `Ctx` here is the concrete
-object handed to a turn; it satisfies `api.Ctx`.
+A turn is those two methods and nothing else. The default `on_input` buffers
+into `self.inputs`; override it to react per message instead. `Ctx` here is
+the concrete object handed to a turn; it satisfies `api.Ctx`.
 """
 
 from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Mapping
+from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from ..api.modules import Ctx as CtxProtocol
 from ..api.modules import Module
@@ -37,12 +36,6 @@ from ..api.types import Link, Message, Payload
 
 if TYPE_CHECKING:  # pragma: no cover
     from .host import Host
-
-
-def handler_name(channel: str) -> str:
-    """`"inspect.context"` -> `"on_inspect_context"`."""
-    safe = "".join(c if c.isalnum() or c == "_" else "_" for c in channel)
-    return f"on_{safe}"
 
 
 @dataclass
@@ -221,21 +214,13 @@ class BaseModule(Module):
 
     # -- the turn ------------------------------------------------------
 
-    def find_handler(self, channel: str) -> Callable[..., Any] | None:
-        """The `on_<channel>` method, if you wrote one."""
-        return getattr(self, handler_name(channel), None)
-
     async def on_input(self, message: Message, ctx: Ctx) -> None:
-        """One message arrived.
+        """One message arrived. Buffers it for `on_process`.
 
-        Routes to `on_<channel>` when such a method exists. Otherwise buffers
-        into `self.inputs` for `on_process` to pick up.
+        Override to react per message instead. `message.channel` says what it
+        is; there is no dispatch beyond that.
         """
-        handler = self.find_handler(message.channel)
-        if handler is not None:
-            await handler(message, ctx)
-        else:
-            self.inputs.append(message)
+        self.inputs.append(message)
 
     async def on_process(self, ctx: Ctx) -> None:
         """Take one step. Does nothing unless you override it."""

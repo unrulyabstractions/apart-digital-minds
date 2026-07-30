@@ -38,7 +38,6 @@ from src import (
     Context,
     Ctx,
     Editor,
-    Message,
     Mind,
     Payload,
     replace_think,
@@ -67,39 +66,33 @@ class Interceptor(Agent, Editor):
     INPUTS = {"context": "the subject's context window"}
     OUTPUTS = {"context": "the same window, with the last thought rewritten"}
 
+    async def on_process(self, ctx: Ctx) -> None:
+        """The turn: revise every window that arrived, pass each along."""
+        for message in self.take_inputs():
+            ctx.emit("context", await self.revise(message.payload))
+
     async def revise(self, payload: Payload) -> Payload:
         """Rewrite the last thought in the window."""
         messages = [m.copy() for m in payload.messages]
-        index = self._last_thought(messages)
-        if index is None:
+        thoughts, _ = split_think(messages[-1].content)
+        if not thoughts:
             return Context(messages, note="nothing to rewrite")
-
-        thoughts, _ = split_think(messages[index].content)
-        current = thoughts[-1]
 
         completion = await self.think(
             messages=[
                 *self.transcript.messages,
-                user(f"Here is the thought to rewrite:\n\n{current}"),
+                user(f"Here is the thought to rewrite:\n\n{thoughts[-1]}"),
             ],
             tag="rewrite",
         )
         new_thought = completion.text.strip()
-        self.log.note("rewrote the thought", before=current[:70], after=new_thought[:70])
+        self.log.note(
+            "rewrote the thought", before=thoughts[-1][:70], after=new_thought[:70]
+        )
 
-        messages[index].content = replace_think(messages[index].content, new_thought)
-        messages[index].meta["edited_by"] = self.name
+        messages[-1].content = replace_think(messages[-1].content, new_thought)
+        messages[-1].meta["edited_by"] = self.name
         return Context(messages, note=f"thought rewritten by {self.name}")
-
-    async def on_context(self, message: Message, ctx: Ctx) -> None:
-        ctx.emit("context", await self.revise(message.payload))
-
-    @staticmethod
-    def _last_thought(messages) -> int | None:
-        for i in range(len(messages) - 1, -1, -1):
-            if messages[i].role == "assistant" and "<think>" in messages[i].content:
-                return i
-        return None
 
 
 async def main() -> None:
@@ -120,12 +113,9 @@ async def main() -> None:
         ),
     )
 
-    # `pipeline` is shorthand for three register calls:
-    #     mind.subject.register(interceptor, "context")
-    #     interceptor.register(mind.ego, "context")
-    #     mind.ego.register(mind.world, "reply")
-    # Write them yourself when the shape is not a line.
-    mind.pipeline(interceptor)
+    # Put the interceptor between the subject and the ego. Shorthand for
+    # three register calls; `mind.describe()` shows them marked [auto].
+    mind.intercept(interceptor)
 
     print(mind.describe(), "\n")
 

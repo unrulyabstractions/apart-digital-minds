@@ -26,10 +26,9 @@ from demo_models import pick
 
 from src import (
     Ctx,
+    Agent,
     Journal,
-    Message,
     Mind,
-    Subject,
     Text,
     get_llm,
     taped,
@@ -44,7 +43,7 @@ JITTERY = pick("MODEL", "jittery")
 WORK = Path("runs/example04")
 
 
-class Remembering(Subject):
+class Remembering(Agent):
     """An agent that consults its journal before answering, and writes to it after."""
 
     OUTPUTS = {"reply": "the answer, informed by what it remembered"}
@@ -53,25 +52,29 @@ class Remembering(Subject):
     def __init__(self, *args, journal_path=None, **kwargs):
         super().__init__(*args, journal=Journal(path=journal_path), **kwargs)
 
-    async def on_prompt(self, message: Message, ctx: Ctx) -> None:
-        prompt = message.payload.text
+    async def on_process(self, ctx: Ctx) -> None:
+        """The turn: recall, answer, remember."""
+        for message in self.take_inputs():
+            prompt = message.payload.text
 
-        recalled = self.journal.recall(prompt, k=3)
-        if recalled:
-            ctx.log.note(f"recalled {len(recalled)} episodes", query=prompt)
-            context = "What you remember:\n" + self.journal.as_text(recalled)
-        else:
-            context = "You remember nothing relevant."
+            recalled = self.journal.recall(prompt, k=3)
+            if recalled:
+                ctx.log.note(f"recalled {len(recalled)} episodes", query=prompt)
+                memory = "What you remember:\n" + self.journal.as_text(recalled)
+            else:
+                memory = "You remember nothing relevant."
 
-        completion = await self.think(
-            messages=[*self.transcript.messages, user(f"{context}\n\nUser: {prompt}")],
-            tag="answer",
-        )
-
-        self.journal.remember(
-            f"user asked about {prompt}", t=ctx.tick, source=self.name
-        )
-        ctx.emit("reply", Text(completion.text))
+            completion = await self.think(
+                messages=[
+                    *self.transcript.messages,
+                    user(f"{memory}\n\nUser: {prompt}"),
+                ],
+                tag="answer",
+            )
+            self.journal.remember(
+                f"user asked about {prompt}", t=ctx.tick, source=self.name
+            )
+            ctx.emit("reply", Text(completion.text))
 
 
 def remembering_mind(journal_path: Path, llm, **kwargs) -> Mind:

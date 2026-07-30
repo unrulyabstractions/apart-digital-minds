@@ -238,34 +238,25 @@ def test_links_are_gathered_from_the_modules():
     assert links[0].describe() == "a --thought--> b as inspect"
 
 
-# -- default on_input dispatch --------------------------------------------
+# -- the default on_input ---------------------------------------------------
 
 
-def test_on_input_routes_to_a_per_channel_method_when_one_exists():
-    class Router(BaseModule):
-        def __init__(self):
-            super().__init__("r")
-            self.calls: list[str] = []
+def test_default_on_input_buffers_everything():
+    """No dispatch magic. A turn is on_input then on_process, nothing else."""
 
-        async def on_user_prompt(self, message, ctx):
-            self.calls.append("user_prompt")
-
-        async def on_inspect_context(self, message, ctx):
-            self.calls.append("inspect_context")
+    class Plain(BaseModule):
+        pass
 
     async def run():
         mind = quiet_mind()
-        r = mind.add(Router())
-        mind.send("user_prompt", Text("x"), to="r")
-        mind.send("inspect.context", Text("x"), to="r")  # dots become underscores
-        mind.send("unheard_of", Text("x"), to="r")
+        plain = mind.add(Plain("p"))
+        mind.send("anything", Text("x"), to="p")
+        mind.send("something.else", Text("x"), to="p")
         await mind.process()
         mind.close()
-        return r.calls, r.inputs
+        return [m.channel for m in plain.inputs]
 
-    calls, buffered = asyncio.run(run())
-    assert calls == ["user_prompt", "inspect_context"]
-    assert [m.channel for m in buffered] == ["unheard_of"], "the rest buffers"
+    assert asyncio.run(run()) == ["anything", "something.else"]
 
 
 def test_take_inputs_drains_the_buffer():

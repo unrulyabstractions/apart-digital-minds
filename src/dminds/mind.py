@@ -17,8 +17,8 @@ connected it. Put a module in between to preprocess either side.
 like onto those, and register back onto its `context` to rewrite what it
 remembers.
 
-`prompt` injects one external input and runs until every queue is empty, so
-when it returns the mind has finished thinking.
+Driving is three calls: `prompt` delivers, `process` ticks until nothing has
+work, `get_replies` drains what reached you.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from typing import Callable, Iterable, Sequence
 
 from ..api.models import LLM
 from ..api.modules import Module
-from ..api.observability import TASK_DELIVER, TASK_EMIT, Sink, Tracer
+from ..api.observability import TASK_DELIVER, TASK_EMIT, Tracer
 from ..api.constants import WORLD
 from ..api.mind import Mind as MindInterface
 from ..api.models import ModelFactory
@@ -43,9 +43,7 @@ from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
 
 def _build_subject(spec, llm: LLM, system: str | None) -> Module:
-    """The module at the centre. A class, a factory, or a finished module."""
-    if isinstance(spec, Module):
-        return spec
+    """The module at the centre: the default, a subclass, or a factory."""
     if spec is None:
         return Subject("subject", llm, system=system)
     if isinstance(spec, type):
@@ -138,10 +136,7 @@ class Mind(MindInterface):
         run_id: str | None = None,
         run_dir: str | Path | None = "runs",
         console: bool = True,
-        keep_events: bool = True,
-        strict: bool = True,
         max_ticks: int = 200,
-        sinks: Sequence[Sink] | None = None,
         scheduler: SchedulerFactory | None = None,
         tracer: Tracer | None = None,
         model_factory: ModelFactory | None = None,
@@ -162,20 +157,16 @@ class Mind(MindInterface):
         self.entry: str | None = None
 
         self.tracer: Tracer = tracer if tracer is not None else RunTracer(self.run_id)
-        self.events: MemorySink | None = None
+        #: Every event of this run, in order. What the tests read.
+        self.events = MemorySink()
+        self.tracer.add_sink(self.events)
         self.run_path: Path | None = None
-
-        if keep_events:
-            self.events = MemorySink()
-            self.tracer.add_sink(self.events)
         if run_dir is not None:
             self.run_path = Path(run_dir) / self.run_id
             self.tracer.add_sink(JsonlSink(self.run_path / "trace.jsonl"))
             self.tracer.add_sink(PerModuleSink(self.run_path / "modules"))
         if console:
             self.tracer.add_sink(ConsoleSink())
-        for sink in sinks or []:
-            self.tracer.add_sink(sink)
 
         #: The caller, as a module. Never scheduled; it only receives.
         self.world = World(self.outbox)
@@ -184,16 +175,15 @@ class Mind(MindInterface):
         self.scheduler: Scheduler = (
             scheduler(self)
             if scheduler is not None
-            else TickScheduler(self, strict=strict, max_ticks=max_ticks)
+            else TickScheduler(self, max_ticks=max_ticks)
         )
 
-        #: The target model, as a module. None if the mind was given no model.
         #: The target model, as a module. None if the mind was given no model.
         self.subject: Module | None = None
         #: The part that speaks, if there is one. Otherwise the subject speaks.
         self.ego: Module | None = None
         self._stages: list[Module] = []
-        self._pipeline_links: list[tuple[Module, Link]] = []
+        self._auto_links: list[tuple[Module, Link]] = []
 
         if model is not None:
             llm = model if isinstance(model, LLM) else self.model(model)
@@ -201,7 +191,7 @@ class Mind(MindInterface):
         if ego is not None:
             self.ego = self.adopt(_build_ego(ego, ego_system, self.model))
         if autowire:
-            self.pipeline()
+            self.intercept()  # with no stages: subject -> ego -> world
 
     # -- models ----------------------------------------------------------
 
@@ -214,24 +204,22 @@ class Mind(MindInterface):
         """
         return self.model_factory(spec, **kwargs)
 
-    # -- the pipeline ----------------------------------------------------
+    # -- interception ----------------------------------------------------
 
-    def pipeline(self, *stages: Module) -> list[Module]:
-        """Lay out `prompt -> subject -> stages -> ego -> world`.
+    def intercept(self, *stages: Module) -> list[Module]:
+        """Put `stages` between the subject and whoever speaks.
 
-        This is shorthand for `register` calls and nothing else. With one stage
-        and an ego, `mind.pipeline(interceptor)` is exactly:
+        Each stage reads the previous one's `context` and passes a `context`
+        along, so the last thing on the path speaks from an edited window.
+        Shorthand for `register` calls and nothing else: with one stage and an
+        ego, `mind.intercept(editor)` is exactly
 
-            mind.subject.register(interceptor, "context")
-            interceptor.register(mind.ego, "context")
+            mind.subject.register(editor, "context")
+            editor.register(mind.ego, "context")
             mind.ego.register(mind.world, "reply")
 
-        Write those yourself when the shape is not a line. Pass
-        `autowire=False` so nothing is laid out for you, then wire whatever
-        graph you want with the same one verb.
-
-        The mind offers this because subject, stages, and ego are its own
-        anatomy. It has no routing table and no say in anything else.
+        Write those yourself when the shape is not a line, or pass
+        `autowire=False` and wire everything with the one verb.
 
         Calling it again discards the previous layout and only that: links you
         made by hand are left alone. `describe` marks what came from here.
@@ -241,9 +229,9 @@ class Mind(MindInterface):
 
         # Undo exactly what a previous layout put down, and nothing else. A
         # monitor somebody registered by hand has to survive a relayout.
-        for module, link in self._pipeline_links:
+        for module, link in self._auto_links:
             module.unregister(link)
-        self._pipeline_links = []
+        self._auto_links = []
 
         self._stages = list(stages)
         for stage in self._stages:
@@ -255,10 +243,10 @@ class Mind(MindInterface):
             chain.append(self.ego)
 
         for producer, consumer in zip(chain, chain[1:]):
-            self._pipeline_links.append(
+            self._auto_links.append(
                 (producer, producer.register(consumer, "context"))
             )
-        self._pipeline_links.append(
+        self._auto_links.append(
             (speaker, speaker.register(self.world, "reply"))
         )
         return self._stages
@@ -526,10 +514,10 @@ class Mind(MindInterface):
             channels = ", ".join(sorted(module.OUTPUTS)) or "no outputs"
             lines.append(f"    {module.name:<16} {type(module).__name__:<14} {channels}")
         links = self.links()
-        laid_out = {id(link) for _, link in self._pipeline_links}
+        laid_out = {id(link) for _, link in self._auto_links}
         lines.append("  links:")
         for link in links:
-            mark = "  [pipeline]" if id(link) in laid_out else ""
+            mark = "  [auto]" if id(link) in laid_out else ""
             lines.append(f"    {link.describe()}{mark}")
         if not links:
             lines.append("    (nothing registered)")

@@ -47,10 +47,14 @@ class Subject(Agent):
         "thought": "the reasoning it did, if it was tagged, as Text",
     }
 
-    async def on_prompt(self, message: Message, ctx: Ctx) -> None:
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        """A prompt arrived. It becomes a user turn in the window."""
         payload = message.payload
         text = payload.text if isinstance(payload, Text) else str(payload)
         self.transcript.append(user(text))
+
+    async def on_process(self, ctx: Ctx) -> None:
+        """One turn over everything that arrived."""
         await self.turn(ctx)
 
     async def turn(self, ctx: Ctx, tag: str = "answer") -> None:
@@ -82,8 +86,12 @@ class Ego(Agent):
     INPUTS = {"context": "a context window to speak from, as Context"}
     OUTPUTS = {"reply": "what it says, as Text"}
 
-    async def on_context(self, message: Message, ctx: Ctx) -> None:
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        """A context window arrived. It becomes this module's memory."""
         self.transcript.replace_all(message.payload.messages)
+
+    async def on_process(self, ctx: Ctx) -> None:
+        """Speak from whatever window it now holds."""
         completion = await self.think(tag="speak")
         self.transcript.append(completion.as_message(stage="spoken"))
         ctx.emit("reply", Text(split_think(completion.text)[1]))

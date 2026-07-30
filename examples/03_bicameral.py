@@ -76,19 +76,23 @@ class Voice(Agent, InnerVoice):
         )
         return completion.text.strip()
 
-    async def on_context(self, message: Message, ctx: Ctx) -> None:
-        messages = [m.copy() for m in message.payload.messages]
-        situation = next(
-            (m.content for m in messages if m.role == "user"), "something happening"
-        )
-        heard = await self.utter(situation)
+    async def on_process(self, ctx: Ctx) -> None:
+        """The turn: speak into every window that arrived, pass each along."""
+        for message in self.take_inputs():
+            messages = [m.copy() for m in message.payload.messages]
+            situation = next(
+                (m.content for m in messages if m.role == "user"), "something happening"
+            )
+            heard = await self.utter(situation)
 
-        # Heard, not received as advice. That framing is the whole experiment.
-        messages.append(
-            user(f"(a voice says: {heard})", source=self.name, unbidden=True)
-        )
-        ctx.log.note("a voice spoke", said=heard[:70])
-        ctx.emit("context", Context(messages, note=f"with a voice from {self.name}"))
+            # Heard, not received as advice. That framing is the experiment.
+            messages.append(
+                user(f"(a voice says: {heard})", source=self.name, unbidden=True)
+            )
+            ctx.log.note("a voice spoke", said=heard[:70])
+            ctx.emit(
+                "context", Context(messages, note=f"with a voice from {self.name}")
+            )
 
 
 class Blackboard(BaseModule, Workspace):
@@ -146,7 +150,7 @@ async def main() -> None:
     )
     blackboard = Blackboard()
 
-    mind.pipeline(voice)  # prompt -> subject -> voice -> ego -> world
+    mind.intercept(voice)  # prompt -> subject -> voice -> ego -> world
     mind.subject.register(blackboard, "*")
     voice.register(blackboard, "*")
 

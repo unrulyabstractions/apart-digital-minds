@@ -163,7 +163,7 @@ def test_a_stage_edits_the_context_on_its_way_to_the_ego():
             model=get_llm("echo:", script=["what the subject thought"]),
             ego=get_llm("echo:", script=["what the ego said"]),
         )
-        mind.pipeline(Rewriter("rewriter"))
+        mind.intercept(Rewriter("rewriter"))
         mind.prompt("hi")
         await mind.process()
         subject_history = [m.content for m in mind.subject.transcript]
@@ -302,7 +302,7 @@ def test_with_an_ego_the_reply_comes_from_the_ego():
     assert links == ["subject --context--> ego", "ego --reply--> world"]
 
 
-def test_pipeline_lays_out_subject_then_stages_then_ego():
+def test_intercept_lays_out_subject_then_stages_then_ego():
     from src import BaseModule
 
     class Stage(BaseModule):
@@ -310,7 +310,7 @@ def test_pipeline_lays_out_subject_then_stages_then_ego():
         OUTPUTS = {"context": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
-    mind.pipeline(Stage("one"), Stage("two"))
+    mind.intercept(Stage("one"), Stage("two"))
     links = sorted(ln.describe() for ln in mind.links())
     stages = [m.name for m in mind.stages]
     mind.close()
@@ -323,7 +323,7 @@ def test_pipeline_lays_out_subject_then_stages_then_ego():
     ])
 
 
-def test_relaying_out_the_pipeline_discards_the_previous_one():
+def test_intercepting_again_discards_the_previous_layout():
     from src import BaseModule
 
     class Stage(BaseModule):
@@ -331,8 +331,8 @@ def test_relaying_out_the_pipeline_discards_the_previous_one():
         OUTPUTS = {"context": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
-    mind.pipeline(Stage("one"))
-    mind.pipeline(Stage("two"))
+    mind.intercept(Stage("one"))
+    mind.intercept(Stage("two"))
     links = sorted(ln.describe() for ln in mind.links())
     mind.close()
     assert "one" not in " ".join(links), "the old layout should be gone"
@@ -343,7 +343,7 @@ def test_relaying_out_the_pipeline_discards_the_previous_one():
     ])
 
 
-def test_a_stage_joins_the_mind_by_being_in_the_pipeline():
+def test_a_stage_joins_the_mind_by_being_intercepted():
     from src import BaseModule
 
     class Stage(BaseModule):
@@ -351,7 +351,7 @@ def test_a_stage_joins_the_mind_by_being_in_the_pipeline():
         OUTPUTS = {"context": "out"}
 
     mind = quiet(model="echo:", ego="echo:")
-    mind.pipeline(Stage("middle"))
+    mind.intercept(Stage("middle"))
     names = sorted(mind.modules)
     mind.close()
     assert names == ["ego", "middle", "subject"]
@@ -378,15 +378,15 @@ def test_relayout_keeps_wiring_it_did_not_create():
 
     mind = quiet(model="echo:", ego="echo:")
     mind.subject.register(Spy("spy"), "*")
-    mind.pipeline(Stage("one"))
-    mind.pipeline(Stage("two"))
+    mind.intercept(Stage("one"))
+    mind.intercept(Stage("two"))
     links = [ln.describe() for ln in mind.links()]
     mind.close()
     assert any("spy" in ln for ln in links), "the hand-made link was destroyed"
 
 
-def test_pipeline_is_exactly_the_register_calls_it_documents():
-    """No hidden wiring. `pipeline` is shorthand, and this pins it down."""
+def test_intercept_is_exactly_the_register_calls_it_documents():
+    """No hidden wiring. `intercept` is shorthand, and this pins it down."""
     from src import BaseModule
 
     class Stage(BaseModule):
@@ -394,7 +394,7 @@ def test_pipeline_is_exactly_the_register_calls_it_documents():
         OUTPUTS = {"context": "out"}
 
     laid_out = quiet(model="echo:", ego="echo:")
-    laid_out.pipeline(Stage("interceptor"))
+    laid_out.intercept(Stage("interceptor"))
     automatic = sorted(ln.describe() for ln in laid_out.links())
     laid_out.close()
 
@@ -409,7 +409,7 @@ def test_pipeline_is_exactly_the_register_calls_it_documents():
     assert automatic == manual
 
 
-def test_describe_marks_which_links_the_pipeline_made():
+def test_describe_marks_which_links_the_mind_laid_out():
     from src import BaseModule
 
     class Spy(BaseModule):
@@ -419,7 +419,7 @@ def test_describe_marks_which_links_the_pipeline_made():
     mind.subject.register(Spy("spy"), "*")
     text = mind.describe()
     mind.close()
-    marked = [ln for ln in text.splitlines() if "[pipeline]" in ln]
+    marked = [ln for ln in text.splitlines() if "[auto]" in ln]
     unmarked = [ln for ln in text.splitlines() if "spy" in ln]
-    assert len(marked) == 2, "subject -> ego and ego -> world came from the pipeline"
-    assert unmarked and "[pipeline]" not in unmarked[0], "the hand-made link is not"
+    assert len(marked) == 2, "subject -> ego and ego -> world were laid out"
+    assert unmarked and "[auto]" not in unmarked[0], "the hand-made link is not"
