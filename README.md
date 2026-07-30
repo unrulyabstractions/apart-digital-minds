@@ -7,6 +7,30 @@ You wire the parts together yourself.
 The package has no required dependencies. Provider SDKs are imported only when
 you ask for that provider.
 
+## Layout
+
+```
+src/api/       the public API, grouped by concern
+src/dminds/    the core implementation
+examples/      four minds assembled from the parts
+tests/         50 tests, no dependencies
+```
+
+Import from `src.api`. It re-exports everything and names the hook points in
+one place, so a rearrangement inside `src/dminds` will not reach you.
+
+```python
+from src.api import Mind, Agent, get_llm      # everything, flat
+from src.api.core import Mind, Module, Ctx    # or by concern
+from src.api.models import get_llm, register_provider
+from src.api.memory import Journal, Transcript
+from src.api.agents import Agent, split_think
+from src.api.observability import Tracer, read_trace
+```
+
+Every name in `src.api` is a re-export, so reaching into `src.dminds` directly
+is always safe. `from src import Mind` works too.
+
 ## Install
 
 ```bash
@@ -18,7 +42,7 @@ pip install -e '.[all]'   # plus every provider SDK
 
 ```python
 import asyncio
-from dmind import Mind, Agent, get_llm, texts
+from src.api import Mind, Agent, get_llm, texts
 
 async def main():
     mind = Mind("demo")
@@ -75,7 +99,7 @@ A task of kind `"user_prompt"` is handled by `on_user_prompt`. That is the whole
 convention. Override `process` if you want different routing.
 
 ```python
-from dmind import Agent, Context, Text, user
+from src.api import Agent, Context, Text, user
 
 class Target(Agent):
     async def on_user_prompt(self, task, ctx):
@@ -141,7 +165,7 @@ llm.tokenizer
 Add your own backend without touching the package:
 
 ```python
-from dmind import register_provider
+from src.api import register_provider
 register_provider("mine", lambda model, spec, **kw: MyLLM(model, spec, **kw))
 ```
 
@@ -195,7 +219,7 @@ The model call is the only place non-determinism enters. Capture it there and
 the whole run reproduces.
 
 ```python
-from dmind import Cassette, get_llm
+from src.api import Cassette, get_llm
 
 llm = Cassette(get_llm("openai:gpt-5"), "runs/tape.jsonl")   # record once, replay after
 ```

@@ -1,4 +1,4 @@
-"""dmind: a small, deterministic runtime for digital-mind experiments.
+"""Core implementation.
 
 Five ideas, and nothing else:
 
@@ -11,7 +11,10 @@ Five ideas, and nothing else:
 Everything else in this package is a convenience built on those. No cognitive
 architecture is baked in. `examples/` shows several assembled from the parts.
 
-    from dmind import Mind, Agent, get_llm, Text
+Prefer `src.api` when you import. It re-exports all of this, grouped by
+concern, and names the hook points. Reaching in here directly is fine too.
+
+    from src.api import Mind, Agent, get_llm, Text
 
     mind = Mind("demo")
     mind.add(Agent("assistant", get_llm("echo:")))

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from dmind import Ctx, Mind, Module, RunawayMind, Task, Text
+from src.api import Ctx, Mind, Module, RunawayMind, Task, Text
 
 
 def quiet_mind(**kwargs) -> Mind:

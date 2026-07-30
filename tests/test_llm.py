@@ -6,8 +6,8 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from dmind import Cassette, GenOptions, get_llm, user
-from dmind.llm import CassetteMiss, parse_spec
+from src.api import Cassette, GenOptions, get_llm, user
+from src.api.models import CassetteMiss, parse_spec
 
 
 def test_parse_spec_splits_on_the_first_colon_only():

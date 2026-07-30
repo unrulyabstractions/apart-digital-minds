@@ -6,7 +6,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from dmind import (
+from src.api import (
     Agent,
     Journal,
     Mind,

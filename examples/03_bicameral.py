@@ -30,7 +30,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from dmind import (
+from src.api import (
     Agent,
     Ctx,
     Mind,

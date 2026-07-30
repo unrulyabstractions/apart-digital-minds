@@ -25,7 +25,7 @@ Every entry records what the output is, how it was checked, and the result.
 Run IDs used second precision, so `examples/01` and `examples/02` both wrote to
 `runs/20260729-215354/`, interleaving two experiments into one trace file. Fixed
 by moving to millisecond precision plus a collision check against the run
-directory (`_fresh_run_id` in `dmind/mind.py`). Re-verified: three back-to-back
+directory (`_fresh_run_id` in `src/dminds/mind.py`). Re-verified: three back-to-back
 example runs produced three distinct directories.
 
 ### UNVERIFIED
@@ -35,11 +35,11 @@ server were available in this session. They are written but unproven.
 
 | Output | Why it is unverified |
 |---|---|
-| `dmind/llm/providers/openai_.py` | Never called against a real endpoint. No `OPENAI_API_KEY`. |
-| `dmind/llm/providers/anthropic_.py` | Never called against a real endpoint. No `ANTHROPIC_API_KEY`. |
-| `dmind/llm/providers/gemini_.py` | Never called against a real endpoint. No `GEMINI_API_KEY`. |
-| `dmind/llm/providers/ollama_.py` | No Ollama server was running. The HTTP request path never executed. |
-| `dmind/llm/providers/hf_.py` | `torch` and `transformers` are not installed here. Weight loading and generation never executed. |
+| `src/dminds/llm/providers/openai_.py` | Never called against a real endpoint. No `OPENAI_API_KEY`. |
+| `src/dminds/llm/providers/anthropic_.py` | Never called against a real endpoint. No `ANTHROPIC_API_KEY`. |
+| `src/dminds/llm/providers/gemini_.py` | Never called against a real endpoint. No `GEMINI_API_KEY`. |
+| `src/dminds/llm/providers/ollama_.py` | No Ollama server was running. The HTTP request path never executed. |
+| `src/dminds/llm/providers/hf_.py` | `torch` and `transformers` are not installed here. Weight loading and generation never executed. |
 
 What *was* verified about these five: each constructs without a key, registers
 under the right spec, and parses its spec correctly (`tests/test_llm.py`). Only
@@ -47,3 +47,23 @@ the network and generation paths are unproven.
 
 Before trusting any of them, run one live call per provider and add an entry
 here.
+
+## 2026-07-29 — restructured to `src/api` and `src/dminds`
+
+`dmind/` moved to `src/dminds/` with `git mv`, so history is preserved. A new
+`src/api/` package re-exports the core, grouped by concern. No logic changed.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 10 | Import paths agree | Imported `Mind` from `src`, `src.api`, `src.api.core`, and `src.dminds.mind`, then asserted all four are the same object | VERIFIED |
+| 11 | No name is lost in the move | Iterated `src.api.__all__` (58 names) and `src.__all__`, checking `hasattr` on each | VERIFIED (0 missing from either) |
+| 12 | No stale references remain | Grepped `examples/`, `tests/`, `pyproject.toml`, and `README.md` for `dmind` | VERIFIED (only the project name in prose remains) |
+| 13 | `pip install -e .` with the new layout | Reinstalled into the clean venv, then imported `src.api` from `/private/tmp` | VERIFIED |
+| 14 | Test suite after the move | Ran `tests/run_tests.py` | VERIFIED (50 passed, 0 failed) |
+| 15 | Examples after the move | Ran all four from `/private/tmp`, not the repo root, so the install had to be doing the work | VERIFIED (4/4 rc=0) |
+| 16 | Trace artifacts after the move | Re-opened all three `trace.jsonl` files and every per-module file. Confirmed `seq` contiguous, per-module line counts summing to the trace total, and `wall`/`tick`/`module` present on every event | VERIFIED (24, 31, and 64 events) |
+
+The UNVERIFIED provider list above still stands unchanged. Those five paths were
+moved, not executed.

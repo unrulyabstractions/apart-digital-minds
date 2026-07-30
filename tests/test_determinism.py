@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import random
 
-from dmind import Agent, Cassette, Ctx, Mind, Module, Task, Text, get_llm
+from src.api import Agent, Cassette, Ctx, Mind, Module, Task, Text, get_llm
 
 
 def quiet_mind(**kwargs) -> Mind:
