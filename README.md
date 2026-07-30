@@ -124,38 +124,50 @@ Driving a mind is three steps, kept apart on purpose.
 | `await mind.process_one()` | Run exactly one tick, for stepping through a run. |
 | `mind.get_replies()` | Read what came out. Reading drains. |
 
-## The soul
+## The soul, the stages, and the ego
 
-The model a mind is built around. `mind.soul` publishes three channels and
-accepts two.
+A mind is a pipeline with a fixed shape.
 
-| Publishes | |
-| --- | --- |
-| `context` | the whole context window, after every turn |
-| `reply` | what it just said, reasoning stripped out |
-| `thought` | the reasoning it just did, if it was tagged |
-
-| Accepts | |
-| --- | --- |
-| `user_prompt` | something to answer |
-| `context` | a replacement window, adopted wholesale |
-
-Adopting a replacement is itself a turn, so the soul publishes again
-afterwards. It is not told this happened and cannot tell. That is the whole
-interception experiment, and it is why an editor on `context` has to know when
-it is finished.
-
-```python
-mind.soul.register(monitor, "context")      # read what it remembers
-mind.soul.register(interceptor, "thought")  # read what it just reasoned
-interceptor.register(mind.soul, "context")  # and rewrite the window
+```
+prompt -> soul -> [stages] -> ego -> world
 ```
 
-Put something else at the centre with `soul=`:
+| Part | Reads | Writes |
+| --- | --- | --- |
+| `soul` | `prompt` | `context`, `reply`, `thought` |
+| stage | `context` | `context` |
+| `ego` | `context` | `reply` |
+
+**soul** is the target model, the thing an experiment is about. It thinks and
+publishes what it thought. **stages** sit in between; each takes a context and
+passes a context along, which is where interception lives. **ego** speaks from
+whatever context reaches it, including an edited one, and cannot tell.
+
+The ego is optional. Without one the soul's own reply goes straight to you, so
+the simplest mind is a soul and nothing else.
+
+Every channel is one-directional and means one thing. The soul never consumes
+what it produces, so **the pipeline cannot loop** and no stage has to know when
+to stop.
 
 ```python
-Mind("halves", "ollama:qwen3:8b", soul=Outer)              # a subclass
-Mind("study", "openai:gpt-5", soul=lambda llm: Mine(...))  # or a factory
+mind = Mind("study", "openai:gpt-5", ego="ollama:qwen3:8b")
+mind.pipeline(interceptor)      # prompt -> soul -> interceptor -> ego -> world
+```
+
+`mind.pipeline` is the one thing the mind wires, because soul, stages, and ego
+are its own anatomy. Everything else still registers itself, and a relayout
+leaves those hand-made links alone.
+
+```python
+mind.soul.register(blackboard, "*")   # a monitor, wired by hand, survives
+```
+
+Put something else at either end:
+
+```python
+Mind("halves", "ollama:qwen3:8b", soul=MySoul)   # a subclass, or a factory
+Mind("halves", "openai:gpt-5", ego=MyEgo("ego", get_llm("echo:")))
 ```
 
 `echo:` is a fake model. It needs no key and always answers the same way, so

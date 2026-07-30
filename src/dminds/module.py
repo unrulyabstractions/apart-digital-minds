@@ -135,6 +135,30 @@ class BaseModule(Module):
     def links(self) -> list[Link]:
         return list(self._links)
 
+    def unregister(self, link: Link) -> bool:
+        """Undo one registration. True if it was there.
+
+        Removing exactly what you put down matters: a caller that tore down
+        every link to relay out a pipeline would also destroy the monitor
+        somebody else attached.
+        """
+        if link not in self._links:
+            return False
+        self._links.remove(link)
+        listeners = self._consumers.get(link.channel, [])
+        for i, (consumer, as_channel) in enumerate(listeners):
+            if consumer.name == link.dst and as_channel == link.as_channel:
+                listeners.pop(i)
+                break
+        if not listeners:
+            self._consumers.pop(link.channel, None)
+        return True
+
+    def unregister_all(self) -> None:
+        """Drop every consumer of this module. Membership is unaffected."""
+        self._links.clear()
+        self._consumers.clear()
+
     def consumers(self, channel: str) -> list[tuple[Module, str]]:
         """Everyone listening to `channel`, plus everyone listening to `"*"`.
 

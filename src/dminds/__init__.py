@@ -43,7 +43,7 @@ from .llm import (
 )
 from .memory import Journal, Scratchpad, Transcript
 from .mind import Mind, World, texts
-from .soul import Soul
+from .soul import Ego, Soul
 from .module import BaseModule, Ctx, FnModule, UndeclaredChannel, handler_name
 from .scheduler import TickScheduler
 from .trace import (
@@ -67,6 +67,7 @@ __all__ = [
     "Ctx",
     "World",
     "Soul",
+    "Ego",
     "UndeclaredChannel",
     "TickScheduler",
     "texts",

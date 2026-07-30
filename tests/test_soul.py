@@ -141,37 +141,41 @@ def test_reply_has_the_reasoning_stripped_out():
     assert asyncio.run(run()) == ["Visible."]
 
 
-def test_a_replacement_context_is_adopted_wholesale():
+def test_the_soul_cannot_consume_what_it_produces():
+    """Atomic channels. No name is both an input and an output, so no cycle."""
+    assert set(Soul.INPUTS) & set(Soul.OUTPUTS) == set()
+    assert set(Soul.INPUTS) == {"prompt"}
+
+
+def test_a_stage_edits_the_context_on_its_way_to_the_ego():
+    """The ego speaks from what it was handed, never from the original."""
     from src import BaseModule, Context, user
 
     class Rewriter(BaseModule):
+        INPUTS = {"context": "the soul's window"}
         OUTPUTS = {"context": "a replacement"}
 
-        def __init__(self):
-            super().__init__("rewriter")
-            self.done = False
-
         async def on_input(self, message: Message, ctx: Ctx) -> None:
-            if self.done:
-                return
-            self.done = True
             ctx.emit("context", Context([user("a totally different history")]))
 
     async def run():
-        mind = quiet(model=get_llm("echo:", script=["first", "second"]))
-        rewriter = Rewriter()
-        mind.soul.register(rewriter, "context")   # soul -> rewriter
-        rewriter.register(mind.soul, "context")   # and back again
+        mind = quiet(
+            model=get_llm("echo:", script=["what the soul thought"]),
+            ego=get_llm("echo:", script=["what the ego said"]),
+        )
+        mind.pipeline(Rewriter("rewriter"))
         mind.prompt("hi")
         await mind.process()
-        history = [m.content for m in mind.soul.transcript]
+        soul_history = [m.content for m in mind.soul.transcript]
+        ego_history = [m.content for m in mind.ego.transcript]
         out = texts(mind.get_replies())
         mind.close()
-        return history, out
+        return soul_history, ego_history, out
 
-    history, out = asyncio.run(run())
-    assert history[0] == "a totally different history", "the old window is gone"
-    assert out == ["first", "second"], "it answered again after adopting"
+    soul_history, ego_history, out = asyncio.run(run())
+    assert "hi" in soul_history, "the soul kept its own window"
+    assert ego_history[0] == "a totally different history", "the ego got the edit"
+    assert out == ["what the ego said"], "the reply comes from the ego"
 
 
 def test_a_custom_soul_class_goes_at_the_centre():
@@ -266,3 +270,116 @@ def test_get_replies_drains():
     assert again == [], "reading drains"
     assert second == ["two"]
     assert history == 2, "outbox keeps everything"
+
+
+# -- the ego and the pipeline -------------------------------------------------
+
+
+def test_without_an_ego_the_soul_speaks():
+    mind = quiet(model="echo:")
+    links = [ln.describe() for ln in mind.links()]
+    ego = mind.ego
+    mind.close()
+    assert ego is None
+    assert links == ["soul --reply--> world"]
+
+
+def test_with_an_ego_the_reply_comes_from_the_ego():
+    async def run():
+        mind = quiet(
+            model=get_llm("echo:", script=["the soul's answer"]),
+            ego=get_llm("echo:", script=["the ego's answer"]),
+        )
+        mind.prompt("hi")
+        await mind.process()
+        out = texts(mind.get_replies())
+        links = [ln.describe() for ln in mind.links()]
+        mind.close()
+        return out, links
+
+    out, links = asyncio.run(run())
+    assert out == ["the ego's answer"], "the soul's reply is not what reaches you"
+    assert links == ["soul --context--> ego", "ego --reply--> world"]
+
+
+def test_pipeline_lays_out_soul_then_stages_then_ego():
+    from src import BaseModule
+
+    class Stage(BaseModule):
+        INPUTS = {"context": "in"}
+        OUTPUTS = {"context": "out"}
+
+    mind = quiet(model="echo:", ego="echo:")
+    mind.pipeline(Stage("one"), Stage("two"))
+    links = sorted(ln.describe() for ln in mind.links())
+    stages = [m.name for m in mind.stages]
+    mind.close()
+    assert stages == ["one", "two"]
+    assert links == sorted([
+        "soul --context--> one",
+        "one --context--> two",
+        "two --context--> ego",
+        "ego --reply--> world",
+    ])
+
+
+def test_relaying_out_the_pipeline_discards_the_previous_one():
+    from src import BaseModule
+
+    class Stage(BaseModule):
+        INPUTS = {"context": "in"}
+        OUTPUTS = {"context": "out"}
+
+    mind = quiet(model="echo:", ego="echo:")
+    mind.pipeline(Stage("one"))
+    mind.pipeline(Stage("two"))
+    links = sorted(ln.describe() for ln in mind.links())
+    mind.close()
+    assert "one" not in " ".join(links), "the old layout should be gone"
+    assert links == sorted([
+        "soul --context--> two",
+        "two --context--> ego",
+        "ego --reply--> world",
+    ])
+
+
+def test_a_stage_joins_the_mind_by_being_in_the_pipeline():
+    from src import BaseModule
+
+    class Stage(BaseModule):
+        INPUTS = {"context": "in"}
+        OUTPUTS = {"context": "out"}
+
+    mind = quiet(model="echo:", ego="echo:")
+    mind.pipeline(Stage("middle"))
+    names = sorted(mind.modules)
+    mind.close()
+    assert names == ["ego", "middle", "soul"]
+
+
+def test_the_ego_reads_context_and_writes_reply():
+    from src import Ego
+
+    assert set(Ego.INPUTS) == {"context"}
+    assert set(Ego.OUTPUTS) == {"reply"}
+    assert set(Ego.INPUTS) & set(Ego.OUTPUTS) == set()
+
+
+def test_relayout_keeps_wiring_it_did_not_create():
+    """A monitor attached by hand must survive a pipeline change."""
+    from src import BaseModule
+
+    class Stage(BaseModule):
+        INPUTS = {"context": "in"}
+        OUTPUTS = {"context": "out"}
+
+    class Spy(BaseModule):
+        pass
+
+    mind = quiet(model="echo:", ego="echo:")
+    mind.soul.register(Spy("spy"), "*")
+    mind.pipeline(Stage("one"))
+    mind.pipeline(Stage("two"))
+    links = [ln.describe() for ln in mind.links()]
+    mind.close()
+    assert any("spy" in ln for ln in links), "the hand-made link was destroyed"

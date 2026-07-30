@@ -43,6 +43,10 @@ class Mind(Host):
     #: the thing an experiment is about. None if the mind was given no model.
     soul: Module | None
 
+    #: The part that speaks, if there is one. Without an ego the soul's own
+    #: reply is what reaches you.
+    ego: Module | None
+
     #: The module standing for you, outside the mind. Register onto a channel
     #: with it as the consumer and whatever arrives lands in `outbox`.
     world: Module
@@ -54,6 +58,15 @@ class Mind(Host):
     outbox: list[Message]
 
     # -- assembly ------------------------------------------------------
+
+    @abstractmethod
+    def pipeline(self, *stages: Module) -> list[Module]:
+        """Lay out `prompt -> soul -> stages -> ego -> world`.
+
+        The mind owns this because soul, stages, and ego are its own anatomy.
+        Each stage takes a `context` and passes a `context` along, so an
+        interceptor is just a stage.
+        """
 
     @abstractmethod
     def adopt(self, module: Module) -> Module:
@@ -107,7 +120,7 @@ class Mind(Host):
         self,
         text: str,
         to: str | Sequence[str] | None = None,
-        channel: str = "user_prompt",
+        channel: str = "prompt",
     ) -> list[Message]:
         """Say something. Delivers immediately and returns, without running.
 

@@ -270,3 +270,48 @@ Driving split into three: `prompt` delivers, `process` runs to quiescence,
 rewrites unconditionally loops forever. The first version of example 02 did
 exactly that and hit `RunawayMind` after 200 ticks. Knowing when to stop is the
 editor's job, so `revise` now returns None once its own mark is in the window.
+
+## 2026-07-30 — atomic channels, and a forward pipeline through soul and ego
+
+The soul used `context` as both an output and an input, which made a cycle and
+forced every editor to know when to stop. Replaced by a forward pipeline with
+one-directional channels:
+
+    prompt -> soul -> [stages] -> ego -> world
+
+    soul   reads prompt    writes context, reply, thought
+    stage  reads context   writes context
+    ego    reads context   writes reply
+
+The soul no longer names its own observers. `mind.pipeline(*stages)` lays out
+the chain, because soul, stages, and ego are the mind's own anatomy. With no
+ego the soul's reply reaches you directly. `user_prompt` became `prompt`.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 69 | Test suite | `tests/run_tests.py` in the clean pip venv | VERIFIED (103 passed, 0 failed) |
+| 70 | Channels are atomic | Asserted `Soul.INPUTS & Soul.OUTPUTS` and `Ego.INPUTS & Ego.OUTPUTS` are both empty, so neither can be wired into a cycle | VERIFIED |
+| 71 | No ego means the soul speaks | Only link is `soul --reply--> world`; a prompt round-trips | VERIFIED |
+| 72 | An ego takes over the reply | Links are `soul --context--> ego`, `ego --reply--> world`, and the answer is the ego's, not the soul's | VERIFIED |
+| 73 | A stage edits on the way through | The soul kept its own window, the ego received the replacement, and the reply came from the ego | VERIFIED |
+| 74 | `pipeline` lays out the chain | Two stages produced exactly the four expected links, and both stages joined the mind | VERIFIED |
+| 75 | Relayout discards only its own links | Called `pipeline` twice; the first stage is gone, and a `soul --*--> spy` link registered by hand survived | VERIFIED |
+| 76 | Examples | All four run. Example 02 settles in 3 ticks and prints the soul's real thought beside the edited one the ego was handed. Example 03 reports `turns by tick: [(0,'soul'), (1,'voice'), (1,'blackboard'), (2,'ego'), (2,'blackboard')]`, so two modules still take turns concurrently. Example 04 still reports `identical: True` | VERIFIED (4/4) |
+| 77 | Trace artifacts | Re-opened every `trace.jsonl` and per-module file | VERIFIED (seq contiguous, per-module sums match) |
+| 78 | `api` purity and dead imports | AST scan across `src/` | VERIFIED (0 and 0) |
+| 79 | README quick start | Ran it verbatim | VERIFIED |
+
+### Bug found by a failing test
+
+`pipeline` first tore down every link on the soul, the stages, and the ego
+before relinking. That worked for the pipeline but silently destroyed any
+registration a caller had made by hand, such as a workspace on `soul --*-->`.
+Added `Module.unregister(link)` and had the pipeline record and remove exactly
+the links it created. `test_relayout_keeps_wiring_it_did_not_create` covers it.
+
+### Deleted
+
+The interceptor's "have I already edited this" guard, and the loop-termination
+paragraph that explained it. With a forward pipeline neither is needed.

@@ -35,29 +35,28 @@ from ..api.runtime import Mind as MindInterface
 from ..api.types import Link, Message, Payload, Text
 from .llm import get_llm
 from .module import BaseModule
-from .soul import Soul
+from .soul import Ego, Soul
 from .scheduler import TickScheduler
 from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
 
-def _build_soul(
-    soul: type[Module] | Callable[[LLM], Module] | None,
-    llm: LLM,
-    system: str | None,
-) -> Module:
-    """Turn the `soul=` argument into the module at the centre of a mind.
-
-    Three forms, so the common cases stay short:
-
-        None        the default `Soul`
-        a class     built as `cls("soul", llm, system=system)`
-        a callable  called as `fn(llm)`, for anything else
-    """
-    if soul is None:
+def _build_soul(spec, llm: LLM, system: str | None) -> Module:
+    """The module at the centre. A class, a factory, or a finished module."""
+    if isinstance(spec, Module):
+        return spec
+    if spec is None:
         return Soul("soul", llm, system=system)
-    if isinstance(soul, type):
-        return soul("soul", llm, system=system)
-    return soul(llm)
+    if isinstance(spec, type):
+        return spec("soul", llm, system=system)
+    return spec(llm)
+
+
+def _build_ego(spec, system: str | None, model: Callable[[str], LLM]) -> Module:
+    """The module that speaks. A finished module, or a model to build one from."""
+    if isinstance(spec, Module):
+        return spec
+    llm = spec if isinstance(spec, LLM) else model(spec)
+    return Ego("ego", llm, system=system)
 
 
 def _fresh_run_id(run_dir: str | Path | None) -> str:
@@ -131,6 +130,8 @@ class Mind(MindInterface):
         model: str | LLM | None = None,
         system: str | None = None,
         soul: type[Module] | Callable[[LLM], Module] | None = None,
+        ego: str | LLM | Module | None = None,
+        ego_system: str | None = None,
         autowire: bool = True,
         run_id: str | None = None,
         run_dir: str | Path | None = "runs",
@@ -185,15 +186,20 @@ class Mind(MindInterface):
         )
 
         #: The target model, as a module. None if the mind was given no model.
+        #: The target model, as a module. None if the mind was given no model.
         self.soul: Module | None = None
+        #: The part that speaks, if there is one. Otherwise the soul speaks.
+        self.ego: Module | None = None
+        self._stages: list[Module] = []
+        self._pipeline_links: list[tuple[Module, Link]] = []
+
         if model is not None:
             llm = model if isinstance(model, LLM) else self.model(model)
             self.soul = self.adopt(_build_soul(soul, llm, system))
-            # The soul is the front door in both directions: `prompt` delivers
-            # to it because it is the entry, and its replies reach you because
-            # of this. Everything else you wire yourself.
-            if autowire and "reply" in self.soul.OUTPUTS:
-                self.soul.register(self.world, "reply")
+        if ego is not None:
+            self.ego = self.adopt(_build_ego(ego, ego_system, self.model))
+        if autowire:
+            self.pipeline()
 
     # -- models ----------------------------------------------------------
 
@@ -205,6 +211,54 @@ class Mind(MindInterface):
         in the run.
         """
         return self.model_factory(spec, **kwargs)
+
+    # -- the pipeline ----------------------------------------------------
+
+    def pipeline(self, *stages: Module) -> list[Module]:
+        """Lay out `prompt -> soul -> stages -> ego -> world`.
+
+        The mind owns this because soul, stages, and ego are its own anatomy,
+        not arbitrary modules. Everything else still registers itself.
+
+        Each stage takes a `context` and passes a `context` along, so an
+        interceptor is just a stage. Call it again to change the order; the
+        previous layout is discarded.
+
+            mind.pipeline(interceptor)      # soul -> interceptor -> ego
+
+        With no ego, the soul's own reply is what reaches you.
+        """
+        if self.soul is None:
+            return []
+
+        # Undo exactly what a previous layout put down, and nothing else. A
+        # monitor somebody registered by hand has to survive a relayout.
+        for module, link in self._pipeline_links:
+            module.unregister(link)
+        self._pipeline_links = []
+
+        self._stages = list(stages)
+        for stage in self._stages:
+            self.adopt(stage)
+
+        chain: list[Module] = [self.soul, *self._stages]
+        speaker = self.ego if self.ego is not None else self.soul
+        if self.ego is not None:
+            chain.append(self.ego)
+
+        for producer, consumer in zip(chain, chain[1:]):
+            self._pipeline_links.append(
+                (producer, producer.register(consumer, "context"))
+            )
+        self._pipeline_links.append(
+            (speaker, speaker.register(self.world, "reply"))
+        )
+        return self._stages
+
+    @property
+    def stages(self) -> list[Module]:
+        """The modules currently sitting between the soul and the ego."""
+        return list(self._stages)
 
     # -- assembly ------------------------------------------------------
 
@@ -412,7 +466,7 @@ class Mind(MindInterface):
         self,
         text: str,
         to: str | Sequence[str] | None = None,
-        channel: str = "user_prompt",
+        channel: str = "prompt",
     ) -> list[Message]:
         """Say something. Delivers immediately and returns.
 

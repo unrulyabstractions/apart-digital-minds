@@ -12,11 +12,16 @@ channels itself, and handles a turn in two steps.
 Wiring lives here, not on the mind. A module owns its output channels, so a
 consumer is attached by the module that will do the emitting:
 
-    target.register(interceptor, "thought", as_channel="inspect")
+    soul.register(monitor, "thought", as_channel="overheard")
 
-When `target` emits on `"thought"`, `interceptor.on_input` is called with a
-message whose channel reads `"inspect"`. Neither module names the other's
-vocabulary, and the mind is not involved.
+When `soul` emits on `"thought"`, `monitor.on_input` is called with a message
+whose channel reads `"overheard"`. Neither module names the other's
+vocabulary.
+
+Keep channels atomic: one name, one direction, one meaning. A module that both
+consumes and produces the same channel name can be wired into a cycle, and a
+cycle in a mind is something a human has to reason about at every tick. The
+shipped `Soul` reads `prompt` and writes `context`, so it cannot loop.
 """
 
 from __future__ import annotations
@@ -71,6 +76,14 @@ class Module(ABC):
     @abstractmethod
     def links(self) -> list[Link]:
         """Every registration made on this module, in the order they were made."""
+
+    @abstractmethod
+    def unregister(self, link: Link) -> bool:
+        """Undo one registration. True if it was there."""
+
+    @abstractmethod
+    def unregister_all(self) -> None:
+        """Drop every consumer of this module. Membership is unaffected."""
 
     @abstractmethod
     def consumers(self, channel: str) -> list[tuple["Module", str]]:

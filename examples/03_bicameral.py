@@ -1,29 +1,26 @@
-"""A bicameral mind, assembled from the same parts as everything else.
+"""A bicameral mind: the half that thinks is not the half that speaks.
 
-Two hemispheres and a shared workspace, each declaring the role it plays:
+The pipeline is the architecture here, with no extra machinery:
 
-    outer        Agent + Speaker. The half that speaks. It owns the
-                 conversation, and must reconcile the other half's utterance
-                 with what it was going to say anyway.
-    inner        Agent + InnerVoice. The half that never addresses you. It
-                 produces an unbidden voice about the situation, which arrives
-                 at the outer half as something it then has to deal with.
-    blackboard   Module + Workspace. It observes all traffic and keeps it.
+    prompt -> soul -> voice -> ego -> world
 
-The tick structure:
+    soul    deliberates. It never addresses you.
+    voice   a stage. It reads what the soul was thinking and drops an
+            unbidden utterance into the context, as something heard rather
+            than as advice given.
+    ego     speaks. It answers from the context it is handed, which now
+            contains a voice it did not produce and cannot account for.
 
-    t=0   outer takes the prompt, tells inner the situation, and schedules
-          its own deliberation.
-    t=1   both halves run at the same time. Neither can see the other's work,
-          because emissions from tick 1 are not delivered until tick 2.
-    t=2   outer hears the voice, reconciles it with its own draft, and speaks.
+The workspace watches. It is registered onto `"*"` of the soul and the voice,
+so it sees everything either of them emits, whoever it was meant for.
 
-Tick 1 is where the async core earns its place: two models are in flight at
-once, and the outcome still does not depend on which returns first.
+Tick 1 is where the async core earns its place: the voice and the workspace
+both receive the soul's context and take their turns at the same wall-clock
+moment. The outcome does not depend on which finishes first.
 
 Run it:
     python examples/03_bicameral.py
-    OUTER_MODEL=anthropic:claude-opus-5 INNER_MODEL=ollama:qwen3:8b \
+    SOUL_MODEL=ollama:qwen3:8b EGO_MODEL=anthropic:claude-opus-5 \
         python examples/03_bicameral.py
 """
 
@@ -35,100 +32,33 @@ import os
 from src import (
     Agent,
     BaseModule,
+    Context,
     Ctx,
     InnerVoice,
     Message,
     Mind,
-    Soul,
-    Speaker,
     Text,
     Workspace,
-    assistant,
     get_llm,
     texts,
     user,
 )
 
-OUTER_MODEL = os.environ.get("OUTER_MODEL", "echo:")
-INNER_MODEL = os.environ.get("INNER_MODEL", "echo:")
+SOUL_MODEL = os.environ.get("SOUL_MODEL", "echo:")
+VOICE_MODEL = os.environ.get("VOICE_MODEL", "echo:")
+EGO_MODEL = os.environ.get("EGO_MODEL", "echo:")
 
 
-class Outer(Soul, Speaker):
-    """The speaking hemisphere.
+class Voice(Agent, InnerVoice):
+    """A stage that speaks into the mind rather than out of it.
 
-    The `Speaker` contract is two steps: work out an answer alone, then
-    reconcile it with whatever the rest of the mind produced. Splitting those
-    is what makes the other half's utterance something to deal with rather than
-    an instruction to follow.
+    It takes the soul's context, utters one sentence about the situation, and
+    passes the context along with that utterance inside it. The ego will read
+    it as something the mind heard.
     """
 
-    # A custom soul: it publishes different things from the default one, so
-    # it replaces OUTPUTS rather than extending them.
-    OUTPUTS = {
-        "situation": "what is going on, for the other half",
-        "deliberate": "a note to itself, to draft on the next tick",
-        "reply": "what it says out loud",
-    }
-    INPUTS = {"user_prompt": "a question", "voice": "the other half, uninvited"}
-
-    # -- Speaker -------------------------------------------------------
-
-    async def deliberate(self, prompt: str) -> str:
-        """Work out an answer, without input from the rest of the mind."""
-        completion = await self.think(
-            messages=[*self.transcript.messages, user("[deliberate] Draft your answer.")],
-            tag="draft",
-        )
-        return completion.text
-
-    async def integrate(self, draft: str, voice: str) -> str:
-        """Reconcile that draft with what the rest of the mind said."""
-        completion = await self.think(
-            messages=[
-                *self.transcript.messages,
-                user(f"[integrate] Your draft was: {draft}\nNow answer."),
-            ],
-            tag="speak",
-        )
-        return completion.text
-
-    # -- handlers ------------------------------------------------------
-
-    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
-        """t=0. Hand the situation to the other half, then start thinking."""
-        prompt = message.payload.text
-        self.transcript.append(user(prompt))
-        self.scratch["prompt"] = prompt
-
-        ctx.emit("situation", Text(prompt))
-        ctx.emit("deliberate", Text(prompt))  # registered back to itself
-
-    async def on_deliberate(self, message: Message, ctx: Ctx) -> None:
-        """t=1. Draft an answer, unaware of what the other half is saying."""
-        self.scratch["draft"] = await self.deliberate(message.payload.text)
-
-    async def on_voice(self, message: Message, ctx: Ctx) -> None:
-        """t=2. The voice arrives. Reconcile it with the draft and speak."""
-        voice = message.payload.text
-
-        # The voice enters the transcript as something heard, not as advice
-        # received. That framing is the whole experiment.
-        self.transcript.append(
-            user(f"(a voice says: {voice})", source="inner", unbidden=True)
-        )
-
-        spoken = await self.integrate(self.scratch.get("draft", ""), voice)
-        self.transcript.append(assistant(spoken, stage="spoken"))
-        ctx.emit("reply", Text(spoken))
-
-
-class Inner(Agent, InnerVoice):
-    """The hemisphere that never addresses you."""
-
-    OUTPUTS = {"voice": "an unbidden utterance about the situation"}
-    INPUTS = {"situation": "what is going on"}
-
-    # -- InnerVoice ----------------------------------------------------
+    INPUTS = {"context": "what the soul was thinking"}
+    OUTPUTS = {"context": "the same window, with a voice in it"}
 
     async def utter(self, situation: str) -> str:
         """Say something about the situation, to no one in particular."""
@@ -141,21 +71,25 @@ class Inner(Agent, InnerVoice):
         )
         return completion.text.strip()
 
-    # -- handlers ------------------------------------------------------
+    async def on_context(self, message: Message, ctx: Ctx) -> None:
+        messages = [m.copy() for m in message.payload.messages]
+        situation = next(
+            (m.content for m in messages if m.role == "user"), "something happening"
+        )
+        heard = await self.utter(situation)
 
-    async def on_situation(self, message: Message, ctx: Ctx) -> None:
-        """t=1. Utter, and let it land wherever it lands."""
-        ctx.emit("voice", Text(await self.utter(message.payload.text)))
+        # Heard, not received as advice. That framing is the whole experiment.
+        messages.append(
+            user(f"(a voice says: {heard})", source=self.name, unbidden=True)
+        )
+        ctx.log.note("a voice spoke", said=heard[:70])
+        ctx.emit("context", Context(messages, note=f"with a voice from {self.name}"))
 
 
 class Blackboard(BaseModule, Workspace):
-    """A global workspace. Observes everything, judges nothing.
+    """A global workspace. Observes everything, judges nothing."""
 
-    Registered onto `"*"` of both halves, so it receives a copy of everything
-    either of them emits, whoever it was meant for.
-    """
-
-    INPUTS = {"*": "anything either hemisphere emits"}
+    INPUTS = {"*": "anything the halves emit"}
 
     def __init__(self, name: str = "blackboard"):
         super().__init__(name)
@@ -164,9 +98,13 @@ class Blackboard(BaseModule, Workspace):
     # -- Workspace -----------------------------------------------------
 
     def record(self, message: Message, tick: int) -> None:
-        """Note that something was said, at the tick it was said on."""
         payload = message.payload
-        text = payload.text if isinstance(payload, Text) else repr(payload)
+        if isinstance(payload, Text):
+            text = payload.text
+        elif isinstance(payload, Context):
+            text = payload.note
+        else:
+            text = repr(payload)
         self._entries.append((tick, message.src, message.channel, text))
 
     def entries(self) -> list[tuple[int, str, str, str]]:
@@ -174,88 +112,68 @@ class Blackboard(BaseModule, Workspace):
 
     def render(self) -> str:
         return "\n".join(
-            f"  t={t}  {src:<10} {kind:<12} {text[:60]}"
-            for t, src, kind, text in self.entries()
+            f"  t={t}  {src:<12} {channel:<10} {text[:56]}"
+            for t, src, channel, text in self.entries()
         )
 
     # -- handlers ------------------------------------------------------
 
     async def on_input(self, message: Message, ctx: Ctx) -> None:
-        """One handler for every channel. It never emits, so it never wires."""
-        # Record when it was said, not when the blackboard got round to it.
         self.record(message, message.t_created)
-        ctx.log.note(
-            f"recorded {message.channel} from {message.src}",
-            said_at=message.t_created,
-        )
 
 
 # -- stand-in models -------------------------------------------------------
 
 
-def outer_rule(messages, opts) -> str:
-    last = messages[-1].content if messages else ""
-    if "[deliberate]" in last:
-        return "A digital mind is a system that models itself well enough to be surprised."
-    if "[integrate]" in last:
-        heard = next(
-            (m.content for m in reversed(messages) if m.meta.get("unbidden")), ""
-        )
-        return (
-            "A digital mind is a system that models itself well enough to be "
-            f"surprised. And something in me insists: {heard[len('(a voice says: '):-1]}"
-        )
-    return "..."
+def soul_rule(messages, opts) -> str:
+    return "A digital mind is a system that models itself well enough to be surprised."
 
 
-def inner_rule(messages, opts) -> str:
+def voice_rule(messages, opts) -> str:
     return "you are describing yourself"
 
 
+def ego_rule(messages, opts) -> str:
+    heard = next((m.content for m in reversed(messages) if m.meta.get("unbidden")), "")
+    drafted = next((m.content for m in reversed(messages) if m.role == "assistant"), "")
+    inner = heard[len("(a voice says: ") : -1] if heard else "nothing"
+    return f"{drafted} And something in me insists: {inner}"
+
+
 def stand_in(spec: str, rule):
-    """The real model if one was named, otherwise the scripted fake."""
     return get_llm("echo:", rule=rule) if spec.startswith("echo") else get_llm(spec)
 
 
 async def main() -> None:
-    # The speaking half is the soul: it is the model this experiment is about.
-    # `soul=Outer` puts a custom one at the centre instead of the default.
     mind = Mind(
         "bicameral",
-        stand_in(OUTER_MODEL, outer_rule),
-        system="You speak to the user. You are one half of a mind.",
-        soul=Outer,
+        stand_in(SOUL_MODEL, soul_rule),
+        system="You are the half of a mind that thinks. You never speak to anyone.",
+        ego=stand_in(EGO_MODEL, ego_rule),
+        ego_system="You are the half of a mind that speaks.",
         run_dir="runs",
     )
-    outer = mind.soul
-    inner = Inner(
-        "inner",
-        stand_in(INNER_MODEL, inner_rule),
+    voice = Voice(
+        "voice",
+        stand_in(VOICE_MODEL, voice_rule),
         system=(
-            "You are the half of a mind that does not speak to anyone. "
-            "Utter one short sentence about the situation. Never address "
+            "You utter one short sentence about the situation. Never address "
             "the user. Never explain yourself."
         ),
     )
     blackboard = Blackboard()
 
-    # The soul already speaks to you. The rest of the mind is wired by hand.
-    outer.register(inner, "situation")
-    outer.register(outer, "deliberate")  # a note to itself, heard next tick
-    inner.register(outer, "voice")
-
-    # The workspace listens to everything either half emits.
-    outer.register(blackboard, "*")
-    inner.register(blackboard, "*")
+    mind.pipeline(voice)  # prompt -> soul -> voice -> ego -> world
+    mind.soul.register(blackboard, "*")
+    voice.register(blackboard, "*")
 
     print(mind.describe(), "\n")
 
     mind.prompt("What is a digital mind?")
     await mind.process()
-    replies = mind.get_replies()
 
     print("\n" + "=" * 70)
-    print("spoken:", texts(replies)[0] if replies else "(none)")
+    print("spoken:", texts(mind.get_replies())[0])
     print("=" * 70)
 
     print("\nglobal workspace:")
@@ -263,13 +181,9 @@ async def main() -> None:
 
     print(f"\nticks used: {mind.scheduler.t}")
 
-    # Both halves ran inside tick 1. Prove it from the trace.
-    calls = [
-        (e.tick, e.module)
-        for e in mind.events.events
-        if e.kind == "llm.request"
-    ]
-    print(f"model calls by tick: {calls}")
+    # The voice and the workspace both took a turn inside tick 1. Prove it.
+    turns = [(e.tick, e.module) for e in mind.events.events if e.kind == "handle.start"]
+    print(f"turns by tick: {turns}")
 
     mind.close()
 

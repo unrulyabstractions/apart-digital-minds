@@ -8,7 +8,7 @@ methods. None of them is baked in here.
     class Assistant(Agent):
         OUTPUTS = {"reply": "the answer"}
 
-        async def on_user_prompt(self, message, ctx):
+        async def on_prompt(self, message, ctx):
             self.transcript.append(user(message.payload.text))
             completion = await self.think(tag="answer")
             self.transcript.append(completion.as_message())
@@ -52,7 +52,7 @@ class Agent(BaseModule, AgentInterface):
     """
 
     OUTPUTS = {"reply": "the agent's answer, as Text"}
-    INPUTS = {"user_prompt": "something to answer, as Text"}
+    INPUTS = {"prompt": "something to answer, as Text"}
 
     def __init__(
         self,
@@ -146,7 +146,7 @@ class Agent(BaseModule, AgentInterface):
 
     # -- default handler ---------------------------------------------------
 
-    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
+    async def on_prompt(self, message: Message, ctx: Ctx) -> None:
         """Answer a prompt and emit it on the `reply` channel.
 
         Whoever registered onto `"reply"` hears it. Nobody does by default, so

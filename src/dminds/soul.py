@@ -1,30 +1,26 @@
-"""`Soul`: the model at the centre of a mind. The one being studied.
+"""`Soul` and `Ego`: the two named parts a mind can be built around.
 
-Every mind is built around one target model. That model is the soul, and the
-mind holds it directly:
+A mind is a pipeline with a fixed shape:
 
-    mind = Mind("study", "openai:gpt-5", system="Think before you answer.")
-    mind.soul.register(mind.world, "reply")
+    prompt -> soul -> [stages] -> ego -> world
 
-Everything else in a mind is attached to the soul: something reading its
-context, something rewriting its thoughts, something speaking beside it. Those
-are ordinary modules registered onto the soul's channels.
+    soul    the target model. It reads the prompt, thinks, and publishes what
+            it thought. It is the thing an experiment is about.
+    stages  anything you put in between. Each one takes a context and passes a
+            context along. This is where interception lives.
+    ego     the part that speaks. It is given a context, possibly an edited
+            one, and produces the reply you see.
 
-The soul publishes three things after every turn.
+The ego is optional. Without one the soul's own reply goes straight to you, so
+the simplest mind is a soul and nothing else.
 
-    context   the whole context window, as it now stands
-    reply     what it just said, with any reasoning stripped out
-    thought   the reasoning it just did, if it was tagged
+Every channel is one-directional and means one thing. The soul never consumes
+what it produces, so the pipeline cannot loop and no stage has to know when to
+stop.
 
-And it accepts two.
-
-    user_prompt   something to answer
-    context       a replacement context window, adopted wholesale
-
-Adopting a replacement is itself a turn, so the soul publishes again
-afterwards. That is deliberate, and it is why an editor attached to `context`
-has to know when it is finished. An editor that rewrites unconditionally will
-loop forever, and `RunawayMind` will say so.
+    soul     reads  prompt            writes  context, reply, thought
+    stage    reads  context           writes  context
+    ego      reads  context           writes  reply
 """
 
 from __future__ import annotations
@@ -37,42 +33,28 @@ from .module import Ctx
 class Soul(Agent):
     """The target model, as a module.
 
-    Subclass it and pass the subclass as `Mind(..., soul=MySoul)` when the
-    thing at the centre of your mind should behave differently. The bicameral
-    example does exactly that.
+    Reads a prompt, takes one turn, and publishes three separate things. What
+    happens to them afterwards is not its concern, and it has no way to find
+    out.
+
+    Subclass it and pass the subclass as `Mind(..., soul=MySoul)`.
     """
 
+    INPUTS = {"prompt": "something to answer, as Text"}
     OUTPUTS = {
-        "context": "the whole context window, after this turn",
-        "reply": "what it just said, with reasoning stripped out",
-        "thought": "the reasoning it just did, if it was tagged",
-    }
-    INPUTS = {
-        "user_prompt": "something to answer, as Text",
-        "context": "a replacement context window, as Context",
+        "context": "the whole context window after this turn, as Context",
+        "reply": "what it said, with reasoning stripped out, as Text",
+        "thought": "the reasoning it did, if it was tagged, as Text",
     }
 
-    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
-        """Somebody asked something. Answer, then publish."""
+    async def on_prompt(self, message: Message, ctx: Ctx) -> None:
         payload = message.payload
         text = payload.text if isinstance(payload, Text) else str(payload)
         self.transcript.append(user(text))
-        await self.turn(ctx, tag="answer")
-
-    async def on_context(self, message: Message, ctx: Ctx) -> None:
-        """Somebody rewrote the context window. Adopt it and think again.
-
-        The soul is not told that this happened, and cannot tell. The replaced
-        history is simply what it now remembers.
-        """
-        self.transcript.replace_all(message.payload.messages)
-        await self.turn(ctx, tag="rethink")
+        await self.turn(ctx)
 
     async def turn(self, ctx: Ctx, tag: str = "answer") -> None:
-        """One model call, then publish context, reply, and thought.
-
-        Override this to change what a turn means or what gets published.
-        """
+        """One model call, then publish. Override to change what a turn means."""
         completion = await self.think(tag=tag)
         self.transcript.append(completion.as_message(stage=tag))
 
@@ -84,3 +66,24 @@ class Soul(Agent):
             "context",
             Context([m.copy() for m in self.transcript.messages], note=f"after {tag}"),
         )
+
+
+class Ego(Agent):
+    """The part of a mind that speaks.
+
+    It is handed a context window, which may have been edited on the way, and
+    answers from it. It never sees the original, so it cannot tell that
+    anything was changed.
+
+    Give a mind an ego and the reply you receive comes from here instead of
+    from the soul.
+    """
+
+    INPUTS = {"context": "a context window to speak from, as Context"}
+    OUTPUTS = {"reply": "what it says, as Text"}
+
+    async def on_context(self, message: Message, ctx: Ctx) -> None:
+        self.transcript.replace_all(message.payload.messages)
+        completion = await self.think(tag="speak")
+        self.transcript.append(completion.as_message(stage="spoken"))
+        ctx.emit("reply", Text(split_think(completion.text)[1]))

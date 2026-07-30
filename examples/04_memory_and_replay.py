@@ -42,12 +42,12 @@ class Remembering(Soul):
     """An agent that consults its journal before answering, and writes to it after."""
 
     OUTPUTS = {"reply": "the answer, informed by what it remembered"}
-    INPUTS = {"user_prompt": "a question, as Text"}
+    INPUTS = {"prompt": "a question, as Text"}
 
     def __init__(self, *args, journal_path=None, **kwargs):
         super().__init__(*args, journal=Journal(path=journal_path), **kwargs)
 
-    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
+    async def on_prompt(self, message: Message, ctx: Ctx) -> None:
         prompt = message.payload.text
 
         recalled = self.journal.recall(prompt, k=3)
