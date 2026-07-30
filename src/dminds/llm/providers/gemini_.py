@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..base import LLM, split_system
-from ..types import ChatMessage, Completion, GenOptions, Usage
+from ..base import BaseLLM, split_system
+from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 
-class GeminiLLM(LLM):
+class GeminiLLM(BaseLLM):
     def __init__(
         self,
         model: str = "gemini-2.5-flash",

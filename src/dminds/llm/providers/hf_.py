@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..base import LLM
-from ..types import ChatMessage, Completion, GenOptions, Usage
+from ..base import BaseLLM
+from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 
 def _pick_device() -> str:
@@ -27,7 +27,7 @@ def _pick_device() -> str:
     return "cpu"
 
 
-class HFLLM(LLM):
+class HFLLM(BaseLLM):
     def __init__(
         self,
         model: str = "Qwen/Qwen3-4B-Instruct-2507",

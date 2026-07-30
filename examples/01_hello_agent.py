@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from src.api import Agent, Mind, get_llm, texts
+from src import Agent, Mind, get_llm, texts
 
 MODEL = os.environ.get("MODEL", "echo:")
 

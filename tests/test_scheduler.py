@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import asyncio
 
-from src.api import Ctx, Mind, Module, RunawayMind, Task, Text
+from src import Ctx, Mind, BaseModule, RunawayMind, Task, Text
 
 
 def quiet_mind(**kwargs) -> Mind:
     return Mind("test", run_dir=None, console=False, **kwargs)
 
 
-class Recorder(Module):
+class Recorder(BaseModule):
     """Notes the tick on which it handled each task."""
 
     def __init__(self, name: str, forward_to: str | None = None, limit: int = 1):
@@ -65,7 +65,7 @@ def test_run_until_idle_drains_a_chain():
 def test_modules_in_one_tick_run_concurrently():
     """Two slow modules in the same tick take one duration, not two."""
 
-    class Slow(Module):
+    class Slow(BaseModule):
         async def process(self, task: Task, ctx: Ctx) -> None:
             await asyncio.sleep(0.05)
 
@@ -123,7 +123,7 @@ def test_one_task_per_module_per_tick():
 
 
 def test_prompt_returns_only_this_prompts_output():
-    class Talker(Module):
+    class Talker(BaseModule):
         async def process(self, task: Task, ctx: Ctx) -> None:
             ctx.emit("reply", Text(f"re:{task.payload.text}"), to="world")
 

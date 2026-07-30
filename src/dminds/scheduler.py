@@ -1,4 +1,7 @@
-"""The clock. This file defines what "one step" means.
+"""`TickScheduler`: the standard implementation of `api.Scheduler`.
+
+This file defines what "one step" means. Replace it to get a different notion
+of time.
 
 One tick has two phases.
 
@@ -26,27 +29,26 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from .messages import Task
-from .module import Ctx, Module
-from .trace import (
+from ..api.modules import Module
+from ..api.observability import (
     HANDLE_END,
     HANDLE_ERROR,
     HANDLE_START,
-    TASK_DELIVER,
     TICK_END,
     TICK_START,
 )
+from ..api.runtime import RunawayMind, Scheduler
+from ..api.types import Task
+from .module import Ctx
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .mind import Mind
+    from ..api.runtime import Host
 
 
-class RunawayMind(RuntimeError):
-    """The mind never went quiet. Usually two modules answering each other."""
+class TickScheduler(Scheduler):
+    """Runs every module holding work concurrently, one task each per tick."""
 
-
-class Scheduler:
-    def __init__(self, mind: "Mind", strict: bool = True, max_ticks: int = 200):
+    def __init__(self, mind: "Host", strict: bool = True, max_ticks: int = 200):
         self.mind = mind
         self.strict = strict
         self.max_ticks = max_ticks

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from .base import LLM
+from ...api.models import LLM
 
 #: provider name -> factory(model, spec, **kwargs) -> LLM
 _PROVIDERS: dict[str, Callable[..., LLM]] = {}

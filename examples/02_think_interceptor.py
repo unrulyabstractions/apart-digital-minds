@@ -26,7 +26,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from src.api import (
+from src import (
     Agent,
     Context,
     Ctx,

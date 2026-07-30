@@ -18,15 +18,22 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
-from .llm.base import LLM
-from .llm.types import ChatMessage, Completion, GenOptions, system as system_msg, user
+from ..api.models import LLM
+from ..api.observability import LLM_ERROR, LLM_REQUEST, LLM_RESPONSE
+from ..api.types import (
+    ChatMessage,
+    Completion,
+    GenOptions,
+    Task,
+    Text,
+    system as system_msg,
+    user,
+)
 from .memory import Journal, Scratchpad, Transcript
-from .messages import Task, Text
-from .module import Ctx, Module
-from .trace import LLM_ERROR, LLM_REQUEST, LLM_RESPONSE
+from .module import BaseModule, Ctx
 
 
-class Agent(Module):
+class Agent(BaseModule):
     """A module backed by a chat model.
 
     Args:

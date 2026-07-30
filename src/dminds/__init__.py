@@ -1,61 +1,55 @@
-"""Core implementation.
+"""The implementations. Every one of them satisfies a contract in `src.api`.
 
-Five ideas, and nothing else:
+    api.Module        -> BaseModule, FnModule, Agent
+    api.Ctx           -> Ctx
+    api.LLM           -> BaseLLM, the providers, Cassette
+    api.Router        -> Bus
+    api.Scheduler     -> TickScheduler
+    api.Host          -> Mind
+    api.MessageStore  -> Transcript
+    api.KeyValueStore -> Scratchpad
+    api.EpisodicStore -> Journal
+    api.Tracer        -> RunTracer
+    api.Logger        -> ModuleLog
+    api.Sink          -> MemorySink, JsonlSink, PerModuleSink, ConsoleSink
 
-    Module      something that holds a queue and handles tasks
-    Task        one unit of work, routed between modules
-    Mind        the assembly of modules, routes, a clock, and a trace
-    Scheduler   ticks the clock; nothing emitted at t is seen before t+1
-    LLM         one chat interface, many providers, chosen by a string
+No cognitive architecture is baked in. `examples/` shows several assembled from
+these parts.
 
-Everything else in this package is a convenience built on those. No cognitive
-architecture is baked in. `examples/` shows several assembled from the parts.
-
-Prefer `src.api` when you import. It re-exports all of this, grouped by
-concern, and names the hook points. Reaching in here directly is fine too.
-
-    from src.api import Mind, Agent, get_llm, Text
+    from src.dminds import Mind, Agent, get_llm
 
     mind = Mind("demo")
     mind.add(Agent("assistant", get_llm("echo:")))
     replies = await mind.prompt("hello")
 """
 
-from .agents import (
-    Agent,
-    has_think,
-    replace_think,
-    split_think,
-    strip_think,
-)
-from .bus import Bus, Route
+from .agents import Agent, has_think, replace_think, split_think, strip_think
+from .bus import Bus
 from .llm import (
-    LLM,
+    ALIASES,
+    DEFAULT_MODELS,
+    BaseLLM,
     Cassette,
-    ChatMessage,
-    Completion,
-    GenOptions,
-    Usage,
-    assistant,
+    CassetteMiss,
     available_providers,
     get_llm,
+    merge_consecutive,
+    parse_spec,
     register_provider,
-    system,
-    user,
+    request_key,
+    split_system,
 )
-from .memory import Episode, Journal, Recallable, Scratchpad, Transcript
-from .messages import Context, Payload, Task, Text, Vector
-from .mind import WORLD, Mind, texts
-from .module import Ctx, FnModule, Module
-from .scheduler import RunawayMind, Scheduler
+from .memory import Journal, Scratchpad, Transcript
+from .mind import Mind, texts
+from .module import BaseModule, Ctx, FnModule, handler_name
+from .scheduler import TickScheduler
 from .trace import (
     ConsoleSink,
-    Event,
     JsonlSink,
     MemorySink,
     ModuleLog,
     PerModuleSink,
-    Tracer,
+    RunTracer,
     causal_chain,
     read_trace,
 )
@@ -63,23 +57,15 @@ from .trace import (
 __version__ = "0.1.0"
 
 __all__ = [
-    # core
+    # runtime
     "Mind",
-    "Module",
+    "BaseModule",
     "FnModule",
     "Ctx",
-    "Task",
-    "Scheduler",
-    "RunawayMind",
     "Bus",
-    "Route",
-    "WORLD",
+    "TickScheduler",
     "texts",
-    # payloads
-    "Text",
-    "Context",
-    "Vector",
-    "Payload",
+    "handler_name",
     # agents
     "Agent",
     "split_think",
@@ -87,28 +73,25 @@ __all__ = [
     "replace_think",
     "has_think",
     # models
-    "LLM",
+    "BaseLLM",
     "get_llm",
     "register_provider",
     "available_providers",
-    "ChatMessage",
-    "Completion",
-    "GenOptions",
-    "Usage",
-    "system",
-    "user",
-    "assistant",
+    "parse_spec",
+    "ALIASES",
+    "DEFAULT_MODELS",
     "Cassette",
+    "CassetteMiss",
+    "request_key",
+    "split_system",
+    "merge_consecutive",
     # memory
     "Transcript",
     "Scratchpad",
     "Journal",
-    "Episode",
-    "Recallable",
-    # instrumentation
-    "Tracer",
+    # observability
+    "RunTracer",
     "ModuleLog",
-    "Event",
     "MemorySink",
     "JsonlSink",
     "PerModuleSink",

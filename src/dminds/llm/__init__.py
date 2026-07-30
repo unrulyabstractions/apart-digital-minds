@@ -1,40 +1,24 @@
-"""Model access. One interface, many providers."""
+"""Model implementations. The interface they satisfy is `src.api.models.LLM`."""
 
-from .base import LLM, merge_consecutive, split_system
+from .base import BaseLLM, merge_consecutive, split_system
 from .record import Cassette, CassetteMiss, request_key
 from .registry import (
     ALIASES,
+    DEFAULT_MODELS,
     available_providers,
     get_llm,
     parse_spec,
     register_provider,
 )
-from .types import (
-    ChatMessage,
-    Completion,
-    GenOptions,
-    Role,
-    Usage,
-    assistant,
-    system,
-    user,
-)
 
 __all__ = [
-    "LLM",
-    "ChatMessage",
-    "Completion",
-    "GenOptions",
-    "Role",
-    "Usage",
-    "system",
-    "user",
-    "assistant",
+    "BaseLLM",
     "get_llm",
     "register_provider",
     "available_providers",
     "parse_spec",
     "ALIASES",
+    "DEFAULT_MODELS",
     "Cassette",
     "CassetteMiss",
     "request_key",

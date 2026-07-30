@@ -1,4 +1,6 @@
-"""The assembly point: modules, routes, a clock, and a trace.
+"""`Mind`: the standard implementation of `api.Host`.
+
+The assembly point: modules, routes, a clock, and a trace.
 
     mind = Mind("demo")
     mind.add(Agent("assistant", get_llm("echo:")))
@@ -14,23 +16,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from .bus import Bus, Route
-from .messages import Payload, Task, Text
-from .module import Module
-from .scheduler import Scheduler
-from .trace import (
-    TASK_DELIVER,
-    TASK_EMIT,
-    ConsoleSink,
-    JsonlSink,
-    MemorySink,
-    PerModuleSink,
-    Sink,
-    Tracer,
-)
-
-#: The virtual module that stands for you, outside the mind.
-WORLD = "world"
+from ..api.modules import Module
+from ..api.observability import TASK_DELIVER, TASK_EMIT, Sink
+from ..api.runtime import WILDCARD, WORLD, Host
+from ..api.types import Payload, Route, Task, Text
+from .bus import Bus
+from .scheduler import TickScheduler
+from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
 
 def _fresh_run_id(run_dir: str | Path | None) -> str:
@@ -50,7 +42,7 @@ def _fresh_run_id(run_dir: str | Path | None) -> str:
     return candidate
 
 
-class Mind:
+class Mind(Host):
     def __init__(
         self,
         name: str = "mind",
@@ -73,7 +65,7 @@ class Mind:
         #: first module added. Set it directly to change the front door.
         self.entry: str | None = None
 
-        self.tracer = Tracer(self.run_id)
+        self.tracer = RunTracer(self.run_id)
         self.events: MemorySink | None = None
         self.run_path: Path | None = None
 
@@ -89,7 +81,7 @@ class Mind:
         for sink in sinks or []:
             self.tracer.add_sink(sink)
 
-        self.scheduler = Scheduler(self, strict=strict, max_ticks=max_ticks)
+        self.scheduler = TickScheduler(self, strict=strict, max_ticks=max_ticks)
 
     # -- assembly ------------------------------------------------------
 
@@ -113,11 +105,11 @@ class Mind:
     def wire(
         self, src: str, kind: str, dst: str, as_kind: str | None = None
     ) -> Route:
-        """Connect an emitter to a receiver. See `dmind.bus.Bus.wire`."""
+        """Connect an emitter to a receiver. See `src.dminds.bus.Bus.wire`."""
         return self.bus.wire(src, kind, dst, as_kind)
 
     def watch(
-        self, dst: str, kind: str = Bus.WILDCARD, src: str = Bus.WILDCARD
+        self, dst: str, kind: str = WILDCARD, src: str = WILDCARD
     ) -> Route:
         """Give one module a copy of matching traffic, however it was addressed.
 

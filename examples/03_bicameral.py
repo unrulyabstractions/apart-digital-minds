@@ -30,11 +30,11 @@ from __future__ import annotations
 import asyncio
 import os
 
-from src.api import (
+from src import (
     Agent,
+    BaseModule,
     Ctx,
     Mind,
-    Module,
     Task,
     Text,
     get_llm,
@@ -103,7 +103,7 @@ class Inner(Agent):
         ctx.emit("voice", Text(completion.text.strip()), to="outer")
 
 
-class Blackboard(Module):
+class Blackboard(BaseModule):
     """A global workspace. Observes everything, judges nothing.
 
     Wired with `mind.watch`, so it receives a copy of every emission even when

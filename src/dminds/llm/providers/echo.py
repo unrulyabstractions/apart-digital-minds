@@ -9,11 +9,11 @@ from __future__ import annotations
 import hashlib
 from typing import Callable, Sequence
 
-from ..base import LLM
-from ..types import ChatMessage, Completion, GenOptions, Usage
+from ..base import BaseLLM
+from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 
-class EchoLLM(LLM):
+class EchoLLM(BaseLLM):
     """Answers from a script, from a rule, or with a deterministic stub.
 
     Three ways to control it, checked in this order:

@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import random
 
-from src.api import Agent, Cassette, Ctx, Mind, Module, Task, Text, get_llm
+from src import Agent, Cassette, Ctx, Mind, BaseModule, Task, Text, get_llm
 
 
 def quiet_mind(**kwargs) -> Mind:
     return Mind("test", run_dir=None, console=False, **kwargs)
 
 
-class Jitter(Module):
+class Jitter(BaseModule):
     """Emits after an unpredictable delay, to try to break ordering."""
 
     def __init__(self, name: str, targets: list[str]):
@@ -25,7 +25,7 @@ class Jitter(Module):
             ctx.emit("note", Text(f"{self.name}->{target}"), to=target)
 
 
-class Collector(Module):
+class Collector(BaseModule):
     def __init__(self, name: str):
         super().__init__(name)
         self.got: list[str] = []

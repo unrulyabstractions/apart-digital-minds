@@ -1,139 +1,119 @@
-"""The public API. Everything you need, in one import.
+"""The contracts. `src.dminds` implements every one of them.
 
-    from src.api import Mind, Agent, get_llm, Text
+Nothing here imports from `src.dminds`. The dependency points one way, so you
+can replace any implementation without touching the vocabulary the other parts
+speak.
 
-Import by concern when you prefer it:
+    types.py           the data that crosses every boundary
+    modules.py         Module, Ctx        -> BaseModule, Ctx
+    models.py          LLM                -> BaseLLM and the providers
+    memory.py          MessageStore, KeyValueStore, EpisodicStore
+                                          -> Transcript, Scratchpad, Journal
+    observability.py   Sink, Logger, Tracer
+                                          -> JsonlSink and friends, ModuleLog,
+                                             RunTracer
+    runtime.py         Router, Scheduler, Host
+                                          -> Bus, TickScheduler, Mind
 
-    from src.api.core import Mind, Module, Ctx
-    from src.api.models import get_llm, register_provider
-    from src.api.memory import Journal, Transcript
-    from src.api.agents import Agent, split_think
-    from src.api.observability import Tracer, read_trace
+Write against these when you want to swap a part. Import the implementations
+from `src.dminds`, or import both from `src`.
 
-Core implementation lives in `src.dminds`. Everything here is a re-export, so
-reaching into `src.dminds` directly is always safe. This layer exists to give
-the hook points one stable place to be found.
+    from src.api import Module, LLM, Sink      # what to implement
+    from src.dminds import Mind, Agent, Bus    # what to use
+    from src import Mind, Agent, Module, LLM   # both, flat
 """
 
-from .agents import THINK_RE, Agent, has_think, replace_think, split_think, strip_think
-from .core import (
-    WORLD,
-    Bus,
-    Context,
-    Ctx,
-    FnModule,
-    Mind,
-    Module,
-    Payload,
-    Route,
-    RunawayMind,
-    Scheduler,
-    Task,
-    Text,
-    Vector,
-    handler_name,
-    texts,
+from .memory import EpisodicStore, KeyValueStore, MessageStore, Recallable
+from .models import LLM
+from .modules import Ctx, Handler, Module
+from .observability import (
+    EVENT_KINDS,
+    HANDLE_END,
+    HANDLE_ERROR,
+    HANDLE_START,
+    LLM_ERROR,
+    LLM_REQUEST,
+    LLM_RESPONSE,
+    MEMORY_WRITE,
+    NOTE,
+    TASK_DELIVER,
+    TASK_EMIT,
+    TICK_END,
+    TICK_START,
+    Logger,
+    Sink,
+    Tracer,
 )
-from .memory import Episode, Journal, Recallable, Scratchpad, Transcript
-from .models import (
-    ALIASES,
-    DEFAULT_MODELS,
-    LLM,
-    Cassette,
-    CassetteMiss,
+from .runtime import WILDCARD, WORLD, Host, RunawayMind, Router, Scheduler
+from .types import (
     ChatMessage,
     Completion,
+    Context,
+    Episode,
+    Event,
     GenOptions,
+    Payload,
     Role,
+    Route,
+    Task,
+    Text,
     Usage,
+    Vector,
     assistant,
-    available_providers,
-    get_llm,
-    merge_consecutive,
-    parse_spec,
-    register_provider,
-    request_key,
-    split_system,
+    preview,
     system,
     user,
 )
-from .observability import (
-    EVENT_KINDS,
-    ConsoleSink,
-    Event,
-    JsonlSink,
-    MemorySink,
-    ModuleLog,
-    PerModuleSink,
-    Sink,
-    Tracer,
-    causal_chain,
-    read_trace,
-)
 
 __all__ = [
-    # core
-    "Mind",
+    # interfaces
     "Module",
-    "FnModule",
     "Ctx",
-    "Task",
+    "Handler",
+    "LLM",
+    "MessageStore",
+    "KeyValueStore",
+    "EpisodicStore",
+    "Recallable",
+    "Sink",
+    "Logger",
+    "Tracer",
+    "Router",
     "Scheduler",
+    "Host",
     "RunawayMind",
-    "Bus",
-    "Route",
-    "WORLD",
-    "texts",
-    "handler_name",
-    # payloads
+    # data
+    "Task",
     "Text",
     "Context",
     "Vector",
     "Payload",
-    # agents
-    "Agent",
-    "split_think",
-    "strip_think",
-    "replace_think",
-    "has_think",
-    "THINK_RE",
-    # models
-    "LLM",
-    "get_llm",
-    "register_provider",
-    "available_providers",
-    "parse_spec",
-    "ALIASES",
-    "DEFAULT_MODELS",
+    "Route",
+    "Event",
+    "Episode",
     "ChatMessage",
     "Completion",
+    "Usage",
     "GenOptions",
     "Role",
-    "Usage",
     "system",
     "user",
     "assistant",
-    "Cassette",
-    "CassetteMiss",
-    "request_key",
-    "split_system",
-    "merge_consecutive",
-    # memory
-    "Transcript",
-    "Scratchpad",
-    "Journal",
-    "Episode",
-    "Recallable",
-    # observability
-    "Tracer",
-    "ModuleLog",
-    "Event",
-    "Sink",
-    "MemorySink",
-    "JsonlSink",
-    "PerModuleSink",
-    "ConsoleSink",
-    "read_trace",
-    "causal_chain",
+    "preview",
+    # constants
+    "WORLD",
+    "WILDCARD",
     "EVENT_KINDS",
+    "TICK_START",
+    "TICK_END",
+    "TASK_EMIT",
+    "TASK_DELIVER",
+    "HANDLE_START",
+    "HANDLE_END",
+    "HANDLE_ERROR",
+    "LLM_REQUEST",
+    "LLM_RESPONSE",
+    "LLM_ERROR",
+    "MEMORY_WRITE",
+    "NOTE",
 ]

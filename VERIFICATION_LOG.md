@@ -67,3 +67,34 @@ here.
 
 The UNVERIFIED provider list above still stands unchanged. Those five paths were
 moved, not executed.
+
+## 2026-07-30 — `src/api` became contracts, not re-exports
+
+`src/api` now declares interfaces and the shared data vocabulary. `src/dminds`
+implements them. Renames: `Module` -> `BaseModule`, `LLM` -> `BaseLLM`,
+`Scheduler` -> `TickScheduler`, `Tracer` -> `RunTracer` on the implementation
+side, with the plain names kept for the contracts.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 17 | The dependency points one way | Parsed every file under `src/api` with `ast` and listed all imports. No file names `dminds` at any level | VERIFIED (0 violations) |
+| 18 | Each implementation declares its contract | Checked `interface in impl.__mro__` for 16 pairs, and `issubclass(..., Sink)` for the four structural sinks | VERIFIED (20/20, 0 failures) |
+| 19 | Test suite after the rewrite | Ran `tests/run_tests.py` in the clean pip venv | VERIFIED (50 passed, 0 failed) |
+| 20 | Examples after the rewrite | Ran all four from `/private/tmp` against the editable install | VERIFIED (4/4 rc=0) |
+| 21 | Trace artifacts after the rewrite | Re-opened all three `trace.jsonl` files and every per-module file; `seq` contiguous, per-module counts summing to the total, `wall`/`tick` present throughout | VERIFIED (24, 31, 64 events) |
+| 22 | The two README extension snippets | Ran them. A custom `Sink` received 12 events and a custom `BaseLLM` registered through `register_provider` answered a prompt | VERIFIED |
+| 23 | No imports left dangling by the move | AST scan for imported-but-unused names across `src/` | VERIFIED after removing three dead imports from `dminds/memory.py` |
+
+### Fixed during verification
+
+- Providers used `...api.types`, which resolves to `src.dminds` from one level
+  deeper. Corrected to `....api.types`. Caught by an import failure, not by
+  reading.
+- `Cassette` called `inner._chat`, which only exists on `BaseLLM` and is not
+  part of the `api.LLM` contract. It now implements `api.LLM` directly and
+  awaits `inner.chat`, so it wraps anything satisfying the interface.
+
+The UNVERIFIED provider list still stands. Those five paths were rewritten, not
+executed.

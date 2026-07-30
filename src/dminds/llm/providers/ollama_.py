@@ -15,13 +15,13 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from ..base import LLM
-from ..types import ChatMessage, Completion, GenOptions, Usage
+from ..base import BaseLLM
+from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 DEFAULT_HOST = "http://localhost:11434"
 
 
-class OllamaLLM(LLM):
+class OllamaLLM(BaseLLM):
     def __init__(
         self,
         model: str = "qwen3:8b",

@@ -1,14 +1,16 @@
 """Instrumentation. Every module and every model call is logged, always.
 
+Implements `api.observability`: `RunTracer` is a `Tracer`, `ModuleLog` is a
+`Logger`, and the four sinks are `Sink`s.
+
 The trace is append-only and totally ordered by `seq`, which makes it an event
 log you can diff between two runs. Each event carries both a logical tick and a
 wall-clock timestamp. Logic must only ever read the tick. Wall time is for you.
 
-A run writes three things under `runs/<run_id>/`:
+A run writes two things under `runs/<run_id>/`:
 
     trace.jsonl              every event, in order
     modules/<name>.jsonl     the same events, split per module
-    console                  a readable stream, if you enable ConsoleSink
 """
 
 from __future__ import annotations
@@ -17,68 +19,12 @@ import json
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterator, Protocol
+from typing import Any, Callable, Iterator
 
-# Event kinds the runtime emits. Yours can be any string.
-TASK_EMIT = "task.emit"
-TASK_DELIVER = "task.deliver"
-HANDLE_START = "handle.start"
-HANDLE_END = "handle.end"
-HANDLE_ERROR = "handle.error"
-LLM_REQUEST = "llm.request"
-LLM_RESPONSE = "llm.response"
-LLM_ERROR = "llm.error"
-MEMORY_WRITE = "memory.write"
-TICK_START = "tick.start"
-TICK_END = "tick.end"
-NOTE = "note"
-
-
-@dataclass(slots=True)
-class Event:
-    seq: int
-    tick: int
-    wall: str
-    elapsed_s: float
-    module: str
-    kind: str
-    data: dict = field(default_factory=dict)
-    duration_s: float | None = None
-    task_id: str | None = None
-    cause: str | None = None
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-    def line(self) -> str:
-        """One readable line."""
-        head = f"t={self.tick:<3} {self.elapsed_s:7.3f}s {self.module:<14} {self.kind:<14}"
-        detail = self.data.get("summary") or _compact(self.data)
-        if self.duration_s is not None:
-            detail = f"{detail}  ({self.duration_s * 1000:.0f}ms)"
-        return f"{head} {detail}"
-
-
-def _compact(data: dict, width: int = 90) -> str:
-    if not data:
-        return ""
-    parts = []
-    for key, value in data.items():
-        text = value if isinstance(value, str) else repr(value)
-        text = " ".join(str(text).split())
-        if len(text) > 40:
-            text = text[:39] + "…"
-        parts.append(f"{key}={text}")
-    joined = " ".join(parts)
-    return joined if len(joined) <= width else joined[: width - 1] + "…"
-
-
-class Sink(Protocol):
-    def write(self, event: Event) -> None: ...
-    def close(self) -> None: ...
+from ..api.observability import NOTE, TASK_DELIVER, TICK_START, Logger, Sink, Tracer
+from ..api.types import Event
 
 
 class MemorySink:
@@ -172,7 +118,7 @@ class ConsoleSink:
         pass
 
 
-class Tracer:
+class RunTracer(Tracer):
     """Owns the sequence counter and fans events out to sinks."""
 
     def __init__(self, run_id: str, sinks: list[Sink] | None = None):
@@ -182,7 +128,7 @@ class Tracer:
         self.tick = 0
         self._start = time.perf_counter()
 
-    def add_sink(self, sink: Sink) -> "Tracer":
+    def add_sink(self, sink: Sink) -> "RunTracer":
         self.sinks.append(sink)
         return self
 
@@ -221,7 +167,7 @@ class Tracer:
             sink.close()
 
 
-class ModuleLog:
+class ModuleLog(Logger):
     """What a module writes to. Every event is tagged with its name and tick."""
 
     def __init__(self, tracer: Tracer, module: str):

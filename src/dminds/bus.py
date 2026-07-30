@@ -1,4 +1,4 @@
-"""Routing: who hears what.
+"""`Bus`: the standard implementation of `api.Router`.
 
 A module emits a kind. The router decides which modules receive it, and under
 which kind they see it. Renaming on the wire matters: the assistant emits
@@ -19,26 +19,15 @@ were explicitly addressed elsewhere.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from ..api.runtime import WILDCARD, Router
+from ..api.types import Route
 
 
-@dataclass(frozen=True, slots=True)
-class Route:
-    src: str
-    kind: str
-    dst: str
-    as_kind: str
+class Bus(Router):
+    """A route table. Registration order is preserved, so delivery order is
+    deterministic."""
 
-    def describe(self) -> str:
-        renamed = f" as {self.as_kind}" if self.as_kind != self.kind else ""
-        return f"{self.src} --{self.kind}--> {self.dst}{renamed}"
-
-
-class Bus:
-    """The route table. Order of registration is preserved, so delivery order
-    is deterministic."""
-
-    WILDCARD = "*"
+    WILDCARD = WILDCARD
 
     def __init__(self) -> None:
         self.routes: list[Route] = []
@@ -72,10 +61,10 @@ class Bus:
     ) -> list[tuple[str, str]]:
         matches = []
         for route in routes:
-            src_ok = route.src in (src, self.WILDCARD)
-            kind_ok = route.kind in (kind, self.WILDCARD)
+            src_ok = route.src in (src, WILDCARD)
+            kind_ok = route.kind in (kind, WILDCARD)
             if src_ok and kind_ok and route.dst != src:
-                as_kind = kind if route.kind == self.WILDCARD else route.as_kind
+                as_kind = kind if route.kind == WILDCARD else route.as_kind
                 matches.append((route.dst, as_kind))
         return matches
 

@@ -10,26 +10,40 @@ you ask for that provider.
 ## Layout
 
 ```
-src/api/       the public API, grouped by concern
-src/dminds/    the core implementation
+src/api/       the contracts
+src/dminds/    the implementations
 examples/      four minds assembled from the parts
 tests/         50 tests, no dependencies
 ```
 
-Import from `src.api`. It re-exports everything and names the hook points in
-one place, so a rearrangement inside `src/dminds` will not reach you.
+`src/api` declares what each part must do. `src/dminds` provides one of each.
+Nothing in `src/api` imports from `src/dminds`, so you can replace any part
+without disturbing the vocabulary the others speak.
+
+| Contract | `src/api` | Shipped implementation |
+| --- | --- | --- |
+| Handles tasks | `Module` | `BaseModule`, `FnModule`, `Agent` |
+| Given to a handler | `Ctx` | `Ctx` |
+| Answers a conversation | `LLM` | `BaseLLM`, the providers, `Cassette` |
+| Decides who hears what | `Router` | `Bus` |
+| Defines one step | `Scheduler` | `TickScheduler` |
+| Holds the modules | `Host` | `Mind` |
+| A conversation | `MessageStore` | `Transcript` |
+| Working state | `KeyValueStore` | `Scratchpad` |
+| Episodic memory | `EpisodicStore` | `Journal` |
+| Fans events out | `Tracer` | `RunTracer` |
+| One module's log | `Logger` | `ModuleLog` |
+| Where events go | `Sink` | `JsonlSink`, `PerModuleSink`, `ConsoleSink`, `MemorySink` |
+
+`src/api/types.py` holds the data that crosses every boundary: `Task`,
+`ChatMessage`, `Completion`, `GenOptions`, `Event`, `Route`, `Episode`, and the
+`Text` / `Context` / `Vector` payloads. Read that file first.
 
 ```python
-from src.api import Mind, Agent, get_llm      # everything, flat
-from src.api.core import Mind, Module, Ctx    # or by concern
-from src.api.models import get_llm, register_provider
-from src.api.memory import Journal, Transcript
-from src.api.agents import Agent, split_think
-from src.api.observability import Tracer, read_trace
+from src.api import Module, LLM, Sink        # what to implement
+from src.dminds import Mind, Agent, Bus      # what to use
+from src import Mind, Agent, Module, LLM     # both, flat
 ```
-
-Every name in `src.api` is a re-export, so reaching into `src.dminds` directly
-is always safe. `from src import Mind` works too.
 
 ## Install
 
@@ -42,7 +56,7 @@ pip install -e '.[all]'   # plus every provider SDK
 
 ```python
 import asyncio
-from src.api import Mind, Agent, get_llm, texts
+from src import Mind, Agent, get_llm, texts
 
 async def main():
     mind = Mind("demo")
@@ -61,7 +75,7 @@ you can build wiring before spending a token.
 | --- | --- |
 | `Module` | Something with a queue and a set of handlers. |
 | `Task` | One unit of work, routed from one module to another. |
-| `Mind` | The assembly: modules, routes, a clock, a trace. |
+| `Host` | Where modules live. `Mind` is the one you get. |
 | `Scheduler` | Runs the clock. Decides what "one step" means. |
 | `LLM` | One chat interface. Providers are chosen by a string. |
 
@@ -95,11 +109,13 @@ t=2   target adopts the rewrite and reruns.     interceptor idle.
 
 ## Writing a module
 
-A task of kind `"user_prompt"` is handled by `on_user_prompt`. That is the whole
-convention. Override `process` if you want different routing.
+Subclass `BaseModule`, or `Agent` if you want a model attached. A task of kind
+`"user_prompt"` is handled by `on_user_prompt`. That is the whole convention.
+Override `process` if you want different routing, or implement `api.Module`
+directly if you want none of the machinery.
 
 ```python
-from src.api import Agent, Context, Text, user
+from src import Agent, Context, Text, user
 
 class Target(Agent):
     async def on_user_prompt(self, task, ctx):
@@ -165,7 +181,7 @@ llm.tokenizer
 Add your own backend without touching the package:
 
 ```python
-from src.api import register_provider
+from src import register_provider
 register_provider("mine", lambda model, spec, **kw: MyLLM(model, spec, **kw))
 ```
 
@@ -219,7 +235,7 @@ The model call is the only place non-determinism enters. Capture it there and
 the whole run reproduces.
 
 ```python
-from src.api import Cassette, get_llm
+from src import Cassette, get_llm
 
 llm = Cassette(get_llm("openai:gpt-5"), "runs/tape.jsonl")   # record once, replay after
 ```
@@ -251,6 +267,39 @@ TARGET_MODEL=anthropic:claude-opus-5 INTERCEPTOR_MODEL=ollama:qwen3:8b \
 python tests/run_tests.py    # no dependencies
 pytest                       # also works
 ```
+
+## Replacing a part
+
+Implement the contract and pass your version in. Nothing else changes.
+
+```python
+from src.api import Sink, LLM, Scheduler
+
+class SlackSink(Sink):                      # a new log destination
+    def write(self, event): ...
+    def close(self): ...
+
+mind.tracer.add_sink(SlackSink())
+```
+
+```python
+from src import Completion, register_provider
+from src.dminds import BaseLLM             # a new backend
+
+class MyLLM(BaseLLM):
+    def _chat(self, messages, opts):
+        return Completion(text="...", model=self.model)
+
+register_provider("mine", lambda model, spec, **kw: MyLLM(model, spec, **kw))
+```
+
+`BaseLLM` handles timing and thread offload, so a provider writes one
+synchronous method. Implement `api.LLM` directly when you need control over the
+async call itself, as `Cassette` does.
+
+The same holds for the rest. Subclass `api.Scheduler` for a different notion of
+time, satisfy `api.Router` for different routing, or satisfy `api.EpisodicStore`
+to put memory in a real vector database.
 
 ## What is deliberately absent
 

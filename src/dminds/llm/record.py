@@ -19,9 +19,10 @@ import hashlib
 import json
 from collections import defaultdict
 from pathlib import Path
+from typing import Sequence
 
-from .base import LLM
-from .types import ChatMessage, Completion, GenOptions, Usage
+from ...api.models import LLM
+from ...api.types import ChatMessage, Completion, GenOptions, Usage
 
 
 class CassetteMiss(RuntimeError):
@@ -46,13 +47,19 @@ def request_key(spec: str, messages: list[ChatMessage], opts: GenOptions) -> str
 
 
 class Cassette(LLM):
-    """Wraps any LLM and persists its answers to a JSONL tape."""
+    """Wraps any LLM and persists its answers to a JSONL tape.
+
+    This implements `api.LLM` directly rather than extending `BaseLLM`, because
+    it must wrap anything satisfying the interface, and the interface only
+    promises the async `chat`. On a hit it never touches the inner model.
+    """
 
     def __init__(self, inner: LLM, path: str | Path, mode: str = "auto"):
-        super().__init__(inner.model, f"cassette({inner.spec})")
+        self.inner = inner
+        self.model = inner.model
+        self.spec = f"cassette({inner.spec})"
         if mode not in ("auto", "replay", "record"):
             raise ValueError(f"mode must be auto, replay, or record. Got {mode!r}.")
-        self.inner = inner
         self.path = Path(path)
         self.mode = mode
         self.hits = 0
@@ -88,8 +95,14 @@ class Cassette(LLM):
         with self.path.open("a") as handle:
             handle.write(json.dumps(entry) + "\n")
 
-    def _chat(self, messages: list[ChatMessage], opts: GenOptions) -> Completion:
-        key = request_key(self.inner.spec, messages, opts)
+    async def chat(
+        self,
+        messages: Sequence[ChatMessage],
+        opts: GenOptions | None = None,
+    ) -> Completion:
+        opts = opts or GenOptions()
+        msgs = [m.copy() for m in messages]
+        key = request_key(self.inner.spec, msgs, opts)
 
         if self.mode != "record":
             # Identical requests can legitimately return different answers, so
@@ -116,7 +129,7 @@ class Cassette(LLM):
                 )
 
         self.misses += 1
-        completion = self.inner._chat(messages, opts)
+        completion = await self.inner.chat(msgs, opts)
         self._append(key, completion)
         return completion
 

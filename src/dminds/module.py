@@ -1,15 +1,16 @@
-"""A module: a queue, a set of handlers, and whatever state you give it.
+"""`BaseModule`: the standard implementation of `api.Module`.
 
-Subclass `Module` and write one method per task kind. A task of kind
-`"user_prompt"` is handled by `on_user_prompt`. That is the whole convention.
+Subclass it and write one method per task kind. A task of kind `"user_prompt"`
+is handled by `on_user_prompt`. That is the whole convention.
 
-    class Critic(Module):
+    class Critic(BaseModule):
         async def on_inspect(self, task, ctx):
-            verdict = await self.think(task.payload)
-            ctx.emit("verdict", verdict, to="assistant")
+            ctx.emit("verdict", "looks wrong", to="assistant")
 
 Handlers never call another module directly. They emit, and the scheduler
 delivers on the next tick.
+
+`Ctx` here is the concrete object handed to handlers. It satisfies `api.Ctx`.
 """
 
 from __future__ import annotations
@@ -18,11 +19,13 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from .messages import Payload, Task
-from .trace import ModuleLog
+from ..api.modules import Ctx as CtxProtocol
+from ..api.modules import Module
+from ..api.observability import Logger
+from ..api.types import Payload, Task
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .mind import Mind
+    from ..api.runtime import Host
 
 
 def handler_name(kind: str) -> str:
@@ -32,14 +35,14 @@ def handler_name(kind: str) -> str:
 
 
 @dataclass
-class Ctx:
+class Ctx(CtxProtocol):
     """What a handler is given: where it is, what it can say, how to log."""
 
     tick: int
     task: Task
-    module: "Module"
-    mind: "Mind"
-    log: ModuleLog
+    module: Module
+    mind: "Host"
+    log: Logger
     outbox: list[Task] = field(default_factory=list)
 
     def emit(
@@ -68,19 +71,19 @@ class Ctx:
         return self.emit(kind, payload, to=self.task.src)
 
 
-class Module:
-    """Base class. Give it a name, add it to a mind, write `on_*` handlers."""
+class BaseModule(Module):
+    """A queue plus `on_<kind>` dispatch. The usual thing to subclass."""
 
     def __init__(self, name: str):
         self.name = name
         self.inbox: deque[Task] = deque()
-        self.mind: "Mind | None" = None
-        self.log: ModuleLog | None = None
+        self.mind: "Host | None" = None
+        self.log: Logger | None = None
         self.handled = 0
 
     # -- lifecycle -----------------------------------------------------
 
-    def attach(self, mind: "Mind") -> None:
+    def attach(self, mind: "Host") -> None:
         """Called once when the module joins a mind. Override to set up."""
         self.mind = mind
         self.log = mind.tracer.bind(self.name)
@@ -127,7 +130,7 @@ class Module:
         return f"<{type(self).__name__} {self.name} pending={self.pending}>"
 
 
-class FnModule(Module):
+class FnModule(BaseModule):
     """Wraps a plain function as a module, for glue and quick probes.
 
         FnModule("counter", lambda task, ctx: ctx.emit("n", 1, to="world"))

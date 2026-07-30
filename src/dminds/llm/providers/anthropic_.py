@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..base import LLM, merge_consecutive, split_system
-from ..types import ChatMessage, Completion, GenOptions, Usage
+from ..base import BaseLLM, merge_consecutive, split_system
+from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 
-class AnthropicLLM(LLM):
+class AnthropicLLM(BaseLLM):
     def __init__(
         self,
         model: str = "claude-sonnet-5",

@@ -22,7 +22,7 @@ import random
 import shutil
 from pathlib import Path
 
-from src.api import (
+from src import (
     Agent,
     Cassette,
     Ctx,

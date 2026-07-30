@@ -4,25 +4,25 @@
     Scratchpad   working state. A dict that logs its writes.
     Journal      episodic memory. Append-only, survives the process, recallable.
 
-They share no base class on purpose. A transcript is a sequence, a scratchpad is
-a mapping, and a journal is a searchable log. Forcing one interface onto all
-three would hide what each is for. If you want to swap implementations, depend
-on the small `Recallable` protocol at the bottom.
+They implement `api.MessageStore`, `api.KeyValueStore`, and `api.EpisodicStore`.
+Those three share no base class on purpose. A transcript is a sequence, a
+scratchpad is a mapping, and a journal is a searchable log. Forcing one
+interface onto all three would hide what each is for.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Protocol, Sequence
+from typing import Any, Callable, Iterable, Iterator, Sequence
 
-from .llm.types import ChatMessage
-from .trace import MEMORY_WRITE, ModuleLog
+from ..api.memory import EpisodicStore, KeyValueStore, MessageStore
+from ..api.observability import MEMORY_WRITE, Logger
+from ..api.types import ChatMessage, Episode
 
 
-class Transcript:
+class Transcript(MessageStore):
     """An ordered conversation you can edit.
 
     Editing is the point. An interceptor rewriting a thought calls `replace`,
@@ -32,7 +32,7 @@ class Transcript:
     def __init__(
         self,
         messages: Iterable[ChatMessage] | None = None,
-        log: ModuleLog | None = None,
+        log: Logger | None = None,
     ):
         self.messages: list[ChatMessage] = list(messages or [])
         self.log = log
@@ -122,10 +122,10 @@ class Transcript:
         )
 
 
-class Scratchpad:
+class Scratchpad(KeyValueStore):
     """Working memory. A dict that leaves a trace of every write."""
 
-    def __init__(self, log: ModuleLog | None = None, **initial: Any):
+    def __init__(self, log: Logger | None = None, **initial: Any):
         self.data: dict[str, Any] = dict(initial)
         self.log = log
 
@@ -160,19 +160,6 @@ class Scratchpad:
         return "\n".join(f"{k}: {v}" for k, v in self.data.items())
 
 
-@dataclass(slots=True)
-class Episode:
-    """One remembered thing."""
-
-    text: str
-    t: int = 0
-    source: str = ""
-    meta: dict = field(default_factory=dict)
-
-    def to_dict(self) -> dict:
-        return {"text": self.text, "t": self.t, "source": self.source, "meta": self.meta}
-
-
 _WORD = re.compile(r"[a-z0-9]+")
 
 
@@ -180,7 +167,7 @@ def _words(text: str) -> set[str]:
     return set(_WORD.findall(text.lower()))
 
 
-class Journal:
+class Journal(EpisodicStore):
     """Episodic memory. Append-only, optionally on disk, recallable.
 
     Recall scores word overlap and breaks ties by recency. No embeddings, so
@@ -191,7 +178,7 @@ class Journal:
     def __init__(
         self,
         path: str | Path | None = None,
-        log: ModuleLog | None = None,
+        log: Logger | None = None,
         scorer: Callable[[str, Episode], float] | None = None,
         recency_weight: float = 0.01,
     ):
@@ -254,9 +241,3 @@ class Journal:
     def __len__(self) -> int:
         return len(self.episodes)
 
-
-class Recallable(Protocol):
-    """The only contract a custom memory has to satisfy."""
-
-    def remember(self, text: str, **meta: Any) -> Any: ...
-    def recall(self, query: str, k: int = 5) -> Sequence[Any]: ...

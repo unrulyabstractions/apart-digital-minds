@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import asyncio
 
-from src.api import Ctx, Mind, Module, Task, Text
+from src import Ctx, Mind, BaseModule, Task, Text
 
 
 def quiet_mind(**kwargs) -> Mind:
     return Mind("test", run_dir=None, console=False, **kwargs)
 
 
-class Emitter(Module):
+class Emitter(BaseModule):
     def __init__(self, name: str, kind: str, to=None):
         super().__init__(name)
         self.kind = kind
@@ -21,7 +21,7 @@ class Emitter(Module):
         ctx.emit(self.kind, Text("payload"), to=self.to)
 
 
-class Sink(Module):
+class Sink(BaseModule):
     def __init__(self, name: str):
         super().__init__(name)
         self.kinds: list[str] = []
@@ -117,7 +117,7 @@ def test_fan_out_to_several_destinations():
 
 
 def test_handler_routing_by_kind():
-    class Router(Module):
+    class Router(BaseModule):
         def __init__(self):
             super().__init__("r")
             self.calls: list[str] = []

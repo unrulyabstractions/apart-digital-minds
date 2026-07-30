@@ -9,15 +9,15 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..base import LLM
-from ..types import ChatMessage, Completion, GenOptions, Usage
+from ..base import BaseLLM
+from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 # Reasoning and newer flagship models renamed or dropped these parameters.
 _USES_COMPLETION_TOKENS = ("gpt-5", "o1", "o3", "o4")
 _REJECTS_TEMPERATURE = ("gpt-5", "o1", "o3", "o4")
 
 
-class OpenAILLM(LLM):
+class OpenAILLM(BaseLLM):
     def __init__(
         self,
         model: str = "gpt-5",

@@ -1,30 +1,26 @@
-"""The one method a provider must implement.
+"""`BaseLLM`: the standard implementation of `api.LLM`.
 
-Providers are written synchronously because every vendor SDK is synchronous and
-sync code is easier to read. `LLM.chat` runs `_chat` on a worker thread, so the
+Providers are written synchronously because every vendor SDK is synchronous
+and sync code is easier to read. `chat` runs `_chat` on a worker thread, so the
 runtime stays async and two modules can call two different models at once.
+
+Subclass this and implement `_chat`. Implement `api.LLM` directly only if you
+need something this does not do.
 """
 
 from __future__ import annotations
 
+import asyncio
 import time
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Sequence
 
-import asyncio
+from ...api.models import LLM
+from ...api.types import ChatMessage, Completion, GenOptions
 
-from .types import ChatMessage, Completion, GenOptions
 
-
-class LLM(ABC):
-    """A chat model behind a uniform interface.
-
-    Subclasses implement `_chat`. Everything else, including timing, is handled
-    here so no provider has to remember to do it.
-    """
-
-    #: Filled in by the registry, e.g. "openai:gpt-5". Used in logs.
-    spec: str = "unknown"
+class BaseLLM(LLM):
+    """Handles timing and thread offload. Subclasses write one method."""
 
     def __init__(self, model: str, spec: str | None = None):
         self.model = model
@@ -48,9 +44,6 @@ class LLM(ABC):
         if not completion.model:
             completion.model = self.model
         return completion
-
-    def close(self) -> None:
-        """Release anything held open. Local backends override this."""
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.spec}>"
