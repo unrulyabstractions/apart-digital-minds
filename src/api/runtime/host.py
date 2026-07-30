@@ -1,42 +1,43 @@
-"""Where modules live."""
+"""Where modules live, as a module sees it."""
 
 from __future__ import annotations
 
-from typing import Protocol, Sequence
+from typing import Protocol
 
 from ..modules import Module
 from ..observability import Tracer
-from ..types import Payload, Task
-from .router import Router
+from ..types import Message, Payload
 
 
 class Host(Protocol):
     """The assembly a module belongs to. Reached through `ctx.mind`.
 
-    Implementations own the module registry, the router, the tracer, and the
-    task-id counter. `Mind` is the one you get.
+    Narrow on purpose. A module can stage an emission, look up who else is
+    here, and log. It cannot register links on other modules' behalf, add
+    modules, or drive the clock.
+
+    Note that routing is absent. A host does not decide where a message goes;
+    the emitting module's own registrations do. The host only turns one
+    emission into messages and delivers them when the tick ends.
     """
 
     modules: dict[str, Module]
-    bus: Router
     tracer: Tracer
-    entry: str | None
 
     def stage(
         self,
-        src: str,
-        kind: str,
+        src: "Module",
+        channel: str,
         payload: Payload,
-        to: str | Sequence[str] | None,
         cause: str | None,
-        outbox: list[Task],
-    ) -> list[Task]:
-        """Turn one emission into one task per destination.
+        outbox: list[Message],
+    ) -> list[Message]:
+        """Turn one emission into one message per registered consumer.
 
         Appends to `outbox` rather than delivering. The scheduler delivers at
         the end of the tick, which is what keeps a tick's emissions invisible
         until the next one.
         """
 
-    def deliver(self, task: Task) -> bool:
-        """Put a task in its target queue. False if it had nowhere to go."""
+    def deliver(self, message: Message) -> bool:
+        """Put a message in its target queue. False if it had nowhere to go."""

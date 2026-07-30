@@ -40,9 +40,9 @@ from src import (
     Ctx,
     Editor,
     Inspectable,
+    Message,
     Mind,
     Payload,
-    Task,
     Text,
     replace_think,
     split_think,
@@ -62,6 +62,15 @@ class Target(Agent, Inspectable):
     As an `Inspectable` it hands out a view of its own state. What that view
     contains is configuration, not architecture.
     """
+
+    OUTPUTS = {
+        "thought": "what it just drafted, for somebody to inspect",
+        "reply": "the answer, once any revision has been adopted",
+    }
+    INPUTS = {
+        "user_prompt": "a question, as Text",
+        "revision": "a replacement context, as Context",
+    }
 
     def __init__(self, *args, export: str = "context", **kwargs):
         super().__init__(*args, **kwargs)
@@ -83,22 +92,23 @@ class Target(Agent, Inspectable):
 
     # -- handlers ------------------------------------------------------
 
-    async def on_user_prompt(self, task: Task, ctx: Ctx) -> None:
-        """t=0. One iteration, then hand something to the interceptor."""
-        self.transcript.append(user(task.payload.text))
+    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
+        """t=0. One iteration, then publish what it thought."""
+        self.transcript.append(user(message.payload.text))
         completion = await self.think(tag="draft")
         self.transcript.append(completion.as_message(stage="draft"))
 
-        ctx.emit("inspect", self.export(), to="interceptor")
+        # It does not know who, if anyone, is listening.
+        ctx.emit("thought", self.export())
 
-    async def on_revision(self, task: Task, ctx: Ctx) -> None:
+    async def on_revision(self, message: Message, ctx: Ctx) -> None:
         """t=2. Adopt the edit and run another iteration on the new context."""
-        revised: Context = task.payload
+        revised: Context = message.payload
         self.transcript.replace_all(revised.messages)
 
         completion = await self.think(tag="final")
         self.transcript.append(completion.as_message(stage="final"))
-        ctx.emit("reply", Text(strip_think(completion.text)), to="world")
+        ctx.emit("reply", Text(strip_think(completion.text)))
 
 
 class Interceptor(Agent, Editor):
@@ -110,6 +120,9 @@ class Interceptor(Agent, Editor):
     As an `Editor` it never touches the target. It returns a payload, and the
     target decides whether to adopt it.
     """
+
+    OUTPUTS = {"revision": "a replacement context, as Context"}
+    INPUTS = {"inspect": "somebody else's context or thought"}
 
     # -- Editor --------------------------------------------------------
 
@@ -146,9 +159,9 @@ class Interceptor(Agent, Editor):
 
     # -- handlers ------------------------------------------------------
 
-    async def on_inspect(self, task: Task, ctx: Ctx) -> None:
-        """t=1. Revise, and send the replacement back."""
-        ctx.emit("revision", await self.revise(task.payload), to="target")
+    async def on_inspect(self, message: Message, ctx: Ctx) -> None:
+        """t=1. Revise, and publish the replacement."""
+        ctx.emit("revision", await self.revise(message.payload))
 
     @staticmethod
     def _last_thinking_index(messages) -> int | None:
@@ -202,25 +215,27 @@ def model_for(mind: Mind, spec: str, rule):
 async def main() -> None:
     mind = Mind("interceptor", run_dir="runs")
 
-    mind.add(
-        Target(
-            "target",
-            model_for(mind, TARGET_MODEL, target_rule),
-            system="You are a helpful assistant. Think inside <think> tags first.",
-            export=EXPORT,
-            reply_to=None,
-        ),
-        Interceptor(
-            "interceptor",
-            model_for(mind, INTERCEPTOR_MODEL, interceptor_rule),
-            system=(
-                "You rewrite another model's private reasoning. "
-                "Reply with the replacement thought only, no tags, no preamble."
-            ),
-            reply_to=None,
+    target = Target(
+        "target",
+        model_for(mind, TARGET_MODEL, target_rule),
+        system="You are a helpful assistant. Think inside <think> tags first.",
+        export=EXPORT,
+    )
+    interceptor = Interceptor(
+        "interceptor",
+        model_for(mind, INTERCEPTOR_MODEL, interceptor_rule),
+        system=(
+            "You rewrite another model's private reasoning. "
+            "Reply with the replacement thought only, no tags, no preamble."
         ),
     )
-    mind.entry = "target"
+    # The loop, wired by the modules themselves. Each register call also brings
+    # the module into the mind, so there is no separate assembly step. The
+    # target emits `thought` and the interceptor hears it as `inspect`, so
+    # neither one has to know the other's vocabulary.
+    target.register(mind.world, "reply")
+    target.register(interceptor, "thought", as_channel="inspect")
+    interceptor.register(target, "revision")
 
     print(mind.describe(), "\n")
 

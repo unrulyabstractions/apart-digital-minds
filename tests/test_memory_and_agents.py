@@ -151,12 +151,12 @@ def test_think_helpers_on_text_without_tags():
 # -- agent -----------------------------------------------------------------
 
 
-def test_agent_default_handler_answers_the_world():
+def test_agent_default_handler_emits_on_reply():
     async def run():
         mind = Mind("t", run_dir=None, console=False)
-        mind.add(Agent("a", get_llm("echo:", script=["hi there"]), system="be terse"))
+        agent = Agent("a", get_llm("echo:", script=["hi there"]), system="be terse")
+        agent.register(mind.world, "reply")
         replies = await mind.prompt("hello")
-        agent = mind.modules["a"]
         mind.close()
         return replies, agent
 
@@ -178,7 +178,7 @@ def test_max_context_limits_what_is_sent_not_what_is_kept():
         agent = Agent(
             "a", get_llm("echo:", rule=capture), system="rules", max_context=2
         )
-        mind.add(agent)
+        agent.register(mind.world, "reply")
         for _ in range(4):
             await mind.prompt("hello")
         mind.close()
@@ -192,7 +192,7 @@ def test_max_context_limits_what_is_sent_not_what_is_kept():
 def test_memory_writes_land_in_the_agents_own_log():
     async def run():
         mind = Mind("t", run_dir=None, console=False)
-        mind.add(Agent("a", get_llm("echo:")))
+        Agent("a", get_llm("echo:")).register(mind.world, "reply")
         await mind.prompt("hello")
         events = [
             e for e in mind.events.events if e.kind == "memory.write" and e.module == "a"

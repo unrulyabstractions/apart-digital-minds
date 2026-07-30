@@ -22,11 +22,14 @@ explicitly when you mean the contract.
 
 Five ideas, and nothing else:
 
-    Module      something that holds a queue and handles tasks
-    Task        one unit of work, routed between modules
+    Module      a queue, declared output channels, and a turn
+    Message     one thing sent on a channel, from one module to another
     Mind        where modules live, and what you drive
     Scheduler   ticks the clock; nothing emitted at t is seen before t+1
     LLM         one chat interface, many providers, chosen by a string
+
+Modules wire themselves. `producer.register(consumer, "channel")` connects them
+and brings the consumer into the mind, so there is no separate assembly step.
 
 No cognitive architecture is baked in. `examples/` shows several assembled
 from the parts.

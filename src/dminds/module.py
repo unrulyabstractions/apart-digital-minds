@@ -1,85 +1,161 @@
 """`BaseModule`: the standard implementation of `api.Module`.
 
-Subclass it and write one method per task kind. A task of kind `"user_prompt"`
-is handled by `on_user_prompt`. That is the whole convention.
+Declare what you emit, register who hears it, and write a turn.
 
     class Critic(BaseModule):
-        async def on_inspect(self, task, ctx):
-            ctx.emit("verdict", "looks wrong", to="assistant")
+        OUTPUTS = {"verdict": "whether the draft holds up"}
+        INPUTS = {"draft": "something to judge"}
 
-Handlers never call another module directly. They emit, and the scheduler
-delivers on the next tick.
+        async def on_input(self, message, ctx):
+            self.inputs.append(message)
 
-`Ctx` here is the concrete object handed to handlers. It satisfies `api.Ctx`.
+        async def on_process(self, ctx):
+            for message in self.take_inputs():
+                ctx.emit("verdict", judge(message.payload))
+
+    writer.register(critic, "draft")
+    critic.register(writer, "verdict")
+
+The default `on_input` routes to `on_<channel>` when you have written such a
+method, and buffers into `self.inputs` when you have not. So a module can react
+per channel or absorb everything and act once. `Ctx` here is the concrete
+object handed to a turn; it satisfies `api.Ctx`.
 """
 
 from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Mapping
 
 from ..api.modules import Ctx as CtxProtocol
 from ..api.modules import Module
 from ..api.observability import Logger
-from ..api.types import Payload, Task
+from ..api.runtime import WILDCARD
+from ..api.types import Link, Message, Payload
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..api.runtime import Host
 
 
-def handler_name(kind: str) -> str:
+def handler_name(channel: str) -> str:
     """`"inspect.context"` -> `"on_inspect_context"`."""
-    safe = "".join(c if c.isalnum() or c == "_" else "_" for c in kind)
+    safe = "".join(c if c.isalnum() or c == "_" else "_" for c in channel)
     return f"on_{safe}"
+
+
+class UndeclaredChannel(ValueError):
+    """A module emitted on, or was registered against, a channel it never
+    declared in `OUTPUTS`."""
 
 
 @dataclass
 class Ctx(CtxProtocol):
-    """What a handler is given: where it is, what it can say, how to log."""
+    """Where a module is in time, what it can emit, and how it logs."""
 
     tick: int
-    task: Task
     module: Module
     mind: "Host"
     log: Logger
-    outbox: list[Task] = field(default_factory=list)
+    outbox: list[Message] = field(default_factory=list)
 
     def emit(
-        self,
-        kind: str,
-        payload: Payload,
-        to: str | Sequence[str] | None = None,
-        cause: str | None = None,
-    ) -> list[Task]:
-        """Send a task. It is delivered at the start of the next tick.
+        self, channel: str, payload: Payload, cause: str | None = None
+    ) -> list[Message]:
+        """Emit on one of this module's declared channels.
 
-        `to` names one or more modules. Leave it out to use the routes wired on
-        the mind. Use `to="world"` to hand something back to the caller.
+        Goes to whoever registered onto it. Delivered at the start of the next
+        tick, never within this one.
         """
         return self.mind.stage(
-            src=self.module.name,
-            kind=kind,
+            src=self.module,
+            channel=channel,
             payload=payload,
-            to=to,
-            cause=cause if cause is not None else self.task.id,
+            cause=cause,
             outbox=self.outbox,
         )
 
-    def reply(self, kind: str, payload: Payload) -> list[Task]:
-        """Emit straight back to whoever sent the current task."""
-        return self.emit(kind, payload, to=self.task.src)
-
 
 class BaseModule(Module):
-    """A queue plus `on_<kind>` dispatch. The usual thing to subclass."""
+    """A queue, declared output channels, and a two-step turn."""
+
+    OUTPUTS: ClassVar[Mapping[str, str]] = {}
+    INPUTS: ClassVar[Mapping[str, str]] = {}
 
     def __init__(self, name: str):
         self.name = name
-        self.inbox: deque[Task] = deque()
+        self.inbox: deque[Message] = deque()
+        #: Messages the default `on_input` buffered, waiting for `on_process`.
+        self.inputs: list[Message] = []
+        self._links: list[Link] = []
+        self._consumers: dict[str, list[tuple[Module, str]]] = {}
         self.mind: "Host | None" = None
         self.log: Logger | None = None
-        self.handled = 0
+        self.turns = 0
+
+    # -- wiring --------------------------------------------------------
+
+    def register(
+        self, consumer: Module, channel: str, as_channel: str | None = None
+    ) -> Link:
+        """Attach `consumer` to one of my output channels.
+
+        `channel` must be declared in `OUTPUTS`, or be `"*"` to forward
+        everything I emit. Declaring outputs is what turns a typo here into an
+        error rather than a message that silently goes nowhere.
+
+        Registering also settles membership. Whichever of the two modules
+        already belongs to a mind pulls the other one in, so wiring a mind and
+        populating it are the same act. There is nothing else to call.
+        """
+        if channel != WILDCARD and channel not in self.OUTPUTS:
+            declared = ", ".join(sorted(self.OUTPUTS)) or "none"
+            raise UndeclaredChannel(
+                f"{type(self).__name__} {self.name!r} has no output channel "
+                f"{channel!r}. Declared channels: {declared}. Add it to OUTPUTS, "
+                f'or register on "*" to receive everything.'
+            )
+
+        host = self.mind or getattr(consumer, "mind", None)
+        if host is None:
+            raise ValueError(
+                f"Neither {self.name!r} nor {consumer.name!r} belongs to a mind yet, "
+                f"so there is nothing to join. Wire one of them to `mind.world` "
+                f"first, or call `mind.add(...)` for a module that emits to nobody."
+            )
+        for module in (self, consumer):
+            if module.mind is None:
+                host.adopt(module)
+
+        link = Link(self.name, channel, consumer.name, as_channel or channel)
+        self._links.append(link)
+        self._consumers.setdefault(channel, []).append((consumer, link.as_channel))
+        return link
+
+    def links(self) -> list[Link]:
+        return list(self._links)
+
+    def consumers(self, channel: str) -> list[tuple[Module, str]]:
+        """Everyone listening to `channel`, plus everyone listening to `"*"`.
+
+        Registration order is preserved, and a consumer registered twice for
+        one emission is only told once.
+        """
+        found: list[tuple[Module, str]] = []
+        seen: set[str] = set()
+        for consumer, as_channel in self._consumers.get(channel, []):
+            if consumer.name not in seen:
+                seen.add(consumer.name)
+                found.append((consumer, as_channel))
+        for consumer, as_channel in self._consumers.get(WILDCARD, []):
+            if consumer.name not in seen:
+                seen.add(consumer.name)
+                # A wildcard listener hears the real channel name.
+                found.append((consumer, channel))
+        return found
+
+    def declares(self, channel: str) -> bool:
+        return channel in self.OUTPUTS
 
     # -- lifecycle -----------------------------------------------------
 
@@ -93,38 +169,56 @@ class BaseModule(Module):
 
     # -- queue ---------------------------------------------------------
 
-    def receive(self, task: Task) -> None:
-        self.inbox.append(task)
+    def receive(self, message: Message) -> None:
+        self.inbox.append(message)
 
     @property
     def pending(self) -> int:
         return len(self.inbox)
 
-    def next_task(self) -> Task | None:
-        """Take one task, in arrival order."""
-        return self.inbox.popleft() if self.inbox else None
+    def drain(self) -> list[Message]:
+        """Take everything queued, in arrival order, and empty the queue."""
+        taken = list(self.inbox)
+        self.inbox.clear()
+        return taken
 
-    # -- dispatch ------------------------------------------------------
+    def take_inputs(self) -> list[Message]:
+        """Take what `on_input` buffered, and clear the buffer.
 
-    def find_handler(self, kind: str) -> Callable[..., Any]:
-        """Route a kind to a method. Override for your own routing scheme."""
-        return getattr(self, handler_name(kind), self.on_default)
-
-    async def process(self, task: Task, ctx: Ctx) -> None:
-        """The single entry point. Routes to `on_<kind>`.
-
-        Override this if you want dispatch to work some other way.
+        The usual first line of `on_process`.
         """
-        await self.find_handler(task.kind)(task, ctx)
+        taken = self.inputs
+        self.inputs = []
+        return taken
 
-    async def on_default(self, task: Task, ctx: Ctx) -> None:
-        """Reached when no `on_<kind>` method exists. Logs and drops."""
-        ctx.log.note(
-            f"no handler for {task.kind!r}, dropped",
-            kind=task.kind,
-            expected_method=handler_name(task.kind),
-            src=task.src,
-        )
+    def wants_process(self) -> bool:
+        """True if `on_process` should run with nothing queued.
+
+        False by default, so an idle module costs nothing. Return True for a
+        module that acts on its own.
+        """
+        return False
+
+    # -- the turn ------------------------------------------------------
+
+    def find_handler(self, channel: str) -> Callable[..., Any] | None:
+        """The `on_<channel>` method, if you wrote one."""
+        return getattr(self, handler_name(channel), None)
+
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        """One message arrived.
+
+        Routes to `on_<channel>` when such a method exists. Otherwise buffers
+        into `self.inputs` for `on_process` to pick up.
+        """
+        handler = self.find_handler(message.channel)
+        if handler is not None:
+            await handler(message, ctx)
+        else:
+            self.inputs.append(message)
+
+    async def on_process(self, ctx: Ctx) -> None:
+        """Take one step. Does nothing unless you override it."""
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.name} pending={self.pending}>"
@@ -133,16 +227,24 @@ class BaseModule(Module):
 class FnModule(BaseModule):
     """Wraps a plain function as a module, for glue and quick probes.
 
-        FnModule("counter", lambda task, ctx: ctx.emit("n", 1, to="world"))
+        FnModule("counter", lambda msg, ctx: ctx.emit("n", 1), outputs={"n": "a count"})
 
-    The function may be sync or async and is called for every task kind.
+    The function may be sync or async and is called for every message.
     """
 
-    def __init__(self, name: str, fn: Callable[[Task, Ctx], Any]):
+    def __init__(
+        self,
+        name: str,
+        fn: Callable[[Message, Ctx], Any],
+        outputs: Mapping[str, str] | None = None,
+    ):
         super().__init__(name)
         self.fn = fn
+        if outputs is not None:
+            # Per-instance channels, so one class can serve many shapes.
+            self.OUTPUTS = dict(outputs)
 
-    async def process(self, task: Task, ctx: Ctx) -> None:
-        result = self.fn(task, ctx)
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        result = self.fn(message, ctx)
         if hasattr(result, "__await__"):
             await result

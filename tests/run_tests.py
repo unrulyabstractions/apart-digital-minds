@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 MODULES = [
     "tests.test_scheduler",
     "tests.test_determinism",
-    "tests.test_routing",
+    "tests.test_wiring",
     "tests.test_llm",
     "tests.test_memory_and_agents",
     "tests.test_composition",

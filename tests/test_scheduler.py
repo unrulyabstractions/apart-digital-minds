@@ -1,10 +1,10 @@
-"""The scheduling rule, which everything else depends on."""
+"""The scheduling rule, and the shape of a turn."""
 
 from __future__ import annotations
 
 import asyncio
 
-from src import Ctx, Mind, BaseModule, RunawayMind, Task, Text
+from src import BaseModule, Ctx, Message, Mind, RunawayMind, Text
 
 
 def quiet_mind(**kwargs) -> Mind:
@@ -12,45 +12,69 @@ def quiet_mind(**kwargs) -> Mind:
 
 
 class Recorder(BaseModule):
-    """Notes the tick on which it handled each task."""
+    """Notes the tick of every input it saw, and of every process step."""
 
-    def __init__(self, name: str, forward_to: str | None = None, limit: int = 1):
+    OUTPUTS = {"ping": "a forwarded ping"}
+
+    def __init__(self, name: str, forward: bool = False, limit: int = 1):
         super().__init__(name)
-        self.seen: list[tuple[int, str]] = []
-        self.forward_to = forward_to
+        self.inputs_seen: list[tuple[int, str]] = []
+        self.processed: list[int] = []
+        self.forward = forward
         self.limit = limit
 
-    async def process(self, task: Task, ctx: Ctx) -> None:
-        self.seen.append((ctx.tick, task.kind))
-        if self.forward_to and len(self.seen) <= self.limit:
-            ctx.emit("ping", task.payload, to=self.forward_to)
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        self.inputs_seen.append((ctx.tick, message.channel))
+
+    async def on_process(self, ctx: Ctx) -> None:
+        self.processed.append(ctx.tick)
+        if self.forward and len(self.inputs_seen) <= self.limit:
+            ctx.emit("ping", Text("x"))
 
 
 def test_emission_is_not_visible_in_the_same_tick():
     async def run():
         mind = quiet_mind()
-        a = Recorder("a", forward_to="b")
-        b = Recorder("b")
+        a, b = Recorder("a", forward=True), Recorder("b")
         mind.add(a, b)
+        a.register(b, "ping")
         mind.send("ping", Text("x"), to="a")
         await mind.run()
         mind.close()
         return a, b
 
     a, b = asyncio.run(run())
-    assert a.seen == [(0, "ping")]
+    assert a.inputs_seen == [(0, "ping")]
     # b must not have run at tick 0, however fast a was.
-    assert b.seen == [(1, "ping")]
+    assert b.inputs_seen == [(1, "ping")]
+
+
+def test_a_turn_is_every_input_then_one_process():
+    """Three messages arrive together: three on_input, one on_process."""
+
+    async def run():
+        mind = quiet_mind()
+        a = Recorder("a")
+        mind.add(a)
+        for _ in range(3):
+            mind.send("ping", Text("x"), to="a")
+        await mind.run()
+        mind.close()
+        return a
+
+    a = asyncio.run(run())
+    assert len(a.inputs_seen) == 3
+    assert [t for t, _ in a.inputs_seen] == [0, 0, 0], "all absorbed in one turn"
+    assert a.processed == [0], "process runs once, after every input"
 
 
 def test_run_until_idle_drains_a_chain():
     async def run():
         mind = quiet_mind()
-        mind.add(
-            Recorder("a", forward_to="b"),
-            Recorder("b", forward_to="c"),
-            Recorder("c"),
-        )
+        a, b, c = Recorder("a", forward=True), Recorder("b", forward=True), Recorder("c")
+        mind.add(a, b, c)
+        a.register(b, "ping")
+        b.register(c, "ping")
         mind.send("ping", Text("x"), to="a")
         ticks = await mind.run()
         idle = mind.scheduler.is_idle()
@@ -63,10 +87,10 @@ def test_run_until_idle_drains_a_chain():
 
 
 def test_modules_in_one_tick_run_concurrently():
-    """Two slow modules in the same tick take one duration, not two."""
+    """Three slow modules in the same tick take one duration, not three."""
 
     class Slow(BaseModule):
-        async def process(self, task: Task, ctx: Ctx) -> None:
+        async def on_input(self, message: Message, ctx: Ctx) -> None:
             await asyncio.sleep(0.05)
 
     async def run():
@@ -82,15 +106,17 @@ def test_modules_in_one_tick_run_concurrently():
         return elapsed
 
     elapsed = asyncio.run(run())
-    assert elapsed < 0.12, f"three 50ms handlers took {elapsed:.3f}s, so they serialised"
+    assert elapsed < 0.12, f"three 50ms turns took {elapsed:.3f}s, so they serialised"
 
 
 def test_runaway_is_caught():
     async def run():
         mind = quiet_mind(max_ticks=10)
-        # Two modules that answer each other forever.
-        mind.add(Recorder("a", forward_to="b", limit=999))
-        mind.add(Recorder("b", forward_to="a", limit=999))
+        a = Recorder("a", forward=True, limit=999)
+        b = Recorder("b", forward=True, limit=999)
+        mind.add(a, b)
+        a.register(b, "ping")
+        b.register(a, "ping")
         mind.send("ping", Text("x"), to="a")
         try:
             await mind.run()
@@ -101,35 +127,62 @@ def test_runaway_is_caught():
         return None
 
     message = asyncio.run(run())
-    assert message is not None
-    assert "10 ticks" in message
+    assert message is not None and "10 ticks" in message
 
 
-def test_one_task_per_module_per_tick():
-    """A module with three queued tasks handles them one tick at a time."""
+def test_wants_process_lets_a_module_act_unprompted():
+    """A module with an empty queue can still take a turn."""
+
+    class Spontaneous(BaseModule):
+        def __init__(self, name: str, times: int):
+            super().__init__(name)
+            self.times = times
+            self.ran = 0
+
+        def wants_process(self) -> bool:
+            return self.ran < self.times
+
+        async def on_process(self, ctx: Ctx) -> None:
+            self.ran += 1
 
     async def run():
         mind = quiet_mind()
-        a = Recorder("a")
-        mind.add(a)
-        for _ in range(3):
-            mind.send("ping", Text("x"), to="a")
-        await mind.run()
+        s = Spontaneous("s", times=3)
+        mind.add(s)
+        ticks = await mind.run()
         mind.close()
-        return a.seen
+        return s.ran, ticks
 
-    seen = asyncio.run(run())
-    assert [tick for tick, _ in seen] == [0, 1, 2]
+    ran, ticks = asyncio.run(run())
+    assert ran == 3, "it should have acted three times with an empty queue"
+    assert ticks == 3
+
+
+def test_an_idle_module_costs_nothing():
+    class Quiet(BaseModule):
+        pass
+
+    async def run():
+        mind = quiet_mind()
+        mind.add(Quiet("q"))
+        ticks = await mind.run()
+        mind.close()
+        return ticks
+
+    assert asyncio.run(run()) == 0
 
 
 def test_prompt_returns_only_this_prompts_output():
     class Talker(BaseModule):
-        async def process(self, task: Task, ctx: Ctx) -> None:
-            ctx.emit("reply", Text(f"re:{task.payload.text}"), to="world")
+        OUTPUTS = {"reply": "an answer"}
+
+        async def on_input(self, message: Message, ctx: Ctx) -> None:
+            ctx.emit("reply", Text(f"re:{message.payload.text}"))
 
     async def run():
         mind = quiet_mind()
-        mind.add(Talker("t"))
+        t = mind.add(Talker("t"))
+        t.register(mind.world, "reply")
         first = await mind.prompt("one")
         second = await mind.prompt("two")
         mind.close()

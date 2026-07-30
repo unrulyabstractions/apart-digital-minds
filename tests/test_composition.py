@@ -1,8 +1,8 @@
-"""Dependency injection, wiring validation, and the model factory.
+"""Dependency injection, membership, validation, and the model factory.
 
 These are the tests that make the interfaces real rather than decorative. If
-`Mind` constructed its own router and scheduler, the contracts next door would
-describe nothing.
+`Mind` constructed its own scheduler, the contract next door would describe
+nothing.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from src import Agent, BaseModule, Bus, Ctx, Mind, Task, Text, get_llm, taped, texts
+from src import Agent, BaseModule, Ctx, Message, Mind, Text, get_llm, taped, texts
 from src.api import Host
 from src.api import Mind as MindInterface
 from src.dminds import RunTracer, TickScheduler
@@ -22,8 +22,10 @@ def quiet(**kwargs) -> Mind:
 
 
 class Echoer(BaseModule):
-    async def process(self, task: Task, ctx: Ctx) -> None:
-        ctx.emit("reply", Text("ok"), to="world")
+    OUTPUTS = {"reply": "an answer"}
+
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        ctx.emit("reply", Text("ok"))
 
 
 # -- the interface ---------------------------------------------------------
@@ -36,45 +38,91 @@ def test_mind_satisfies_both_its_interfaces():
 
 def test_host_is_narrower_than_mind():
     """A module gets a Host, which cannot add modules or drive the clock."""
-    host_only = {n for n in dir(Host) if not n.startswith("_")}
-    mind_only = {n for n in dir(MindInterface) if not n.startswith("_")}
-    assert "stage" in host_only and "deliver" in host_only
-    for name in ("add", "wire", "run", "prompt"):
-        assert name in mind_only, name
-        assert name not in host_only, f"{name} should not be reachable from a module"
+    host_names = {n for n in dir(Host) if not n.startswith("_")}
+    mind_names = {n for n in dir(MindInterface) if not n.startswith("_")}
+    assert "stage" in host_names and "deliver" in host_names
+    for name in ("add", "adopt", "run", "prompt", "validate"):
+        assert name in mind_names, name
+        assert name not in host_names, f"{name} should not be reachable from a module"
+
+
+def test_host_has_no_routing():
+    """Routing left the runtime entirely. Modules own their own links."""
+    assert not hasattr(Host, "bus")
+    assert not any("rout" in n.lower() for n in dir(Host))
+
+
+# -- membership ------------------------------------------------------------
+
+
+def test_registering_brings_both_modules_into_the_mind():
+    """One verb. Wiring a module in is adding it."""
+    mind = quiet()
+    a, b = Echoer("a"), Echoer("b")
+    a.register(mind.world, "reply")   # a joins: world is already here
+    a.register(b, "reply")            # b joins: a is here now
+    names = sorted(mind.modules)
+    mind.close()
+    assert names == ["a", "b"]
+
+
+def test_first_module_to_join_becomes_the_entry():
+    mind = quiet()
+    a, b = Echoer("a"), Echoer("b")
+    a.register(mind.world, "reply")
+    a.register(b, "reply")
+    entry = mind.entry
+    mind.close()
+    assert entry == "a"
+
+
+def test_registering_two_orphans_says_what_to_do():
+    mind = quiet()
+    a, b = Echoer("a"), Echoer("b")
+    try:
+        a.register(b, "reply")
+    except ValueError as exc:
+        mind.close()
+        assert "neither" in str(exc).lower()
+        assert "mind.world" in str(exc)
+    else:
+        mind.close()
+        raise AssertionError("expected a ValueError")
+
+
+def test_add_is_only_needed_for_a_module_wired_to_nothing():
+    class Loner(BaseModule):
+        def __init__(self):
+            super().__init__("loner")
+            self.ran = 0
+
+        def wants_process(self) -> bool:
+            return self.ran < 1
+
+        async def on_process(self, ctx: Ctx) -> None:
+            self.ran += 1
+
+    async def run():
+        mind = quiet()
+        loner = mind.add(Loner())
+        await mind.run()
+        mind.close()
+        return loner.ran
+
+    assert asyncio.run(run()) == 1
+
+
+def test_adopting_the_same_module_twice_is_harmless():
+    mind = quiet()
+    a = Echoer("a")
+    a.register(mind.world, "reply")
+    mind.adopt(a)
+    count = len(mind.modules)
+    mind.close()
+    assert count == 1
 
 
 # -- injection -------------------------------------------------------------
-
-
-def test_router_can_be_injected():
-    class CountingBus(Bus):
-        def __init__(self):
-            super().__init__()
-            self.resolved = 0
-
-        def resolve(self, src, kind):
-            self.resolved += 1
-            return super().resolve(src, kind)
-
-    class Unaddressed(BaseModule):
-        """Emits with no `to=`, so the router has to decide where it goes."""
-
-        async def process(self, task: Task, ctx: Ctx) -> None:
-            ctx.emit("reply", Text("ok"))
-
-    async def run():
-        bus = CountingBus()
-        mind = quiet(router=bus)
-        mind.add(Unaddressed("a"))
-        mind.wire("a", "reply", "world")
-        out = texts(await mind.prompt("hi"))
-        mind.close()
-        return bus, out
-
-    bus, out = asyncio.run(run())
-    assert bus.resolved > 0, "the injected router was never consulted"
-    assert out == ["ok"], "the injected router did not deliver"
 
 
 def test_scheduler_can_be_injected():
@@ -87,7 +135,7 @@ def test_scheduler_can_be_injected():
 
     async def run():
         mind = quiet(scheduler=lambda host: LoudScheduler(host, max_ticks=5))
-        mind.add(Echoer("a"))
+        Echoer("a").register(mind.world, "reply")
         await mind.prompt("hi")
         assert isinstance(mind.scheduler, LoudScheduler)
         mind.close()
@@ -117,7 +165,6 @@ def test_tracer_can_be_injected():
 
 def test_defaults_are_used_when_nothing_is_injected():
     mind = quiet()
-    assert isinstance(mind.bus, Bus)
     assert isinstance(mind.scheduler, TickScheduler)
     assert isinstance(mind.tracer, RunTracer)
     assert mind.model_factory is get_llm
@@ -127,66 +174,28 @@ def test_defaults_are_used_when_nothing_is_injected():
 # -- validation ------------------------------------------------------------
 
 
-def test_validate_catches_a_mistyped_route_target():
-    mind = quiet()
-    mind.add(Echoer("assistant"))
-    mind.wire("assistant", "thought", "intercepter")  # typo
-    problems = mind.validate()
-    mind.close()
-    assert len(problems) == 1
-    assert "intercepter" in problems[0]
-    assert "assistant" in problems[0], "the message should list the known modules"
-
-
-def test_validate_catches_a_mistyped_observer():
-    mind = quiet()
-    mind.add(Echoer("a"))
-    mind.watch("blackbord")
-    problems = mind.validate()
-    mind.close()
-    assert len(problems) == 1 and "blackbord" in problems[0]
-
-
 def test_validate_catches_a_bad_entry():
     mind = quiet()
-    mind.add(Echoer("a"))
+    Echoer("a").register(mind.world, "reply")
     mind.entry = "nobody"
     problems = mind.validate()
     mind.close()
     assert len(problems) == 1 and "nobody" in problems[0]
 
 
-def test_validate_accepts_world_and_wildcard():
+def test_a_clean_mind_validates():
     mind = quiet()
-    mind.add(Echoer("a"), Echoer("b"))
-    mind.wire("a", "reply", "world")
-    mind.watch("b")
+    a, b = Echoer("a"), Echoer("b")
+    a.register(mind.world, "reply")
+    a.register(b, "reply")
     problems = mind.validate()
     mind.close()
     assert problems == []
 
 
-def test_run_refuses_to_start_a_mind_wired_wrong():
-    async def run():
-        mind = quiet()
-        mind.add(Echoer("a"))
-        mind.wire("a", "reply", "ghost")
-        try:
-            await mind.prompt("hi")
-        except ValueError as exc:
-            mind.close()
-            return str(exc)
-        mind.close()
-        return None
-
-    message = asyncio.run(run())
-    assert message is not None, "a typo'd route must not fail silently"
-    assert "wired wrong" in message and "ghost" in message
-
-
 def test_validation_runs_once_not_every_tick():
     mind = quiet()
-    mind.add(Echoer("a"))
+    Echoer("a").register(mind.world, "reply")
     calls = {"n": 0}
     original = mind.validate
 
@@ -234,12 +243,10 @@ def test_taped_makes_a_whole_mind_reproducible():
         mind = Mind(
             "t", run_dir=None, console=False, model_factory=taped(tape, mode=mode)
         )
-        mind.add(
-            Agent("a", mind.model("echo:", rule=jittery), reply_to=None),
-            Agent("b", mind.model("echo:", rule=jittery), reply_to=None),
-        )
-        mind.wire("a", "reply", "world")
-        mind.wire("b", "reply", "world")
+        for name in ("a", "b"):
+            Agent(name, mind.model("echo:", rule=jittery)).register(
+                mind.world, "reply"
+            )
         out = texts(await mind.prompt("hello", to=["a", "b"]))
         mind.close()
         return out
@@ -255,8 +262,8 @@ def test_taped_makes_a_whole_mind_reproducible():
     assert counter["n"] == calls_after_record, "replay must not call any model"
 
 
-def test_taped_record_mode_does_not_clobber_across_models():
-    """Two cassettes share one tape. The second must not erase the first."""
+def test_taped_shares_one_cursor_across_models():
+    """Two agents, same model, same question. Each must get its own answer."""
     counter = {"n": 0}
 
     def jittery(messages, opts):
@@ -264,14 +271,11 @@ def test_taped_record_mode_does_not_clobber_across_models():
         return f"answer {counter['n']}"
 
     async def run(tape, mode):
-        factory = taped(tape, mode=mode)
-        a, b = factory("echo:", rule=jittery), factory("echo:", rule=jittery)
         from src import user as u
 
-        return [
-            (await a.chat([u("one")])).text,
-            (await b.chat([u("two")])).text,
-        ]
+        factory = taped(tape, mode=mode)
+        a, b = factory("echo:", rule=jittery), factory("echo:", rule=jittery)
+        return [(await a.chat([u("same")])).text, (await b.chat([u("same")])).text]
 
     with tempfile.TemporaryDirectory() as tmp:
         tape = Path(tmp) / "shared.jsonl"
@@ -280,4 +284,5 @@ def test_taped_record_mode_does_not_clobber_across_models():
         replayed = asyncio.run(run(tape, "replay"))
 
     assert len(lines) == 2, f"both calls should be on the tape, found {len(lines)}"
-    assert replayed == recorded
+    assert recorded[0] != recorded[1], "the two calls differ"
+    assert replayed == recorded, "and replay must keep them in order"

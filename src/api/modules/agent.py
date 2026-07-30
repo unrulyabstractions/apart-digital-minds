@@ -4,8 +4,8 @@ An agent is a module that owns a model and a memory. Any part of a mind that
 reasons is one of these, whether it talks to you, watches another agent, or
 edits somebody's context.
 
-Implemented in `src.dminds.agents` by `Agent`, which adds `on_<kind>` dispatch
-and a default handler. Subclass that.
+Implemented in `src.dminds.agents` by `Agent`. Subclass that, declare your
+`OUTPUTS`, and write `on_input` or `on_process`.
 """
 
 from __future__ import annotations

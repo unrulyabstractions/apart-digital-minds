@@ -6,11 +6,13 @@ architecture in `examples/` is built by subclassing this and writing `on_*`
 methods. None of them is baked in here.
 
     class Assistant(Agent):
-        async def on_user_prompt(self, task, ctx):
-            self.transcript.append(user(task.payload.text))
+        OUTPUTS = {"reply": "the answer"}
+
+        async def on_user_prompt(self, message, ctx):
+            self.transcript.append(user(message.payload.text))
             completion = await self.think(tag="answer")
             self.transcript.append(completion.as_message())
-            ctx.emit("reply", Text(completion.text), to="world")
+            ctx.emit("reply", Text(completion.text))
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from ..api.types import (
     ChatMessage,
     Completion,
     GenOptions,
-    Task,
+    Message,
     Text,
     system as system_msg,
     user,
@@ -37,16 +39,20 @@ from .module import BaseModule, Ctx
 class Agent(BaseModule, AgentInterface):
     """A module backed by a chat model.
 
+    Declares one output channel, `"reply"`, so the simplest possible mind is
+    two lines of wiring. Subclasses that emit more should extend `OUTPUTS`.
+
     Args:
-        name: how it appears in routes and logs.
+        name: how it appears in links and logs.
         llm: any `LLM`. Swap providers by changing the spec string.
         system: the system prompt, seeded as the first transcript message.
         opts: default sampling options for this agent's calls.
-        reply_to: where the default handler sends its answer. `"world"` hands
-            it back to the caller. Set to `None` to use the wired routes.
         max_context: if set, only the last N messages are sent to the model.
             The transcript keeps everything either way.
     """
+
+    OUTPUTS = {"reply": "the agent's answer, as Text"}
+    INPUTS = {"user_prompt": "something to answer, as Text"}
 
     def __init__(
         self,
@@ -54,14 +60,12 @@ class Agent(BaseModule, AgentInterface):
         llm: LLM,
         system: str | None = None,
         opts: GenOptions | None = None,
-        reply_to: str | None = "world",
         max_context: int | None = None,
         journal: Journal | None = None,
     ):
         super().__init__(name)
         self.llm = llm
         self.opts = opts or GenOptions()
-        self.reply_to = reply_to
         self.max_context = max_context
         self.transcript = Transcript()
         self.scratch = Scratchpad()
@@ -142,11 +146,16 @@ class Agent(BaseModule, AgentInterface):
 
     # -- default handler ---------------------------------------------------
 
-    async def on_user_prompt(self, task: Task, ctx: Ctx) -> None:
-        """Answer a prompt and send the answer to `reply_to`."""
-        text = task.payload.text if isinstance(task.payload, Text) else str(task.payload)
+    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
+        """Answer a prompt and emit it on the `reply` channel.
+
+        Whoever registered onto `"reply"` hears it. Nobody does by default, so
+        a bare agent is silent until you say `agent.register(mind.world, "reply")`.
+        """
+        payload = message.payload
+        text = payload.text if isinstance(payload, Text) else str(payload)
         completion = await self.say(text, tag="reply")
-        ctx.emit("reply", Text(completion.text), to=self.reply_to)
+        ctx.emit("reply", Text(completion.text))
 
     def close(self) -> None:
         self.llm.close()

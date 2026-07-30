@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, Sequence, runtime_checkable
 
-from ..types import Payload, Task
+from ..types import Message, Payload
 
 
 @runtime_checkable
@@ -52,11 +52,11 @@ class Editor(Protocol):
 class Workspace(Protocol):
     """A shared surface that records what passes through it.
 
-    Wire one with `mind.watch(name)` and it sees every emission, including
-    those addressed to somebody else.
+    Register one onto `"*"` of every module you want it to observe, and it
+    sees each of their emissions.
     """
 
-    def record(self, task: Task, tick: int) -> None:
+    def record(self, message: Message, tick: int) -> None:
         """Note that something was said."""
 
     def entries(self) -> Sequence[Any]:

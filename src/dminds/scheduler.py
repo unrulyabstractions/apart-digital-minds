@@ -5,9 +5,10 @@ of time.
 
 One tick has two phases.
 
-    Phase 1, act.     Every module holding at least one task pops exactly one
-                      and handles it. Modules run concurrently, so two agents
-                      think at the same wall-clock moment.
+    Phase 1, act.     Every module with something to do takes a turn. A turn
+                      is `on_input` for each message that arrived, in order,
+                      then one `on_process`. Modules take their turns
+                      concurrently, so two agents think at the same moment.
     Phase 2, deliver. Everything emitted during phase 1 lands in its target
                       queue, all at once.
 
@@ -16,6 +17,9 @@ makes a run deterministic: a module can never observe how far another module
 got inside the same tick, so concurrency cannot change the outcome. Each module
 writes to a private outbox and those outboxes are concatenated in registration
 order, so the delivered sequence is fixed too.
+
+Absorbing every input before processing is why the two phases of a turn are
+separate. A module never decides on half of what reached it.
 
 The lock-step this produces is exactly the target/interceptor protocol:
 
@@ -38,7 +42,7 @@ from ..api.observability import (
     TICK_START,
 )
 from ..api.runtime import RunawayMind, Scheduler
-from ..api.types import Task
+from ..api.types import Message
 from .module import Ctx
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -46,7 +50,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class TickScheduler(Scheduler):
-    """Runs every module holding work concurrently, one task each per tick."""
+    """Runs every module that has work, concurrently, one turn each per tick."""
 
     def __init__(self, mind: "Host", strict: bool = True, max_ticks: int = 200):
         self.mind = mind
@@ -54,14 +58,22 @@ class TickScheduler(Scheduler):
         self.max_ticks = max_ticks
         self.t = 0
 
+    def active(self) -> list[Module]:
+        """Modules with queued input, or that asked to run anyway."""
+        return [
+            m
+            for m in self.mind.modules.values()
+            if m.pending or m.wants_process()
+        ]
+
     # -- one tick ------------------------------------------------------
 
     async def tick(self) -> int:
-        """Run one tick. Returns how many tasks were handled."""
+        """Run one tick. Returns how many modules took a turn."""
         mind = self.mind
         mind.tracer.tick = self.t
 
-        active = [m for m in mind.modules.values() if m.pending]
+        active = self.active()
         if not active:
             return 0
 
@@ -72,11 +84,11 @@ class TickScheduler(Scheduler):
         )
 
         # Phase 1: act. Private outbox per module keeps ordering deterministic
-        # even though the handlers run concurrently.
-        outboxes: list[list[Task]] = [[] for _ in active]
+        # even though the turns run concurrently.
+        outboxes: list[list[Message]] = [[] for _ in active]
         await asyncio.gather(
             *(
-                self._handle_one(module, outbox)
+                self._take_turn(module, outbox)
                 for module, outbox in zip(active, outboxes)
             )
         )
@@ -84,77 +96,80 @@ class TickScheduler(Scheduler):
         # Phase 2: deliver, in module registration order.
         delivered = 0
         for outbox in outboxes:
-            for task in outbox:
-                task.t_deliver = self.t + 1
-                if mind.deliver(task):
+            for message in outbox:
+                message.t_deliver = self.t + 1
+                if mind.deliver(message):
                     delivered += 1
 
         mind.tracer.emit(
             "runtime",
             TICK_END,
             {
-                "handled": len(active),
+                "turns": len(active),
                 "delivered": delivered,
-                "summary": f"handled {len(active)}, delivered {delivered}",
+                "summary": f"{len(active)} turns, delivered {delivered}",
             },
         )
         self.t += 1
         return len(active)
 
-    async def _handle_one(self, module: Module, outbox: list[Task]) -> None:
-        task = module.next_task()
-        if task is None:
-            return
-
+    async def _take_turn(self, module: Module, outbox: list[Message]) -> None:
+        """One module's turn: every input, then one process."""
+        arrived = module.drain()
         ctx = Ctx(
             tick=self.t,
-            task=task,
             module=module,
             mind=self.mind,
             log=module.log,
             outbox=outbox,
         )
         tracer = self.mind.tracer
+        summary = (
+            f"{len(arrived)} in: "
+            + ", ".join(m.channel for m in arrived[:3])
+            + ("…" if len(arrived) > 3 else "")
+            if arrived
+            else "no input, wants_process"
+        )
         tracer.emit(
             module.name,
             HANDLE_START,
-            {"kind": task.kind, "src": task.src, "summary": task.describe()},
-            task_id=task.id,
-            cause=task.cause,
+            {"inputs": len(arrived), "summary": summary},
+            task_id=arrived[0].id if arrived else None,
         )
 
         loop = asyncio.get_running_loop()
         start = loop.time()
         try:
-            await module.process(task, ctx)
+            for message in arrived:
+                await module.on_input(message, ctx)
+            await module.on_process(ctx)
         except Exception as exc:
             tracer.emit(
                 module.name,
                 HANDLE_ERROR,
-                {"kind": task.kind, "error": repr(exc), "summary": f"FAILED {exc!r}"},
+                {"error": repr(exc), "summary": f"FAILED {exc!r}"},
                 duration_s=loop.time() - start,
-                task_id=task.id,
             )
             if self.strict:
                 raise
             return
 
-        module.handled += 1
+        module.turns += 1
         tracer.emit(
             module.name,
             HANDLE_END,
-            {"kind": task.kind, "emitted": len(outbox)},
+            {"inputs": len(arrived), "emitted": len(outbox)},
             duration_s=loop.time() - start,
-            task_id=task.id,
         )
 
     # -- running to quiescence ------------------------------------------
 
     def is_idle(self) -> bool:
-        return not any(m.pending for m in self.mind.modules.values())
+        return not self.active()
 
     async def run_until_idle(self, max_ticks: int | None = None) -> int:
-        """Tick until every queue is empty. Returns the number of ticks run.
+        """Tick until nothing has work. Returns the number of ticks run.
 
         This is the guarantee behind `mind.prompt`: an external input is fully
         digested before control comes back to you.
@@ -163,13 +178,12 @@ class TickScheduler(Scheduler):
         ticks = 0
         while not self.is_idle():
             if ticks >= limit:
-                backlog = {
-                    m.name: m.pending for m in self.mind.modules.values() if m.pending
-                }
+                backlog = {m.name: m.pending for m in self.active()}
                 raise RunawayMind(
-                    f"Still busy after {limit} ticks. Outstanding queues: {backlog}. "
-                    f"Raise max_ticks if this is expected, or check for two modules "
-                    f"replying to each other forever."
+                    f"Still busy after {limit} ticks. Outstanding: {backlog}. "
+                    f"Raise max_ticks if this is expected, check for two modules "
+                    f"replying to each other forever, or for a module whose "
+                    f"wants_process never turns False."
                 )
             await self.tick()
             ticks += 1

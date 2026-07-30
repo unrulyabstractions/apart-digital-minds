@@ -166,3 +166,38 @@ Fixed by extracting `Tape`, which owns the entries and one shared cursor.
 tape is cleared once, by the object that owns it.
 
 The UNVERIFIED provider list still stands.
+
+## 2026-07-30 — channels, two-phase turns, and one wiring verb
+
+Modules now declare `OUTPUTS`, register consumers on each other, and take a
+turn in two steps. `Bus` and `Router` are gone: routing left the runtime, so
+a mind holds modules and time and nothing else.
+
+Registering also settles membership, after the observation that calling both
+`mind.add` and `module.register` was redundant ceremony. Whichever module is
+already in a mind pulls the other in. `mind.add` survives only for a module
+wired to nothing.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 42 | Test suite | `tests/run_tests.py` in the clean pip venv, after rewriting the scheduler, wiring, determinism and composition suites | VERIFIED (78 passed, 0 failed) |
+| 43 | Two-phase turn | Three messages delivered together produce three `on_input` calls at one tick and exactly one `on_process` | VERIFIED |
+| 44 | The tick rule still holds | An emission at tick 0 is not seen until tick 1; three 50ms turns finish in under 120ms, so they ran concurrently | VERIFIED |
+| 45 | Delivery order is still deterministic | Eight runs with random per-turn latency produced identical delivery order, and message ids matched across runs | VERIFIED |
+| 46 | Declared channels | Registering or emitting on an undeclared channel raises, and the error lists the real channels | VERIFIED |
+| 47 | Wildcard registration | A `"*"` listener hears every channel under its real name, and a module registered both specifically and by wildcard is told once | VERIFIED |
+| 48 | One verb settles membership | Registering brings both modules in; the first to join becomes entry; two unattached modules raise a message naming `mind.world` | VERIFIED |
+| 49 | Self-registration | A module registered onto its own channel schedules its own next turn | VERIFIED (3 turns) |
+| 50 | `wants_process` | A module with an empty queue took three turns and then stopped; an idle module caused zero ticks | VERIFIED |
+| 51 | Examples | All four run. Example 02 still settles in 3 ticks with the same answer and the same edited transcript; example 03 still shows `model calls by tick: [(1,'outer'), (1,'inner'), (2,'outer')]`; example 04 still reports `identical: True` and `record vs replay differences: 0` | VERIFIED (4/4) |
+| 52 | Trace artifacts | Re-opened all three `trace.jsonl` files and every per-module file | VERIFIED (24, 31, 55 events; seq contiguous; per-module sums match) |
+| 53 | `api` purity and dead imports | AST scan over all of `src/` after deleting `router.py` and `bus.py` | VERIFIED (0 and 0) |
+| 54 | README quick start and error text | Ran both. The `UndeclaredChannel` message matches the documented text character for character | VERIFIED |
+
+### Removed by the redesign
+
+Two validation tests were deleted rather than fixed. `validate` used to catch a
+consumer that was never added to the mind; registering now makes that state
+unreachable. A test asserting the new guarantee replaced them.

@@ -26,10 +26,9 @@ from src import (
     Agent,
     Ctx,
     Journal,
+    Message,
     Mind,
-    Task,
     Text,
-    get_llm,
     taped,
     texts,
     user,
@@ -41,8 +40,11 @@ WORK = Path("runs/example04")
 class Remembering(Agent):
     """An agent that consults its journal before answering, and writes to it after."""
 
-    async def on_user_prompt(self, task: Task, ctx: Ctx) -> None:
-        prompt = task.payload.text
+    OUTPUTS = {"reply": "the answer, informed by what it remembered"}
+    INPUTS = {"user_prompt": "a question, as Text"}
+
+    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
+        prompt = message.payload.text
 
         recalled = self.journal.recall(prompt, k=3)
         if recalled:
@@ -59,17 +61,19 @@ class Remembering(Agent):
         self.journal.remember(
             f"user asked about {prompt}", t=ctx.tick, source=self.name
         )
-        ctx.emit("reply", Text(completion.text), to="world")
+        ctx.emit("reply", Text(completion.text))
 
 
-def make_agent(journal_path: Path, llm) -> Remembering:
-    return Remembering(
+def make_agent(mind: Mind, journal_path: Path, llm) -> Remembering:
+    """Build the agent, add it, and wire its one output to the caller."""
+    agent = Remembering(
         "assistant",
         llm,
         system="You are an assistant with a long memory.",
         journal=Journal(path=journal_path),
-        reply_to=None,
     )
+    agent.register(mind.world, "reply")   # wires it and joins the mind
+    return agent
 
 
 def jittery_rule(messages, opts) -> str:
@@ -90,14 +94,14 @@ async def part1_memory_survives() -> Path:
     journal_path = WORK / "journal.jsonl"
 
     mind_a = Mind("session-a", run_dir=None, console=False)
-    mind_a.add(make_agent(journal_path, get_llm("echo:", rule=jittery_rule)))
+    make_agent(mind_a, journal_path, mind_a.model("echo:", rule=jittery_rule))
     print("session A:", texts(await mind_a.prompt("what are octopuses like?"))[0])
     print(f"  journal now holds {len(mind_a.modules['assistant'].journal)} episodes")
     mind_a.close()
 
     # A brand new process would do the same thing: the file is the memory.
     mind_b = Mind("session-b", run_dir=None, console=False)
-    mind_b.add(make_agent(journal_path, get_llm("echo:", rule=jittery_rule)))
+    make_agent(mind_b, journal_path, mind_b.model("echo:", rule=jittery_rule))
     agent_b = mind_b.modules["assistant"]
     print(f"session B loaded {len(agent_b.journal)} episodes from disk")
     print("session B:", texts(await mind_b.prompt("tell me about octopuses"))[0])
@@ -120,11 +124,8 @@ async def run_once(tape: Path, mode: str, run_id: str) -> tuple[str, list]:
         console=False,
         model_factory=taped(tape, mode=mode),
     )
-    mind.add(
-        make_agent(
-            WORK / f"journal-{run_id}.jsonl",
-            mind.model("echo:", rule=jittery_rule),
-        )
+    make_agent(
+        mind, WORK / f"journal-{run_id}.jsonl", mind.model("echo:", rule=jittery_rule)
     )
     replies = await mind.prompt("what are octopuses like?")
     events = list(mind.events.events)

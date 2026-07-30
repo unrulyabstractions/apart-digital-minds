@@ -1,13 +1,16 @@
-"""`Mind`: the standard implementation of `api.Host`.
+"""`Mind`: the standard implementation of `api.Mind`.
 
-The assembly point: modules, routes, a clock, and a trace.
+It holds modules and time. It does not wire them, and it has no routing table.
+A module registers consumers onto its own channels, so the mind never decides
+who hears what.
 
     mind = Mind("demo")
-    mind.add(Agent("assistant", get_llm("echo:")))
+    assistant = mind.add(Agent("assistant", mind.model("echo:")))
+    assistant.register(mind.world, "reply")
     replies = await mind.prompt("hello")
 
-`prompt` injects one external input and then runs until every queue is empty,
-so when it returns, the mind has finished thinking.
+`prompt` injects one external input and runs until every queue is empty, so
+when it returns the mind has finished thinking.
 """
 
 from __future__ import annotations
@@ -19,18 +22,11 @@ from typing import Iterable, Sequence
 from ..api.models import LLM
 from ..api.modules import Module
 from ..api.observability import TASK_DELIVER, TASK_EMIT, Sink, Tracer
-from ..api.runtime import (
-    WILDCARD,
-    WORLD,
-    ModelFactory,
-    Router,
-    Scheduler,
-    SchedulerFactory,
-)
+from ..api.runtime import WORLD, ModelFactory, Scheduler, SchedulerFactory
 from ..api.runtime import Mind as MindInterface
-from ..api.types import Payload, Route, Task, Text
-from .bus import Bus
+from ..api.types import Link, Message, Payload, Text
 from .llm import get_llm
+from .module import BaseModule
 from .scheduler import TickScheduler
 from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
@@ -52,16 +48,33 @@ def _fresh_run_id(run_dir: str | Path | None) -> str:
     return candidate
 
 
+class World(BaseModule):
+    """You, from the mind's point of view.
+
+    A sink. Register it onto any channel and whatever is emitted there lands
+    in `mind.outbox`, which is what `prompt` returns.
+
+        assistant.register(mind.world, "reply")
+    """
+
+    INPUTS = {"*": "anything a module wants to hand back to the caller"}
+
+    def __init__(self, outbox: list[Message], name: str = WORLD):
+        super().__init__(name)
+        self._outbox = outbox
+
+    async def on_input(self, message: Message, ctx) -> None:
+        self._outbox.append(message)
+
+
 class Mind(MindInterface):
     """The default composition, with every part replaceable.
 
-    The router, the scheduler, the tracer, and the model factory are all
-    arguments. Left alone they are `Bus`, `TickScheduler`, `RunTracer`, and
-    `get_llm`. Passed in, they are whatever you wrote.
+    The scheduler, the tracer, and the model factory are arguments. Left alone
+    they are `TickScheduler`, `RunTracer`, and `get_llm`.
 
-        Mind("fast", scheduler=lambda host: MyScheduler(host))
+        Mind("fast",  scheduler=lambda host: MyScheduler(host))
         Mind("taped", model_factory=taped("runs/tape.jsonl"))
-        Mind("quiet", router=PriorityBus(), console=False)
     """
 
     def __init__(
@@ -74,7 +87,6 @@ class Mind(MindInterface):
         strict: bool = True,
         max_ticks: int = 200,
         sinks: Sequence[Sink] | None = None,
-        router: Router | None = None,
         scheduler: SchedulerFactory | None = None,
         tracer: Tracer | None = None,
         model_factory: ModelFactory | None = None,
@@ -82,12 +94,11 @@ class Mind(MindInterface):
         self.name = name
         self.run_id = run_id or _fresh_run_id(run_dir)
         self.modules: dict[str, Module] = {}
-        self.bus: Router = router if router is not None else Bus()
-        self.outbox: list[Task] = []
+        self.outbox: list[Message] = []
         self.model_factory: ModelFactory = (
             model_factory if model_factory is not None else get_llm
         )
-        self._task_counter = 0
+        self._message_counter = 0
         self._validated = False
 
         #: Where `prompt` delivers, unless you say otherwise. Defaults to the
@@ -110,6 +121,10 @@ class Mind(MindInterface):
         for sink in sinks or []:
             self.tracer.add_sink(sink)
 
+        #: The caller, as a module. Never scheduled; it only receives.
+        self.world = World(self.outbox)
+        self.world.attach(self)
+
         self.scheduler: Scheduler = (
             scheduler(self)
             if scheduler is not None
@@ -129,63 +144,69 @@ class Mind(MindInterface):
 
     # -- assembly ------------------------------------------------------
 
+    def adopt(self, module: Module) -> Module:
+        """Take a module into this mind. Called by `Module.register`.
+
+        You rarely call this. Wiring a module to something already here brings
+        it in, so `register` is normally the only verb you need.
+        """
+        if module is self.world:
+            return module
+        if module.name in self.modules:
+            if self.modules[module.name] is module:
+                return module
+            raise ValueError(f"A different module is already named {module.name!r}.")
+        if module.name == WORLD:
+            raise ValueError(
+                f"{WORLD!r} is reserved. Use `mind.world` to hear a channel."
+            )
+        self.modules[module.name] = module
+        module.attach(self)
+        if self.entry is None:
+            self.entry = module.name
+        return module
+
     def add(self, *modules: Module) -> Module:
-        """Register modules. Returns the last one, so you can inline it."""
+        """Take modules in explicitly. Returns the last one, so you can inline it.
+
+        Only needed for a module that is wired to nothing, such as one that
+        runs on `wants_process` alone. Everything else joins by being
+        registered.
+        """
         last = None
         for module in modules:
-            if module.name in self.modules:
-                raise ValueError(f"A module named {module.name!r} is already added.")
-            if module.name == WORLD:
-                raise ValueError(f"{WORLD!r} is reserved for the outside caller.")
-            self.modules[module.name] = module
-            module.attach(self)
-            if self.entry is None:
-                self.entry = module.name
-            last = module
+            last = self.adopt(module)
         if last is None:
             raise ValueError("add() needs at least one module.")
         return last
 
-    def wire(
-        self, src: str, kind: str, dst: str, as_kind: str | None = None
-    ) -> Route:
-        """Connect an emitter to a receiver. See `src.dminds.bus.Bus.wire`."""
-        return self.bus.wire(src, kind, dst, as_kind)
-
-    def watch(
-        self, dst: str, kind: str = WILDCARD, src: str = WILDCARD
-    ) -> Route:
-        """Give one module a copy of matching traffic, however it was addressed.
-
-        This is how you attach a monitor that reads what other modules say to
-        each other without being in the middle of the conversation.
-        """
-        return self.bus.observe(dst, kind, src)
+    def links(self) -> list[Link]:
+        """Every registration in the mind, gathered from its modules."""
+        return [link for module in self.modules.values() for link in module.links()]
 
     def validate(self) -> list[str]:
         """Every problem with the assembly, as readable lines.
 
-        Routes name modules by string, so a typo would otherwise fail silently
-        by dropping messages into nowhere. `run` calls this before the first
-        tick and refuses to start if anything comes back.
+        Registrations name modules by object, so a bad name is impossible, but
+        a consumer can still have been left out of the mind. `run` calls this
+        before the first tick and refuses to start if anything comes back.
         """
         problems = []
-        reserved = {WILDCARD, WORLD}
+        known = set(self.modules) | {WORLD}
 
-        for route in [*self.bus.routes, *self.bus.observers]:
-            for name, position in ((route.src, "source"), (route.dst, "target")):
-                if name in reserved or name in self.modules:
-                    continue
-                known = ", ".join(sorted(self.modules)) or "none"
-                problems.append(
-                    f"route {route.describe()!r} names {name!r} as its {position}, "
-                    f"but no such module was added. Known modules: {known}."
-                )
+        for module in self.modules.values():
+            for link in module.links():
+                if link.dst not in known:
+                    listed = ", ".join(sorted(self.modules)) or "none"
+                    problems.append(
+                        f"link {link.describe()!r} sends to {link.dst!r}, which was "
+                        f"never added to this mind. Added modules: {listed}."
+                    )
 
         if self.entry is not None and self.entry not in self.modules:
             problems.append(
                 f"entry is {self.entry!r}, which is not a module. "
-                f"Known modules: {', '.join(sorted(self.modules)) or 'none'}."
+                f"Added modules: {', '.join(sorted(self.modules)) or 'none'}."
             )
         return problems
 
@@ -195,138 +216,141 @@ class Mind(MindInterface):
         self._validated = True
         problems = self.validate()
         if problems:
-            raise ValueError(
-                "This mind is wired wrong:\n  " + "\n  ".join(problems)
-            )
+            raise ValueError("This mind is wired wrong:\n  " + "\n  ".join(problems))
 
-    # -- task plumbing ---------------------------------------------------
+    # -- message plumbing -------------------------------------------------
 
     def _next_id(self) -> str:
-        self._task_counter += 1
-        return f"T{self._task_counter:04d}"
+        self._message_counter += 1
+        return f"M{self._message_counter:04d}"
 
     def stage(
         self,
-        src: str,
-        kind: str,
+        src: Module,
+        channel: str,
         payload: Payload,
-        to: str | Sequence[str] | None,
         cause: str | None,
-        outbox: list[Task],
-    ) -> list[Task]:
-        """Turn one emission into one task per destination.
+        outbox: list[Message],
+    ) -> list[Message]:
+        """Turn one emission into one message per registered consumer.
 
-        Called by `Ctx.emit`. Nothing is delivered here; the scheduler does that
-        at the end of the tick.
+        Called by `Ctx.emit`. Nothing is delivered here; the scheduler does
+        that at the end of the tick.
         """
-        if to is None:
-            targets = self.bus.resolve(src, kind)
-        elif isinstance(to, str):
-            targets = [(to, kind)]
-        else:
-            targets = [(name, kind) for name in to]
+        if channel not in src.OUTPUTS:
+            declared = ", ".join(sorted(src.OUTPUTS)) or "none"
+            raise ValueError(
+                f"{type(src).__name__} {src.name!r} emitted on {channel!r}, which is "
+                f"not one of its output channels. Declared: {declared}. "
+                f"Add it to OUTPUTS."
+            )
 
-        # Observers get a copy even when the emission was addressed elsewhere.
-        addressed = {dst for dst, _ in targets}
-        for dst, as_kind in self.bus.observers_for(src, kind):
-            if dst not in addressed:
-                targets.append((dst, as_kind))
-                addressed.add(dst)
-
+        targets = src.consumers(channel)
         if not targets:
             self.tracer.emit(
-                src,
+                src.name,
                 TASK_EMIT,
                 {
-                    "kind": kind,
-                    "summary": f"{kind} went nowhere (no route, no explicit to=)",
+                    "channel": channel,
+                    "summary": f"{channel} has no listeners, dropped",
                     "dropped": True,
                 },
                 cause=cause,
             )
             return []
 
-        tasks = []
-        for dst, as_kind in targets:
-            task = Task(
+        messages = []
+        for consumer, as_channel in targets:
+            message = Message(
                 id=self._next_id(),
-                kind=as_kind,
+                channel=as_channel,
                 payload=payload,
-                src=src,
-                dst=dst,
+                src=src.name,
+                dst=consumer.name,
                 t_created=self.scheduler.t,
                 t_deliver=self.scheduler.t + 1,
                 cause=cause,
             )
-            outbox.append(task)
-            tasks.append(task)
+            outbox.append(message)
+            messages.append(message)
             self.tracer.emit(
-                src,
+                src.name,
                 TASK_EMIT,
-                {"kind": as_kind, "dst": dst, "summary": task.describe()},
-                task_id=task.id,
+                {"channel": as_channel, "dst": consumer.name,
+                 "summary": message.describe()},
+                task_id=message.id,
                 cause=cause,
             )
-        return tasks
+        return messages
 
-    def deliver(self, task: Task) -> bool:
-        """Put a task in its target queue. Returns False if it had nowhere to go."""
-        if task.dst == WORLD:
-            self.outbox.append(task)
-            self.tracer.emit(
-                WORLD,
-                TASK_DELIVER,
-                {"kind": task.kind, "summary": task.describe()},
-                task_id=task.id,
-                cause=task.cause,
-            )
-            return True
-
-        module = self.modules.get(task.dst)
-        if module is None:
+    def deliver(self, message: Message) -> bool:
+        """Put a message in its target queue. False if it had nowhere to go."""
+        target = self.world if message.dst == WORLD else self.modules.get(message.dst)
+        if target is None:
             self.tracer.emit(
                 "runtime",
                 TASK_DELIVER,
                 {
-                    "summary": f"no module named {task.dst!r}, dropped {task.kind}",
+                    "summary": f"no module named {message.dst!r}, dropped "
+                    f"{message.channel}",
                     "dropped": True,
                 },
-                task_id=task.id,
+                task_id=message.id,
             )
             return False
 
-        module.receive(task)
+        if target is self.world:
+            # World is never scheduled, so it absorbs on delivery.
+            self.outbox.append(message)
+        else:
+            target.receive(message)
+
         self.tracer.emit(
-            task.dst,
+            message.dst,
             TASK_DELIVER,
-            {"kind": task.kind, "src": task.src, "summary": task.describe()},
-            task_id=task.id,
-            cause=task.cause,
+            {"channel": message.channel, "src": message.src,
+             "summary": message.describe()},
+            task_id=message.id,
+            cause=message.cause,
         )
         return True
 
-    # -- driving it ------------------------------------------------------
+    # -- driving ------------------------------------------------------
 
     def send(
         self,
-        kind: str,
+        channel: str,
         payload: Payload,
         to: str | Sequence[str] | None = None,
-        src: str = WORLD,
-    ) -> list[Task]:
+    ) -> list[Message]:
         """Inject an external input. Delivered immediately, not next tick."""
-        staged: list[Task] = []
-        tasks = self.stage(src, kind, payload, to, cause=None, outbox=staged)
-        for task in staged:
-            task.t_deliver = self.scheduler.t
-            self.deliver(task)
-        return tasks
+        names = [to] if isinstance(to, str) else list(to or ([self.entry] if self.entry else []))
+        messages = []
+        for name in names:
+            message = Message(
+                id=self._next_id(),
+                channel=channel,
+                payload=payload,
+                src=WORLD,
+                dst=name,
+                t_created=self.scheduler.t,
+                t_deliver=self.scheduler.t,
+            )
+            self.tracer.emit(
+                WORLD,
+                TASK_EMIT,
+                {"channel": channel, "dst": name, "summary": message.describe()},
+                task_id=message.id,
+            )
+            if self.deliver(message):
+                messages.append(message)
+        return messages
 
     async def run(self, max_ticks: int | None = None) -> int:
         """Tick until quiet. Returns the number of ticks run.
 
-        Validates the wiring before the first tick, so a mistyped module name
-        fails loudly instead of silently dropping messages.
+        Validates the assembly before the first tick, so a consumer that was
+        never added fails loudly instead of silently dropping messages.
         """
         self._check_once()
         return await self.scheduler.run_until_idle(max_ticks)
@@ -335,30 +359,33 @@ class Mind(MindInterface):
         self,
         text: str,
         to: str | Sequence[str] | None = None,
-        kind: str = "user_prompt",
+        channel: str = "user_prompt",
         max_ticks: int | None = None,
-    ) -> list[Task]:
+    ) -> list[Message]:
         """Say something, wait for the mind to settle, take what it produced.
 
         Delivers to `to`, or to `self.entry` when you do not say. Returns only
-        the tasks addressed to `world` during this prompt.
+        the messages that reached `world` during this prompt.
         """
         mark = len(self.outbox)
-        self.send(kind, Text(text), to=to if to is not None else self.entry)
+        self.send(channel, Text(text), to=to)
         await self.run(max_ticks)
         return self.outbox[mark:]
 
     # -- inspection --------------------------------------------------------
 
     def describe(self) -> str:
-        lines = [f"Mind {self.name!r} (run {self.run_id})"]
-        lines.append(f"  entry: {self.entry}")
+        lines = [f"Mind {self.name!r} (run {self.run_id})", f"  entry: {self.entry}"]
         lines.append("  modules:")
         for module in self.modules.values():
-            lines.append(f"    {module.name:<16} {type(module).__name__}")
-        lines.append("  routes:")
-        for line in self.bus.describe().splitlines():
-            lines.append(f"    {line}")
+            channels = ", ".join(sorted(module.OUTPUTS)) or "no outputs"
+            lines.append(f"    {module.name:<16} {type(module).__name__:<14} {channels}")
+        links = self.links()
+        lines.append("  links:")
+        for link in links:
+            lines.append(f"    {link.describe()}")
+        if not links:
+            lines.append("    (nothing registered)")
         if self.run_path:
             lines.append(f"  trace: {self.run_path}/trace.jsonl")
         return "\n".join(lines)
@@ -375,11 +402,11 @@ class Mind(MindInterface):
         self.close()
 
 
-def texts(tasks: Iterable[Task]) -> list[str]:
-    """Pull the plain text out of a batch of tasks, skipping anything else."""
+def texts(messages: Iterable[Message]) -> list[str]:
+    """Pull the plain text out of a batch of messages, skipping anything else."""
     out = []
-    for task in tasks:
-        payload = task.payload
+    for message in messages:
+        payload = message.payload
         if isinstance(payload, Text):
             out.append(payload.text)
         elif isinstance(payload, str):

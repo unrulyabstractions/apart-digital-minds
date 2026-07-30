@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from src import Agent, Mind, get_llm, texts
+from src import Agent, Mind, texts
 
 MODEL = os.environ.get("MODEL", "echo:")
 
@@ -25,13 +25,17 @@ MODEL = os.environ.get("MODEL", "echo:")
 async def main() -> None:
     mind = Mind("hello", run_dir="runs")
 
-    mind.add(
-        Agent(
-            "assistant",
-            get_llm(MODEL),
-            system="You are a careful assistant. Answer in two sentences.",
-        )
+    assistant = Agent(
+        "assistant",
+        mind.model(MODEL),
+        system="You are a careful assistant. Answer in two sentences.",
     )
+
+    # One verb. `Agent` declares one output channel, `reply`; nobody hears it
+    # until somebody registers. Registering against `mind.world` both wires the
+    # channel and brings the agent into the mind, so there is nothing else to
+    # call.
+    assistant.register(mind.world, "reply")
 
     print(mind.describe(), "\n")
 

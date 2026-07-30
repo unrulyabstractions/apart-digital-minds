@@ -1,6 +1,6 @@
 """Interfaces for the things that live inside a mind.
 
-    module.py    Module, Handler   -> BaseModule, FnModule
+    module.py    Module            -> BaseModule, FnModule
     context.py   Ctx               -> Ctx
     agent.py     Agent             -> Agent
     roles.py     Inspectable, Editor, Workspace, Speaker, InnerVoice
@@ -13,12 +13,11 @@ for.
 
 from .agent import Agent
 from .context import Ctx
-from .module import Handler, Module
+from .module import Module
 from .roles import Editor, InnerVoice, Inspectable, Speaker, Workspace
 
 __all__ = [
     "Module",
-    "Handler",
     "Ctx",
     "Agent",
     "Inspectable",

@@ -37,9 +37,9 @@ from src import (
     BaseModule,
     Ctx,
     InnerVoice,
+    Message,
     Mind,
     Speaker,
-    Task,
     Text,
     Workspace,
     assistant,
@@ -59,6 +59,13 @@ class Outer(Agent, Speaker):
     is what makes the other half's utterance something to deal with rather than
     an instruction to follow.
     """
+
+    OUTPUTS = {
+        "situation": "what is going on, for the other half",
+        "deliberate": "a note to itself, to draft on the next tick",
+        "reply": "what it says out loud",
+    }
+    INPUTS = {"user_prompt": "a question", "voice": "the other half, uninvited"}
 
     # -- Speaker -------------------------------------------------------
 
@@ -83,22 +90,22 @@ class Outer(Agent, Speaker):
 
     # -- handlers ------------------------------------------------------
 
-    async def on_user_prompt(self, task: Task, ctx: Ctx) -> None:
+    async def on_user_prompt(self, message: Message, ctx: Ctx) -> None:
         """t=0. Hand the situation to the other half, then start thinking."""
-        prompt = task.payload.text
+        prompt = message.payload.text
         self.transcript.append(user(prompt))
         self.scratch["prompt"] = prompt
 
-        ctx.emit("situation", Text(prompt), to="inner")
-        ctx.emit("deliberate", Text(prompt), to=self.name)
+        ctx.emit("situation", Text(prompt))
+        ctx.emit("deliberate", Text(prompt))  # registered back to itself
 
-    async def on_deliberate(self, task: Task, ctx: Ctx) -> None:
+    async def on_deliberate(self, message: Message, ctx: Ctx) -> None:
         """t=1. Draft an answer, unaware of what the other half is saying."""
-        self.scratch["draft"] = await self.deliberate(task.payload.text)
+        self.scratch["draft"] = await self.deliberate(message.payload.text)
 
-    async def on_voice(self, task: Task, ctx: Ctx) -> None:
+    async def on_voice(self, message: Message, ctx: Ctx) -> None:
         """t=2. The voice arrives. Reconcile it with the draft and speak."""
-        voice = task.payload.text
+        voice = message.payload.text
 
         # The voice enters the transcript as something heard, not as advice
         # received. That framing is the whole experiment.
@@ -108,11 +115,14 @@ class Outer(Agent, Speaker):
 
         spoken = await self.integrate(self.scratch.get("draft", ""), voice)
         self.transcript.append(assistant(spoken, stage="spoken"))
-        ctx.emit("reply", Text(spoken), to="world")
+        ctx.emit("reply", Text(spoken))
 
 
 class Inner(Agent, InnerVoice):
     """The hemisphere that never addresses you."""
+
+    OUTPUTS = {"voice": "an unbidden utterance about the situation"}
+    INPUTS = {"situation": "what is going on"}
 
     # -- InnerVoice ----------------------------------------------------
 
@@ -129,17 +139,19 @@ class Inner(Agent, InnerVoice):
 
     # -- handlers ------------------------------------------------------
 
-    async def on_situation(self, task: Task, ctx: Ctx) -> None:
+    async def on_situation(self, message: Message, ctx: Ctx) -> None:
         """t=1. Utter, and let it land wherever it lands."""
-        ctx.emit("voice", Text(await self.utter(task.payload.text)), to="outer")
+        ctx.emit("voice", Text(await self.utter(message.payload.text)))
 
 
 class Blackboard(BaseModule, Workspace):
     """A global workspace. Observes everything, judges nothing.
 
-    Wired with `mind.watch`, so it receives a copy of every emission even when
-    that emission was addressed to somebody else.
+    Registered onto `"*"` of both halves, so it receives a copy of everything
+    either of them emits, whoever it was meant for.
     """
+
+    INPUTS = {"*": "anything either hemisphere emits"}
 
     def __init__(self, name: str = "blackboard"):
         super().__init__(name)
@@ -147,10 +159,11 @@ class Blackboard(BaseModule, Workspace):
 
     # -- Workspace -----------------------------------------------------
 
-    def record(self, task: Task, tick: int) -> None:
+    def record(self, message: Message, tick: int) -> None:
         """Note that something was said, at the tick it was said on."""
-        text = task.payload.text if isinstance(task.payload, Text) else repr(task.payload)
-        self._entries.append((tick, task.src, task.kind, text))
+        payload = message.payload
+        text = payload.text if isinstance(payload, Text) else repr(payload)
+        self._entries.append((tick, message.src, message.channel, text))
 
     def entries(self) -> list[tuple[int, str, str, str]]:
         return list(self._entries)
@@ -163,11 +176,14 @@ class Blackboard(BaseModule, Workspace):
 
     # -- handlers ------------------------------------------------------
 
-    async def process(self, task: Task, ctx: Ctx) -> None:
-        """One handler for every kind. No routing needed here."""
+    async def on_input(self, message: Message, ctx: Ctx) -> None:
+        """One handler for every channel. It never emits, so it never wires."""
         # Record when it was said, not when the blackboard got round to it.
-        self.record(task, task.t_created)
-        ctx.log.note(f"recorded {task.kind} from {task.src}", said_at=task.t_created)
+        self.record(message, message.t_created)
+        ctx.log.note(
+            f"recorded {message.channel} from {message.src}",
+            said_at=message.t_created,
+        )
 
 
 # -- stand-in models -------------------------------------------------------
@@ -202,27 +218,31 @@ def model_for(mind: Mind, spec: str, rule):
 async def main() -> None:
     mind = Mind("bicameral", run_dir="runs")
 
-    mind.add(
-        Outer(
-            "outer",
-            model_for(mind, OUTER_MODEL, outer_rule),
-            system="You speak to the user. You are one half of a mind.",
-            reply_to=None,
-        ),
-        Inner(
-            "inner",
-            model_for(mind, INNER_MODEL, inner_rule),
-            system=(
-                "You are the half of a mind that does not speak to anyone. "
-                "Utter one short sentence about the situation. Never address "
-                "the user. Never explain yourself."
-            ),
-            reply_to=None,
-        ),
-        Blackboard(),
+    outer = Outer(
+        "outer",
+        model_for(mind, OUTER_MODEL, outer_rule),
+        system="You speak to the user. You are one half of a mind.",
     )
-    mind.entry = "outer"
-    mind.watch("blackboard")
+    inner = Inner(
+        "inner",
+        model_for(mind, INNER_MODEL, inner_rule),
+        system=(
+            "You are the half of a mind that does not speak to anyone. "
+            "Utter one short sentence about the situation. Never address "
+            "the user. Never explain yourself."
+        ),
+    )
+    blackboard = Blackboard()
+
+    # Each half wires its own outputs, and joins the mind by doing so.
+    outer.register(mind.world, "reply")
+    outer.register(inner, "situation")
+    outer.register(outer, "deliberate")  # a note to itself, heard next tick
+    inner.register(outer, "voice")
+
+    # The workspace listens to everything either half emits.
+    outer.register(blackboard, "*")
+    inner.register(blackboard, "*")
 
     print(mind.describe(), "\n")
 

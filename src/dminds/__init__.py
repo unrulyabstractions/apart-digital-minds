@@ -3,7 +3,6 @@
     api.Module        -> BaseModule, FnModule, Agent
     api.Ctx           -> Ctx
     api.LLM           -> BaseLLM, the providers, Cassette
-    api.Router        -> Bus
     api.Scheduler     -> TickScheduler
     api.Host          -> Mind (narrow view, for modules)
     api.Mind          -> Mind (full view, for you)
@@ -25,7 +24,6 @@ these parts.
 """
 
 from .agents import Agent, has_think, replace_think, split_think, strip_think
-from .bus import Bus
 from .llm import (
     ALIASES,
     DEFAULT_MODELS,
@@ -43,8 +41,8 @@ from .llm import (
     taped,
 )
 from .memory import Journal, Scratchpad, Transcript
-from .mind import Mind, texts
-from .module import BaseModule, Ctx, FnModule, handler_name
+from .mind import Mind, World, texts
+from .module import BaseModule, Ctx, FnModule, UndeclaredChannel, handler_name
 from .scheduler import TickScheduler
 from .trace import (
     ConsoleSink,
@@ -65,7 +63,8 @@ __all__ = [
     "BaseModule",
     "FnModule",
     "Ctx",
-    "Bus",
+    "World",
+    "UndeclaredChannel",
     "TickScheduler",
     "texts",
     "handler_name",

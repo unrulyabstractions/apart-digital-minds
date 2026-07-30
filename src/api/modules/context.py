@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, Sequence
+from typing import TYPE_CHECKING, Protocol
 
 from ..observability import Logger
-from ..types import Payload, Task
+from ..types import Message, Payload
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..runtime import Host
@@ -13,30 +13,23 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Ctx(Protocol):
-    """Where a handler is, what it can say, and how it logs.
+    """Where a module is in time, what it can emit, and how it logs.
 
-    Constructed by the scheduler, one per handled task. Implement this only if
-    you are writing an alternative runtime.
+    Constructed by the scheduler, one per turn. Implement this only if you are
+    writing an alternative runtime.
     """
 
     tick: int
-    task: Task
     module: "Module"
     mind: "Host"
     log: Logger
 
-    def emit(
-        self,
-        kind: str,
-        payload: Payload,
-        to: str | Sequence[str] | None = None,
-        cause: str | None = None,
-    ) -> list[Task]:
-        """Send a task. It is delivered at the start of the next tick.
+    def emit(self, channel: str, payload: Payload, cause: str | None = None) -> list[Message]:
+        """Emit on one of this module's declared channels.
 
-        `to` names one or more modules. Leave it out to use the wired routes.
-        Use `to="world"` to hand something back to the caller.
+        Goes to whoever registered onto that channel, and to nobody otherwise.
+        There is no address here on purpose: a module says what it produced,
+        and the registrations decide who hears it.
+
+        Delivered at the start of the next tick, never within this one.
         """
-
-    def reply(self, kind: str, payload: Payload) -> list[Task]:
-        """Emit straight back to whoever sent the current task."""

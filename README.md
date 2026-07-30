@@ -13,7 +13,7 @@ you ask for that provider.
 src/api/       the contracts
 src/dminds/    the implementations
 examples/      four minds assembled from the parts
-tests/         50 tests, no dependencies
+tests/         78 tests, no dependencies
 ```
 
 `src/api` declares what each part must do. `src/dminds` provides one of each.
@@ -22,21 +22,20 @@ without disturbing the vocabulary the others speak.
 
 ```
 src/api/
-  types/           messages.py  payloads.py  tasks.py  records.py
+  types/           messages.py  payloads.py  messages_flow.py  records.py
   modules/         module.py  context.py  agent.py  roles.py
   models/          llm.py
   memory/          stores.py
   observability/   sinks.py  tracing.py  kinds.py
-  runtime/         router.py  scheduler.py  host.py  constants.py
+  runtime/         scheduler.py  host.py  mind.py  factories.py  constants.py
 ```
 
 | Contract | `src/api` | Shipped implementation |
 | --- | --- | --- |
-| Handles tasks | `Module` | `BaseModule`, `FnModule` |
-| Handles tasks, with a model | `Agent` | `Agent` |
-| Given to a handler | `Ctx` | `Ctx` |
+| Takes a turn | `Module` | `BaseModule`, `FnModule` |
+| Takes a turn, with a model | `Agent` | `Agent` |
+| Given to a turn | `Ctx` | `Ctx` |
 | Answers a conversation | `LLM` | `BaseLLM`, the providers, `Cassette` |
-| Decides who hears what | `Router` | `Bus` |
 | Defines one step | `Scheduler` | `TickScheduler` |
 | Holds the modules, seen from inside | `Host` | `Mind` |
 | The whole assembly, seen from outside | `Mind` | `Mind` |
@@ -62,13 +61,13 @@ from src import Agent            # the class
 from src.api import Agent        # the interface it satisfies
 ```
 
-`src/api/types/` holds the data that crosses every boundary: `Task`,
-`ChatMessage`, `Completion`, `GenOptions`, `Event`, `Route`, `Episode`, and the
-`Text` / `Context` / `Vector` payloads. Read that package first.
+`src/api/types/` holds the data that crosses every boundary: `Message`, `Link`,
+`Channel`, `ChatMessage`, `Completion`, `GenOptions`, `Event`, `Episode`, and
+the `Text` / `Context` / `Vector` payloads. Read that package first.
 
 ```python
 from src.api import Module, Agent, LLM, Sink   # what to implement
-from src.dminds import Mind, Bus, BaseModule   # what to use
+from src.dminds import Mind, BaseModule, Agent  # what to use
 from src import Mind, Agent, get_llm           # both, flat
 ```
 
@@ -100,11 +99,12 @@ pip install -e '.[all]'   # plus every provider SDK
 
 ```python
 import asyncio
-from src import Mind, Agent, get_llm, texts
+from src import Mind, Agent, texts
 
 async def main():
     mind = Mind("demo")
-    mind.add(Agent("assistant", get_llm("echo:"), system="Be terse."))
+    assistant = Agent("assistant", mind.model("echo:"), system="Be terse.")
+    assistant.register(mind.world, "reply")     # wires it and adds it
     print(texts(await mind.prompt("What is a digital mind?")))
 
 asyncio.run(main())
@@ -117,9 +117,9 @@ you can build wiring before spending a token.
 
 | Idea | What it is |
 | --- | --- |
-| `Module` | Something with a queue and a set of handlers. |
-| `Task` | One unit of work, routed from one module to another. |
-| `Host` | Where modules live. `Mind` is the one you get. |
+| `Module` | A queue, declared output channels, and a turn. |
+| `Message` | One thing sent on a channel, from one module to another. |
+| `Mind` | Where modules live, and what you drive. |
 | `Scheduler` | Runs the clock. Decides what "one step" means. |
 | `LLM` | One chat interface. Providers are chosen by a string. |
 
@@ -129,8 +129,9 @@ Everything else is built from these.
 
 This is the one thing to understand. A tick has two phases.
 
-1. **Act.** Every module holding at least one task pops exactly one and handles
-   it. Modules run concurrently, so two agents think at the same moment.
+1. **Act.** Every module with something to do takes a turn: `on_input` for each
+   message that arrived, then one `on_process`. Modules take their turns
+   concurrently, so two agents think at the same moment.
 2. **Deliver.** Everything emitted during phase 1 lands in its target queue,
    all at once.
 
@@ -153,47 +154,90 @@ t=2   target adopts the rewrite and reruns.     interceptor idle.
 
 ## Writing a module
 
-Subclass `BaseModule`, or `Agent` if you want a model attached. A task of kind
-`"user_prompt"` is handled by `on_user_prompt`. That is the whole convention.
-Override `process` if you want different routing, or implement `api.Module`
-directly if you want none of the machinery.
+A turn is two steps, run once per tick: `on_input` for every message that
+arrived, in order, then one `on_process`. Splitting them means a module absorbs
+everything that reached it before it acts, so it never decides on half the
+picture.
 
 ```python
 from src import Agent, Context, Text, user
 
 class Target(Agent):
-    async def on_user_prompt(self, task, ctx):
-        self.transcript.append(user(task.payload.text))
+    OUTPUTS = {"thought": "the draft, for inspection", "reply": "the answer"}
+
+    async def on_user_prompt(self, message, ctx):        # per-channel
+        self.transcript.append(user(message.payload.text))
         completion = await self.think(tag="draft")
         self.transcript.append(completion.as_message())
-        ctx.emit("inspect", Context(self.transcript.messages), to="interceptor")
+        ctx.emit("thought", Context(self.transcript.messages))
 
-    async def on_revision(self, task, ctx):
-        self.transcript.replace_all(task.payload.messages)
+    async def on_revision(self, message, ctx):
+        self.transcript.replace_all(message.payload.messages)
         completion = await self.think(tag="final")
-        ctx.emit("reply", Text(completion.text), to="world")
+        ctx.emit("reply", Text(completion.text))
 ```
 
-Handlers never call another module. They emit, and the scheduler delivers.
-`to="world"` hands something back to you.
+The default `on_input` routes to `on_<channel>` when you have written such a
+method, and buffers into `self.inputs` when you have not. So a module can react
+per channel, as above, or absorb everything and act once:
+
+```python
+class Batcher(BaseModule):
+    OUTPUTS = {"summary": "one summary of everything that arrived"}
+
+    async def on_process(self, ctx):
+        batch = self.take_inputs()
+        if batch:
+            ctx.emit("summary", summarise(batch))
+```
+
+Return True from `wants_process` to take a turn with an empty queue, which is
+how a module acts unprompted.
+
+Modules never call each other. They emit on a channel, and the scheduler
+delivers to whoever registered, at the start of the next tick.
 
 Payloads are anything. `Text`, `Context`, and `Vector` are conveniences, and you
 are free to ignore them. Send raw activations if that is your experiment.
 
-## Routing
+## Channels and wiring
+
+A module declares what it can emit. Emitting on anything else is an error, and
+so is registering against a channel that does not exist, so a typo fails at
+wiring time rather than silently dropping messages.
 
 ```python
-mind.wire("assistant", "thought", "interceptor", as_kind="inspect")
-mind.watch("blackboard")   # a copy of all traffic
+class Target(Agent):
+    OUTPUTS = {"thought": "what it just drafted", "reply": "the answer"}
+    INPUTS  = {"user_prompt": "a question", "revision": "a replacement context"}
 ```
 
-A **route** decides where an unaddressed emission goes, and can rename the kind
-on the wire. Renaming matters: the assistant emits `"thought"` and the
-interceptor handles `"inspect"`, and neither module knows the other exists.
+Wiring lives on the modules. The mind has no routing table and no opinion about
+who talks to whom.
 
-An **observer** gets a copy of everything regardless of address. That is a
-separate concept because `to=` bypasses routes, and a monitor still needs to see
-traffic addressed elsewhere.
+```python
+target.register(interceptor, "thought", as_channel="inspect")
+interceptor.register(target, "revision")
+target.register(mind.world, "reply")
+outer.register(blackboard, "*")        # a workspace hears everything
+```
+
+Renaming matters: the target emits `"thought"` and the interceptor hears
+`"inspect"`, so neither module knows the other's vocabulary. `"*"` forwards
+every channel under its real name, which is how a monitor attaches.
+
+**Registering is the only verb.** It wires the channel *and* brings the module
+into the mind, so there is no separate assembly step. Whichever of the two
+modules is already in a mind pulls the other one in.
+
+```python
+mind = Mind("demo")
+assistant = Agent("assistant", mind.model("openai:gpt-5"))
+assistant.register(mind.world, "reply")     # wires it and adds it
+```
+
+`mind.add(...)` still exists, but only for a module wired to nothing, such as
+one that runs on `wants_process` alone.
 
 ## Swapping models
 
@@ -275,29 +319,28 @@ Log from your own code with `ctx.log.note(...)`, and time a block with
 
 ## Composition
 
-`Mind` builds nothing itself. The router, the scheduler, the tracer, and the
-model factory are all arguments, defaulting to the shipped implementations.
-Without this the `Router` and `Scheduler` contracts would describe nothing.
+`Mind` builds nothing itself. The scheduler, the tracer, and the model factory
+are all arguments, defaulting to the shipped implementations.
+Without this the `Scheduler` contract would describe nothing.
 
 ```python
 Mind("fast",  scheduler=lambda host: MyScheduler(host))
-Mind("quiet", router=PriorityBus(), console=False)
 Mind("taped", model_factory=taped("runs/tape.jsonl"))
 ```
 
 A scheduler needs the host it will drive and a tracer needs the run id, so both
 arrive as factories rather than finished objects.
 
-Routes name modules by string, so a typo would silently drop messages. `run`
-validates the wiring before the first tick and refuses to start:
+Channels are declared, so a mistyped one fails the moment you register or emit:
 
 ```
-ValueError: This mind is wired wrong:
-  route 'assistant --thought--> intercepter' names 'intercepter' as its target,
-  but no such module was added. Known modules: assistant, interceptor.
+UndeclaredChannel: Target 'target' has no output channel 'thougth'.
+Declared channels: reply, thought. Add it to OUTPUTS, or register on "*"
+to receive everything.
 ```
 
-Call `mind.validate()` yourself for the list without raising.
+`mind.validate()` catches what is left, and `run` calls it before the first
+tick.
 
 ## Replay
 
@@ -379,8 +422,7 @@ synchronous method. Implement `api.LLM` directly when you need control over the
 async call itself, as `Cassette` does.
 
 The same holds for the rest. Subclass `api.Scheduler` for a different notion of
-time, satisfy `api.Router` for different routing, or satisfy `api.EpisodicStore`
-to put memory in a real vector database.
+time, or satisfy `api.EpisodicStore` to put memory in a real vector database.
 
 An agent is a module with a model and a memory. `api.Agent` is the contract:
 

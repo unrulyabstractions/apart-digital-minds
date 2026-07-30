@@ -1,8 +1,8 @@
 """Factories, so the runtime's parts can be chosen rather than hardcoded.
 
-A `Mind` needs a router, a scheduler, and a tracer. If it constructed them
-itself the interfaces next door would be decorative. Instead it takes them, and
-falls back to the shipped implementations when you say nothing.
+A `Mind` needs a scheduler and a tracer. If it constructed them itself the
+interfaces next door would be decorative. Instead it takes them, and falls back
+to the shipped implementations when you say nothing.
 
 The scheduler and the tracer cannot be passed as finished objects. A scheduler
 needs the host it will drive, and a tracer needs the run id. Both arrive as
@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from ..models import LLM
 from ..observability import Tracer
-from .router import Router
 from .scheduler import Scheduler
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -37,12 +36,6 @@ class ModelFactory(Protocol):
     """
 
     def __call__(self, spec: str, **kwargs: Any) -> LLM: ...
-
-
-class RouterFactory(Protocol):
-    """Builds an empty routing table."""
-
-    def __call__(self) -> Router: ...
 
 
 class SchedulerFactory(Protocol):
