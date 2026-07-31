@@ -108,21 +108,44 @@ def build_mind(kind: str, model: str) -> Mind:
 
 
 def windows(mind: Mind) -> list[dict]:
-    """Each agent's context window, so you can see what was edited."""
-    out = []
-    for module in mind.modules.values():
-        transcript = getattr(module, "transcript", None)
-        if transcript is None:
+    """Every context window, in pipeline order, each naming the one before it.
+
+    The mind knows its own shape, so it can say which window a given one was
+    derived from. That lets a reader compare two adjacent windows and see what
+    a stage did, whatever the stage was and whatever kind of edit it made.
+    Nothing here knows about any particular architecture.
+    """
+    # The window in flight is held by the ends of the pipeline. A stage
+    # transforms it in passing and keeps its own separate conversation, so a
+    # stage is never the thing a later window should be compared against.
+    carriers = [m for m in (mind.subject, mind.ego) if m is not None]
+    chain = [m for m in (mind.subject, *mind.stages, mind.ego) if m is not None]
+    placed = {m.name for m in chain}
+
+    def described(module, upstream, carries):
+        return {
+            "module": module.name,
+            "upstream": upstream,
+            "carries": carries,
+            "messages": [
+                {"role": m.role, "content": m.content, "meta": dict(m.meta)}
+                for m in module.transcript
+            ],
+        }
+
+    out, seen_carrier = [], None
+    for module in chain:
+        if getattr(module, "transcript", None) is None:
             continue
-        out.append(
-            {
-                "module": module.name,
-                "messages": [
-                    {"role": m.role, "content": m.content, "meta": dict(m.meta)}
-                    for m in transcript
-                ],
-            }
-        )
+        if module in carriers:
+            out.append(described(module, seen_carrier, True))
+            seen_carrier = module.name
+        else:
+            out.append(described(module, None, False))
+
+    for module in mind.modules.values():
+        if module.name not in placed and getattr(module, "transcript", None) is not None:
+            out.append(described(module, None, False))
     return out
 
 

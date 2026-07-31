@@ -766,3 +766,40 @@ finished run and rewind to walk through it.
 | 164 | Rewind still works | Clicked the reset button | VERIFIED (back to 0/33) |
 | 165 | The message reads clearly | Screenshotted and looked. Subject shows purple thinking, ego shows amber thinking with identical says text, header tagged | VERIFIED |
 | 166 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+
+## 2026-07-30 — the window diff, made generic
+
+The ego column showed two `ASSISTANT` messages with nothing to tell them
+apart, and the colouring behind it only understood one thing: an interceptor
+rewriting a `<think>` block. A different stage doing a different edit would
+have gone unreported.
+
+The server now returns windows in pipeline order, each naming the window it
+derives from, and marking whether it carries the flowing window or keeps its
+own conversation. The page diffs the two message lists and reports per message
+`same`, `changed`, `added`, or `own`. It knows nothing about any particular
+stage or edit type.
+
+One bug caught here by looking rather than assuming. The first version tested
+`meta.stage` before comparing position, so an inherited-and-edited message
+read as `written here` and the header claimed `identical to subject` while an
+edit was on screen. Position is now compared first.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 167 | Windows carry upstream and carrier flags | Ran the interceptor mind, read `/state` JSON | VERIFIED (subject carries/no upstream, interceptor own conversation, ego carries/upstream=subject) |
+| 168 | The same holds for an insertion | Ran the bicameral mind, read `/state` JSON and diffed the lists | VERIFIED (voice keeps its own conversation; ego gains a `user` message `ADDED by voice`) |
+| 169 | First render of the diff | Viewed `diffview.png` with image tokens | BROKEN (edit labelled `written here`, header said `identical to subject`) |
+| 170 | Render after the ordering fix | Viewed `diff2.png` with image tokens | VERIFIED (header `1 changed since subject`, edit amber and `changed by interceptor`, ego reply green `written here`, prefix collapsed to `2 messages unchanged from subject`) |
+| 171 | `classify` across every edit shape | Extracted the function and ran it under node on five synthetic pairs | VERIFIED (untouched, rewrite, insertion, deletion, own reply, all 5 correct) |
+| 172 | Page parses | `node --check` on the extracted script | VERIFIED |
+| 173 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+| 174 | All four examples | Ran each, read the output, then re-ran for exit codes | VERIFIED (all exit 0) |
+
+### Still UNVERIFIED
+
+The `openai`, `anthropic`, `gemini` and `ollama` network paths. No keys and no
+local server, so they have never made a real call. Only `hf:Qwen/Qwen3-0.6B`
+has been run against a real model.

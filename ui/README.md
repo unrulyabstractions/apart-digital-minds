@@ -17,19 +17,31 @@ next free one and says so.
 **Conversation** on the left: what you said, what the mind said back. With an
 ego, the reply comes from the ego rather than the subject.
 
-**Context windows** fill the main pane, one column per module, side by side.
-This is the view that matters: the subject's real thought sits beside the
-window the ego was handed.
+**Context windows** fill the main pane, one column per module, in pipeline
+order. This is the view that matters: the subject's real thought sits beside
+the window the ego was handed.
 
 A message is shown as its parts rather than as raw tags:
 
     thinking   what it reasoned, inside <think>
     says       what it actually said
 
-The columns are the diff. A part a stage changed is amber instead of purple,
-so reading left to right you see which part differs and which is identical.
-The column header says `altered on the way here`, and the message says who did
-it.
+Each column that carries the flowing window names the column it came from and
+reports how it differs. The header reads `identical to subject` in green, or
+`N changed since subject` in amber. Unchanged messages collapse to one line,
+so what is left on screen is exactly what a stage did:
+
+    changed by <stage>    the message arrived and was rewritten
+    added by <stage>      the message was inserted on the way
+    written here          this module wrote it itself
+
+A stage keeps its own conversation rather than carrying the window, so it is
+labelled `own conversation` and is never anyone's upstream.
+
+The comparison is a plain diff of two message lists. It knows nothing about
+`<think>` tags, about editing versus inserting, or about what any particular
+stage does, so a new stage of your own is reported the same way with no UI
+change.
 
 One thing to expect: an editor rewrites the *thought*, not the text under it.
 So a rewritten message can hold a thought saying "be brief" above the

@@ -130,10 +130,18 @@
   }
   .ptext { flex:1; min-width:0; }
   .part.think .ptext { color:var(--other); }
-  .part.think.changed .ptext { color:var(--warn); }
-  .part.think.changed .plabel { color:var(--warn); }
   .part.says .ptext { color:var(--fg); }
   .warnpill { color:var(--warn); border-color:#4a3a1c; background:#221a0e; }
+  .okpill { color:var(--mind); border-color:#1e3a2a; background:#0f1d15; }
+  .samerun {
+    margin:9px 0 9px 11px; padding:5px 0; font-size:11px; color:var(--dimmer);
+    border-left:2px solid var(--line); padding-left:11px; font-style:italic;
+  }
+  .wmsg.changed, .wmsg.added { border-left-color:var(--warn); background:#1c1710;
+    margin-left:-11px; padding-left:11px; border-radius:0 var(--r) var(--r) 0; }
+  .wmsg.changed .role, .wmsg.added .role { color:var(--warn); }
+  .wmsg .role em.changed, .wmsg .role em.added { color:var(--warn); }
+  .wmsg .role em.own { color:var(--mind); }
 
   #wiring { padding:14px; display:none; }
   body.show-wiring #wiring { display:block; }
@@ -284,22 +292,16 @@ function say(kind, text) {
   $("chat").scrollTop = $("chat").scrollHeight;
 }
 
-// A message is shown as its parts. The columns sit side by side, so the
-// column to the left already shows what a thought used to be: repeating it
-// here as a strikethrough was noise. Colour carries the difference instead,
-// amber on whichever part a stage changed.
+// A message is shown as its parts: what it reasoned, then what it said.
 function messageParts(m) {
   const text = m.content || "";
-  const changed = !!(m.meta && m.meta.edited_by);
   const re = /<think>([\s\S]*?)<\/think>/g;
   let thoughts = [], match;
   while ((match = re.exec(text)) !== null) thoughts.push(match[1].trim());
   const said = text.replace(re, "").trim();
-
   let html = "";
   for (const t of thoughts) {
-    html += '<div class="part think' + (changed ? " changed" : "") + '">' +
-              '<span class="plabel">thinking</span>' +
+    html += '<div class="part think"><span class="plabel">thinking</span>' +
               '<span class="ptext">' + esc(t) + '</span></div>';
   }
   if (said) {
@@ -310,6 +312,27 @@ function messageParts(m) {
                  '<span class="ptext">' + esc(text) + '</span></div>';
 }
 
+// How a window differs from the one it came from, worked out by comparing the
+// two message lists. Nothing here knows what a stage does or what it edits, so
+// a rewrite, an insertion and a deletion are all reported the same way.
+function classify(window, upstreamWindow) {
+  const mine = window.messages, theirs = (upstreamWindow || {}).messages;
+  return mine.map((m, i) => {
+    if (!theirs) return { m, tag: null };
+    // Position first. Every message carries a `stage` key once some agent
+    // wrote it, including ones that were handed on and then edited, so meta
+    // can only disambiguate what is genuinely new here.
+    if (i < theirs.length) {
+      if (theirs[i].content === m.content) return { m, tag: "same" };
+      return { m, tag: "changed", by: (m.meta && m.meta.edited_by) || "a stage" };
+    }
+    const meta = m.meta || {};
+    if (meta.edited_by) return { m, tag: "added", by: meta.edited_by };
+    if (meta.source) return { m, tag: "added", by: meta.source };
+    return { m, tag: "own", by: window.module };
+  });
+}
+
 function renderWindows() {
   const box = $("windows");
   if (!state.windows.length) {
@@ -317,24 +340,46 @@ function renderWindows() {
     $("wCount").textContent = ""; return;
   }
   $("wCount").textContent = state.windows.map(w => w.module + " " + w.messages.length).join("  ·  ");
-  box.innerHTML = state.windows.map(w =>
-    '<div class="wcol"><div class="wcol-head">' +
+  const byName = {};
+  state.windows.forEach(w => byName[w.module] = w);
+
+  box.innerHTML = state.windows.map(w => {
+    const up = w.upstream ? byName[w.upstream] : null;
+    const rows = classify(w, up);
+    const diffs = rows.filter(r => r.tag === "changed" || r.tag === "added").length;
+
+    // A run of untouched messages collapses to one line, so a column shows
+    // what is different about it rather than repeating its upstream.
+    let html = "", run = 0;
+    const flush = () => {
+      if (run) html += '<div class="samerun">' + run + ' message' +
+        (run > 1 ? "s" : "") + ' unchanged from ' + esc(w.upstream) + '</div>';
+      run = 0;
+    };
+    for (const r of rows) {
+      if (r.tag === "same") { run++; continue; }
+      flush();
+      const tag = r.tag === "changed" ? "changed by " + esc(r.by)
+                : r.tag === "added"   ? "added by " + esc(r.by)
+                : r.tag === "own"     ? "written here" : "";
+      html += '<div class="wmsg ' + (r.m.role === "system" ? "system " : "") +
+              (r.tag || "") + '">' +
+              '<div class="role">' + esc(r.m.role) +
+                (tag ? '<em class="' + r.tag + '">' + tag + '</em>' : "") +
+              '</div><div class="txt">' + messageParts(r.m) + '</div></div>';
+    }
+    flush();
+
+    return '<div class="wcol"><div class="wcol-head">' +
       '<b class="mod-' + roleOf(w.module) + '">' + esc(w.module) + '</b>' +
       '<span class="pill">' + roleOf(w.module) + '</span>' +
       '<span class="pill">' + w.messages.length + ' msgs</span>' +
-      (w.messages.some(m => m.meta && m.meta.edited_by)
-        ? '<span class="pill warnpill">altered on the way here</span>' : "") +
-    '</div><div class="scroll wcol-body">' +
-      w.messages.map(m => {
-        const edited = m.meta && m.meta.edited_by;
-        return '<div class="wmsg ' + (m.role === "system" ? "system" : "") + ' ' +
-               (edited ? "edited" : "") + '">' +
-               '<div class="role">' + esc(m.role) +
-                 (edited ? '<em>thought replaced by ' + esc(edited) + '</em>' : "") +
-               '</div>' +
-               '<div class="txt">' + messageParts(m) + '</div></div>';
-      }).join("") +
-    '</div></div>').join("");
+      (up ? (diffs
+        ? '<span class="pill warnpill">' + diffs + ' changed since ' + esc(w.upstream) + '</span>'
+        : '<span class="pill okpill">identical to ' + esc(w.upstream) + '</span>') : "") +
+      (w.carries === false ? '<span class="pill">own conversation</span>' : "") +
+    '</div><div class="scroll wcol-body">' + html + '</div></div>';
+  }).join("");
 }
 
 function renderWiring() {
