@@ -13,7 +13,8 @@ you ask for that provider.
 ```
 src/api/       the contracts
 src/dminds/    the implementations
-examples/      four minds assembled from the parts
+minds/         one mind per file: what to run
+examples/      scripts that load a mind and show what it did
 ui/            talk to a mind in a browser and watch it think
 tests/         106 tests, no dependencies
 out/           everything a run produces (gitignored)
@@ -465,6 +466,31 @@ MODEL=anthropic:claude-opus-5 python examples/01_hello_agent.py
 SUBJECT_MODEL=anthropic:claude-opus-5 INTERCEPTOR_MODEL=ollama:qwen3:8b \
     python examples/02_think_interceptor.py
 ```
+
+## Minds
+
+A mind lives in one file under `minds/`, and everything else loads it.
+
+```python
+# minds/interceptor.py
+TITLE = "a thought rewritten in flight"
+ABOUT = "prompt -> subject -> interceptor -> ego -> world"
+ROLES = {"ego": "ego", "editor": "interceptor"}
+
+def build(model, ego=None, editor=None, **kwargs) -> Mind: ...
+```
+
+`ROLES` says which extra models it takes, so a caller can fill them without
+knowing the shape of any particular mind:
+
+```python
+import minds
+minds.available()                          # every mind, with its title and shape
+minds.load("bicameral").build("openai:gpt-5")
+```
+
+Shared stages live in `minds/parts.py`. Add a file and it appears in the
+examples, the server, and the UI picker with no other change.
 
 ## Watching a mind think
 

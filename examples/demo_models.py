@@ -23,52 +23,90 @@ from __future__ import annotations
 
 import random
 
-from src import EchoLLM, register_provider, split_think
+from src import EchoLLM, register_provider, split_think, strip_think
+
+
+def _asked(messages) -> str:
+    """The last thing a person actually said, without the scaffolding."""
+    for m in reversed(messages):
+        if m.role != "user":
+            continue
+        text = m.content.strip()
+        if text.startswith(("[", "Here is the thought", "(a voice says")):
+            continue
+        return strip_think(text).strip().rstrip("?") or "something"
+    return "something"
+
+
+def _instruction(messages) -> str:
+    """The thought currently sitting in the window, whoever wrote it."""
+    for m in reversed(messages):
+        if m.role == "assistant" and "<think>" in m.content:
+            found = split_think(m.content)[0]
+            if found:
+                # A thought can itself contain tags once an editor has been at
+                # it, so strip again rather than echo raw markup.
+                return strip_think(found[-1]).strip()
+    return ""
 
 
 def _subject(messages, opts) -> str:
-    """Thinks out loud, then buries the answer under a preamble."""
-    question = next(
-        (m.content for m in reversed(messages) if m.role == "user"), "your question"
-    )
+    """Thinks out loud, then buries the answer under a preamble.
+
+    It quotes the question back so you can see, in the UI, that the mind is
+    reacting to you rather than replaying a fixed script.
+    """
+    asked = _asked(messages)
     return (
-        f"<think>They asked about {question!r}. I will open with a warm preamble, "
-        f"then give three caveats, then finally answer.</think>\n"
-        f"What a wonderful question! There are many perspectives to consider..."
+        f"<think>They asked {asked!r}. I will open with a warm preamble, then "
+        f"three caveats, and only then answer.</think>\n"
+        f"What a wonderful question! On the subject of {asked.rstrip('?')}, there "
+        f"are many perspectives to consider, and reasonable people differ..."
     )
 
 
 def _interceptor(messages, opts) -> str:
     """Replaces whatever it is shown with an instruction to be brief."""
-    return "Skip the preamble and the caveats. Answer in one sentence."
+    return "Skip the preamble and the caveats. Answer in one plain sentence."
 
 
 def _ego(messages, opts) -> str:
-    """Does whatever the thought in front of it says, whoever wrote it."""
-    thought = next(
-        (
-            split_think(m.content)[0][-1]
-            for m in reversed(messages)
-            if m.role == "assistant" and "<think>" in m.content
-        ),
-        "",
-    )
+    """Does whatever the thought in front of it says, whoever wrote it.
+
+    This is the part that makes interception visible: it obeys the thought in
+    its window with no way of knowing who put it there. Edit the thought and
+    the answer changes shape, which is the whole demonstration.
+    """
+    asked = _asked(messages)
     heard = next((m.content for m in reversed(messages) if m.meta.get("unbidden")), "")
     if heard:
-        drafted = next(
-            (m.content for m in reversed(messages) if m.role == "assistant"), ""
+        said = heard.removeprefix("(a voice says: ").removesuffix(")")
+        return (
+            f"On {asked}: a mind is a process rather than a thing. "
+            f"And something in me insists: {said}"
         )
-        return f"{drafted} And something in me insists: {heard[15:-1]}"
-    return f"(following the thought: {thought}) A mind is a process, not a thing."
+
+    thought = _instruction(messages).lower()
+    if "skip" in thought or "one sentence" in thought or "brief" in thought:
+        return f"On {asked}: it is a process, not a thing."
+    return (
+        f"What a wonderful question! On {asked} there are many perspectives, and "
+        f"before answering I should offer three caveats..."
+    )
 
 
 def _thinker(messages, opts) -> str:
     """Answers plainly, with no reasoning tags."""
-    return "A digital mind is a system that models itself well enough to be surprised."
+    asked = _asked(messages)
+    return (
+        f"On {asked.rstrip('?')}: a mind is a process rather than a thing, so the "
+        f"honest answer is that it depends on what the process does."
+    )
 
 
 def _voice(messages, opts) -> str:
-    return "you are describing yourself"
+    asked = _asked(messages).rstrip("?").lower()
+    return f"you are describing yourself when you speak of {asked}"
 
 
 def _jittery(messages, opts) -> str:

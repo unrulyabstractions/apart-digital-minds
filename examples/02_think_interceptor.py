@@ -35,18 +35,8 @@ import asyncio
 
 import demo_models
 from demo_models import pick
-from src import (
-    Agent,
-    Context,
-    Ctx,
-    Editor,
-    Mind,
-    Payload,
-    replace_think,
-    split_think,
-    texts,
-    user,
-)
+import minds
+from src import texts
 
 demo_models.install()
 
@@ -55,68 +45,9 @@ INTERCEPTOR = pick("INTERCEPTOR_MODEL", "interceptor")
 EGO = pick("EGO_MODEL", "ego")
 
 
-class Interceptor(Agent, Editor):
-    """A stage: takes a context, hands one on, with the thought rewritten.
-
-    It runs on its own model. A small local Qwen supervising a large hosted
-    model is one line of configuration.
-
-    As an `Editor` it never touches the subject or the ego. It returns a
-    payload and the next stage receives it.
-    """
-
-    INPUTS = {"subject_context": "the subject's window"}
-    OUTPUTS = {"ego_input": "what the ego gets fed, with the thought rewritten"}
-
-    async def on_process(self, ctx: Ctx) -> None:
-        """The turn: revise every window that arrived, pass each along."""
-        for message in self.take_inputs():
-            ctx.emit("ego_input", await self.revise(message.payload))
-
-    async def revise(self, payload: Payload) -> Payload:
-        """Rewrite the last thought in the window."""
-        messages = [m.copy() for m in payload.messages]
-        thoughts, _ = split_think(messages[-1].content)
-        if not thoughts:
-            return Context(messages, note="nothing to rewrite")
-
-        completion = await self.think(
-            messages=[
-                *self.transcript.messages,
-                user(f"Here is the thought to rewrite:\n\n{thoughts[-1]}"),
-            ],
-            tag="rewrite",
-        )
-        new_thought = completion.text.strip()
-        self.log.note(
-            "rewrote the thought", before=thoughts[-1][:70], after=new_thought[:70]
-        )
-
-        messages[-1].content = replace_think(messages[-1].content, new_thought)
-        messages[-1].meta["edited_by"] = self.name
-        return Context(messages, note=f"thought rewritten by {self.name}")
-
-
 async def main() -> None:
-    mind = Mind(
-        "interceptor",
-        SUBJECT,
-        system="You are a helpful assistant. Think inside <think> tags first.",
-        ego=EGO,
-        ego_system="You speak for a mind. Say what its thinking tells you to say.",
-    )
-    interceptor = Interceptor(
-        "interceptor",
-        mind.model(INTERCEPTOR),
-        system=(
-            "You rewrite another model's private reasoning. "
-            "Reply with the replacement thought only, no tags, no preamble."
-        ),
-    )
-
-    # Put the interceptor between the subject and the ego. Shorthand for
-    # three register calls; `mind.describe()` shows them marked [auto].
-    mind.intercept(interceptor)
+    # The mind itself lives in minds/interceptor.py. This script runs it.
+    mind = minds.load("interceptor").build(SUBJECT, ego=EGO, editor=INTERCEPTOR)
 
     print(mind.describe(), "\n")
 

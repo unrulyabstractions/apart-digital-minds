@@ -6,11 +6,13 @@
 <title>dmind</title>
 <style>
   :root {
-    --bg:#0b0f14; --panel:#111823; --line:#1e2836; --line2:#2a3648;
-    --fg:#dbe4f0; --dim:#7d8fa6; --dimmer:#556478;
-    --you:#5aa9e6; --mind:#7ee0a8; --warn:#f0b866; --bad:#f07878;
+    --bg:#0a0e13; --panel:#0f151e; --raise:#141c27;
+    --line:#1c2532; --line2:#26313f;
+    --fg:#e2e9f2; --dim:#8798ab; --dimmer:#5b6a7d;
+    --you:#61a6e8; --mind:#7fd7a4; --warn:#e8b471; --bad:#ef7d7d;
     --subject:#7aa2f7; --ego:#9ece6a; --stage:#e0af68; --other:#bb9af7;
-    --world:#7dcfff; --runtime:#5a6a80;
+    --world:#7dcfff; --runtime:#55637a;
+    --r:8px;
   }
   * { box-sizing:border-box; }
   html,body { height:100%; margin:0; }
@@ -23,15 +25,34 @@
 
   /* ---- header ---- */
   header {
-    display:flex; align-items:center; gap:18px; padding:10px 16px;
-    background:var(--panel); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:20px; padding:0 16px; height:52px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:none;
   }
-  .brand { font-weight:650; letter-spacing:.3px; }
-  .brand span { color:var(--dim); font-weight:400; }
-  .meta { display:flex; gap:16px; font-size:12px; color:var(--dim); flex:1; flex-wrap:wrap; }
-  .meta b { color:var(--fg); font-weight:500; }
-  .status { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--dim); }
-  .dot { width:8px; height:8px; border-radius:50%; background:var(--dimmer); }
+  .brand {
+    font-weight:680; letter-spacing:-.2px; font-size:15px;
+    padding-right:20px; border-right:1px solid var(--line);
+  }
+  .shape { display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .shape #hShape { font-size:12.5px; font-weight:550; }
+  .shape small {
+    font-family:ui-monospace,Menlo,monospace; font-size:10.5px; color:var(--dimmer);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .meta { display:flex; gap:20px; flex:1; justify-content:flex-end; }
+  .meta div { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+  .meta span {
+    font-size:9.5px; text-transform:uppercase; letter-spacing:.8px; color:var(--dimmer);
+  }
+  .meta b {
+    color:var(--fg); font-weight:550; font-size:12px;
+    font-family:ui-monospace,Menlo,monospace; max-width:190px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .status {
+    display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--dim);
+    padding-left:18px; border-left:1px solid var(--line); min-width:112px;
+  }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--dimmer); flex:none; }
   .dot.thinking { background:var(--warn); animation:pulse 1s ease-in-out infinite; }
   .dot.stepping { background:var(--you); }
   .dot.idle { background:var(--mind); }
@@ -42,9 +63,9 @@
   .pane { display:flex; flex-direction:column; min-height:0; min-width:0; }
   .pane + .pane { border-left:1px solid var(--line); }
   .pane-head {
-    display:flex; align-items:center; gap:8px; padding:9px 14px;
-    font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--dim);
-    border-bottom:1px solid var(--line); background:var(--panel);
+    display:flex; align-items:center; gap:9px; padding:0 14px; height:38px;
+    font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:var(--dim);
+    border-bottom:1px solid var(--line); background:var(--panel); flex:none;
   }
   .pane-head .spacer { flex:1; }
   .scroll { overflow-y:auto; overflow-x:hidden; flex:1; padding:12px 14px; }
@@ -52,46 +73,58 @@
   .scroll::-webkit-scrollbar-thumb { background:var(--line2); border-radius:5px; }
 
   /* ---- chat ---- */
-  .msg { margin-bottom:12px; }
-  .msg .who { font-size:11px; color:var(--dim); margin-bottom:3px; }
+  .msg { margin-bottom:14px; animation:rise .18s ease-out; }
+  @keyframes rise { from{opacity:0; transform:translateY(3px)} to{opacity:1} }
+  .msg .who {
+    font-size:9.5px; text-transform:uppercase; letter-spacing:.9px;
+    color:var(--dimmer); margin-bottom:4px;
+  }
   .msg .body {
-    padding:9px 12px; border-radius:9px; background:#16202e;
+    padding:10px 13px; border-radius:var(--r); background:var(--raise);
     border:1px solid var(--line2); white-space:pre-wrap; word-wrap:break-word;
+    font-size:13.5px; line-height:1.55;
   }
   .msg.you .who { color:var(--you); }
-  .msg.you .body { background:#132132; border-color:#22384f; }
+  .msg.you .body { background:#122032; border-color:#243c56; }
   .msg.mind .who { color:var(--mind); }
-  .msg.err .body { border-color:var(--bad); color:var(--bad); }
-  .composer { border-top:1px solid var(--line); padding:10px 12px; background:var(--panel); }
-  .composer textarea {
-    width:100%; resize:none; min-height:62px; padding:9px 11px; color:var(--fg);
-    background:#0d141d; border:1px solid var(--line2); border-radius:8px;
-    font:14px/1.45 inherit; outline:none;
+  .msg.mind .body { border-left:2px solid var(--mind); }
+  .msg.err .body { border-color:var(--bad); color:var(--bad); background:#2a1618; }
+  .composer {
+    border-top:1px solid var(--line); padding:11px 13px; background:var(--panel); flex:none;
   }
-  .composer textarea:focus { border-color:#31506e; }
+  .composer textarea {
+    width:100%; resize:none; height:58px; padding:9px 11px; color:var(--fg);
+    background:#0a1017; border:1px solid var(--line2); border-radius:var(--r);
+    font:13.5px/1.5 inherit; outline:none; transition:border-color .12s;
+  }
+  .composer textarea::placeholder { color:var(--dimmer); }
+  .composer textarea:focus { border-color:#33587d; background:#0b131c; }
   .row { display:flex; gap:8px; align-items:center; margin-top:8px; }
   button {
-    padding:7px 13px; border-radius:7px; cursor:pointer; font:500 13px inherit;
-    background:#1d2a3b; color:var(--fg); border:1px solid var(--line2);
+    padding:6px 12px; border-radius:6px; cursor:pointer; font:520 12.5px inherit;
+    background:var(--raise); color:var(--fg); border:1px solid var(--line2);
+    transition:background .12s, border-color .12s;
   }
-  button:hover:not(:disabled) { background:#243449; }
-  button:disabled { opacity:.4; cursor:default; }
-  button.primary { background:#1f4a72; border-color:#2b6499; }
-  button.primary:hover:not(:disabled) { background:#265b8c; }
+  button:hover:not(:disabled) { background:#1c2634; border-color:#33414f; }
+  button:active:not(:disabled) { transform:translateY(1px); }
+  button:disabled { opacity:.35; cursor:default; }
+  button.primary { background:#1d4d78; border-color:#2c6ba3; color:#eaf3fb; }
+  button.primary:hover:not(:disabled) { background:#235e91; border-color:#3880bd; }
   label.check { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); cursor:pointer; }
 
   /* ---- trace ---- */
   .tick-sep {
-    display:flex; align-items:center; gap:10px; margin:14px 0 8px;
-    font-size:11px; letter-spacing:1px; color:var(--dimmer);
+    display:flex; align-items:center; gap:10px; margin:15px 0 7px;
+    font-size:10px; letter-spacing:1.3px; text-transform:uppercase; color:var(--dimmer);
   }
   .tick-sep::after { content:""; flex:1; height:1px; background:var(--line); }
   .tick-sep b { color:var(--you); font-weight:600; }
   .ev {
-    display:grid; grid-template-columns:78px 96px 1fr auto; gap:10px;
-    padding:3px 6px; border-radius:5px; font-size:12.5px; align-items:baseline;
+    display:grid; grid-template-columns:74px 92px 1fr auto; gap:11px;
+    padding:2.5px 7px; border-radius:5px; font-size:12px; align-items:baseline;
+    border-left:2px solid transparent;
   }
-  .ev:hover { background:#141d29; }
+  .ev:hover { background:#131b26; border-left-color:var(--line2); }
   .ev .mod { font-weight:600; overflow:hidden; text-overflow:ellipsis; }
   .ev .kind { color:var(--dimmer); font-size:11.5px; }
   .ev .sum { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -116,9 +149,10 @@
     border-radius:7px; padding:4px 8px; font:12px inherit; max-width:340px;
   }
   .playbar {
-    display:flex; align-items:center; gap:8px; padding:8px 14px;
-    border-bottom:1px solid var(--line); background:#0e1621;
+    display:flex; align-items:center; gap:8px; padding:8px 14px; flex:none;
+    border-bottom:1px solid var(--line); background:var(--raise);
   }
+  .playbar[hidden] { display:none; }   /* display:flex would otherwise win */
   .playbar button { padding:4px 10px; font-size:12px; }
   .playbar select {
     background:#16202e; color:var(--dim); border:1px solid var(--line2);
@@ -137,8 +171,8 @@
   }
   .tab.on { background:#1d2a3b; color:var(--fg); }
   .card {
-    border:1px solid var(--line2); border-radius:9px; padding:10px 12px;
-    margin-bottom:10px; background:#0f1620;
+    border:1px solid var(--line); border-radius:var(--r); padding:11px 13px;
+    margin-bottom:10px; background:var(--panel);
   }
   .card h4 { margin:0 0 6px; font-size:13px; display:flex; align-items:center; gap:7px; }
   .pill {
@@ -155,18 +189,30 @@
   .win-msg .txt { white-space:pre-wrap; word-wrap:break-word; color:var(--fg); }
   .win-msg.edited { border-left-color:var(--warn); }
   .win-msg.edited .role::after { content:" · edited"; color:var(--warn); }
-  .empty { color:var(--dimmer); font-size:12.5px; padding:14px 2px; }
+  .empty {
+    color:var(--dimmer); font-size:12.5px; padding:26px 4px; text-align:center;
+    line-height:1.7;
+  }
+  .empty kbd {
+    background:var(--raise); border:1px solid var(--line2); border-radius:4px;
+    padding:1px 5px; font-family:ui-monospace,Menlo,monospace; font-size:11px;
+    color:var(--dim);
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand">dmind <span id="hMind"></span></div>
+  <div class="brand">dmind</div>
+  <div class="shape">
+    <span id="hShape">—</span>
+    <small id="hAbout"></small>
+  </div>
   <div class="meta">
-    <div>subject <b id="hSubject">—</b></div>
-    <div>ego <b id="hEgo">—</b></div>
-    <div>tick <b id="hTick">0</b></div>
-    <div>events <b id="hCount">0</b></div>
+    <div><span>subject</span><b id="hSubject">—</b></div>
+    <div><span>ego</span><b id="hEgo">—</b></div>
+    <div><span>tick</span><b id="hTick">0</b></div>
+    <div><span>events</span><b id="hCount">0</b></div>
   </div>
   <select id="source" title="live, or a recorded run">
     <option value="">● live</option>
@@ -178,7 +224,7 @@
   <!-- conversation -->
   <section class="pane">
     <div class="pane-head">conversation</div>
-    <div class="scroll" id="chat"></div>
+    <div class="scroll" id="chat"><div class="empty" id="chatEmpty">Type below and press <kbd>Enter</kbd>.</div></div>
     <div class="composer">
       <textarea id="input" placeholder="Say something to the mind…  (Enter to send, Shift+Enter for a newline)"></textarea>
       <div class="row">
@@ -214,7 +260,7 @@
       <input type="range" id="pbScrub" min="0" value="0" step="1">
       <span class="pbpos mono" id="pbPos">0 / 0</span>
     </div>
-    <div class="scroll mono" id="trace"><div class="empty">Waiting for the first prompt.</div></div>
+    <div class="scroll mono" id="trace"><div class="empty">Nothing yet.<br>Say something, or pick a recording from the header.</div></div>
   </section>
 
   <!-- inspector -->
@@ -232,6 +278,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const state = {
+  minds: [],
   tab: new URLSearchParams(location.search).get("tab") || "wiring",
   wiring:null, windows:[], tick:-1, count:0, busy:false,
 };
@@ -246,6 +293,8 @@ const roleOf = (name) => {
 
 /* ---------- chat ---------- */
 function say(kind, text) {
+  const blank = document.getElementById("chatEmpty");
+  if (blank) blank.remove();
   const who = kind === "you" ? "you" : kind === "err" ? "error" : "mind";
   const el = document.createElement("div");
   el.className = "msg " + kind;
@@ -366,7 +415,13 @@ function handle(p) {
   else if (p.type === "you")   say("you", p.text);
   else if (p.type === "mind")  say("mind", p.text);
   else if (p.type === "error") say("err", p.text);
-  else if (p.type === "wiring")  { state.wiring = p.wiring; $("hMind").textContent = p.wiring.run_id; renderInspector(); }
+  else if (p.type === "wiring") {
+    state.wiring = p.wiring;
+    const here = (state.minds || []).find(m => m.name === p.wiring.name);
+    $("hShape").textContent = here ? here.title : p.wiring.name;
+    $("hAbout").textContent = here ? here.about : p.wiring.run_id;
+    renderInspector();
+  }
   else if (p.type === "windows") { state.windows = p.windows; renderInspector(); }
   else if (p.type === "status") {
     setStatus(p.state, p.ticks != null ? `${p.ticks} ticks` : (p.turns != null ? `${p.turns} turns` : null));
@@ -448,7 +503,8 @@ async function loadRecording(value) {
   $("traceLabel").textContent = "recorded trace";
   resetPanes();
   state.wiring = data.meta; renderInspector();
-  $("hMind").textContent = `${mind} · ${run}`;
+  $("hShape").textContent = `${mind} · recorded`;
+  $("hAbout").textContent = run;
   const sub = (data.meta.modules || []).find(m => m.role === "subject");
   const ego = (data.meta.modules || []).find(m => m.role === "ego");
   $("hSubject").textContent = sub?.model || "—";
@@ -516,10 +572,18 @@ document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
 });
 ["fLlm","fFlow","fTurns"].forEach(id => $(id).onchange = () => {});
 
+fetch("/minds").then(r => r.json()).then(list => {
+  state.minds = list;
+  const here = list.find(m => m.name === (state.wiring?.name || ""));
+  if (here) { $("hShape").textContent = here.title; $("hAbout").textContent = here.about; }
+});
+
 fetch("/state").then(r => r.json()).then(s => {
   if (still) (s.backlog || []).forEach(handle);
   state.wiring = s.wiring; state.windows = s.windows;
-  $("hMind").textContent = s.wiring.run_id;
+  const here = (state.minds || []).find(m => m.name === s.wiring.name);
+  $("hShape").textContent = here ? here.title : s.wiring.name;
+  $("hAbout").textContent = here ? here.about : s.wiring.run_id;
   const sub = s.wiring.modules.find(m => m.role === "subject");
   const ego = s.wiring.modules.find(m => m.role === "ego");
   $("hSubject").textContent = sub?.model || "—";

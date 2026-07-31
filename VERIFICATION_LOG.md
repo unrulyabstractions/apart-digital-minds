@@ -603,3 +603,47 @@ appended or the whole window replaced. A trace is now a complete recording.
 The header picker still read `● live` and the pane still read `LIVE TRACE`
 while a recording was on screen: the UI was misreporting its own state. Both
 now switch, and the picker selects the run being shown.
+
+## 2026-07-30 — minds/ as the source of truth, and why the chat looked dead
+
+Three complaints: chat did not work, it was not polished, and minds should
+live in their own files.
+
+`minds/<name>.py` now holds one mind each, with `TITLE`, `ABOUT`, `ROLES`, and
+`build()`. Shared stages moved to `minds/parts.py`. The server discovers them,
+so it knows nothing about any architecture, and examples 02 and 03 went from
+145 and 178 lines to 76 and 73 by loading rather than redefining.
+
+### The chat was not broken; it looked broken
+
+Driving a real browser over the Chrome DevTools Protocol showed the click
+working: chat nodes went 2 to 4, a reply arrived, no console errors. The
+actual fault was that the demo models returned one fixed string whatever you
+typed, so every answer was identical. They now answer from what was asked.
+
+Worse, the interception was not happening at all in the UI. The server passed
+only `ego=` to `build()`, so `editor` fell back to the subject's model and the
+"interceptor" was running the subject's rule. That is why every reply was the
+long preamble rather than the terse one. `ROLES` fixes it: a mind declares the
+models it takes and the caller fills each one.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 140 | The chat path works | Drove Chrome over CDP: set the input, clicked Send, watched the DOM and console | VERIFIED (2 -> 4 chat nodes, no errors) |
+| 141 | Replies now depend on the prompt | Three different questions through the running server | VERIFIED (three different answers) |
+| 142 | The interception reaches the UI | Same three prompts: replies are terse because the thought was rewritten, and the ego window reports 1 edited message | VERIFIED |
+| 143 | All three minds build and answer | Built each from `minds.available()` and prompted it | VERIFIED (3/3) |
+| 144 | Suite and examples | 106 tests, four examples | VERIFIED |
+| 145 | No unused imports | AST scan across `src/`, `examples/`, `tests/`, `minds/`, `ui/` | VERIFIED after dropping `importlib` from the server |
+| 146 | The polished page renders | Screenshotted and looked twice | VERIFIED |
+
+### Found by looking
+
+The playback bar was visible in live mode reading `0 / 0`. The element had the
+`hidden` attribute, but `.playbar { display:flex }` overrides it, since a class
+rule beats the user-agent `[hidden]` rule. Added `.playbar[hidden]{display:none}`.
+
+Two typos also went in and came out again during the polish pass, `#1d3busy`
+and `#23real`, both caught by reading the file back.

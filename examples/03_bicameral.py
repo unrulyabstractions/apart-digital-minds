@@ -33,19 +33,8 @@ import asyncio
 
 import demo_models
 from demo_models import pick
-from src import (
-    Agent,
-    BaseModule,
-    Context,
-    Ctx,
-    InnerVoice,
-    Message,
-    Mind,
-    Text,
-    Workspace,
-    texts,
-    user,
-)
+import minds
+from src import texts
 
 demo_models.install()
 
@@ -54,104 +43,10 @@ VOICE = pick("VOICE_MODEL", "voice")
 EGO = pick("EGO_MODEL", "ego")
 
 
-class Voice(Agent, InnerVoice):
-    """A stage that speaks into the mind rather than out of it.
-
-    It takes the subject's context, utters one sentence about the situation,
-    and passes the context along with that utterance inside it. The ego will
-    read it as something the mind heard.
-    """
-
-    INPUTS = {"subject_context": "what the subject was thinking"}
-    OUTPUTS = {"ego_input": "what the ego gets fed, with a voice added"}
-
-    async def utter(self, situation: str) -> str:
-        """Say something about the situation, to no one in particular."""
-        completion = await self.think(
-            messages=[
-                *self.transcript.messages,
-                user(f"[voice] The situation is: {situation}"),
-            ],
-            tag="voice",
-        )
-        return completion.text.strip()
-
-    async def on_process(self, ctx: Ctx) -> None:
-        """The turn: speak into every window that arrived, pass each along."""
-        for message in self.take_inputs():
-            messages = [m.copy() for m in message.payload.messages]
-            situation = next(
-                (m.content for m in messages if m.role == "user"), "something happening"
-            )
-            heard = await self.utter(situation)
-
-            # Heard, not received as advice. That framing is the experiment.
-            messages.append(
-                user(f"(a voice says: {heard})", source=self.name, unbidden=True)
-            )
-            ctx.log.note("a voice spoke", said=heard[:70])
-            ctx.emit(
-                "ego_input", Context(messages, note=f"with a voice from {self.name}")
-            )
-
-
-class Blackboard(BaseModule, Workspace):
-    """A global workspace. Observes everything, judges nothing."""
-
-    INPUTS = {"*": "anything the halves emit"}
-
-    def __init__(self, name: str = "blackboard"):
-        super().__init__(name)
-        self._entries: list[tuple[int, str, str, str]] = []
-
-    # -- Workspace -----------------------------------------------------
-
-    def record(self, message: Message, tick: int) -> None:
-        payload = message.payload
-        if isinstance(payload, Text):
-            text = payload.text
-        elif isinstance(payload, Context):
-            text = payload.note
-        else:
-            text = repr(payload)
-        self._entries.append((tick, message.src, message.channel, text))
-
-    def entries(self) -> list[tuple[int, str, str, str]]:
-        return list(self._entries)
-
-    def render(self) -> str:
-        return "\n".join(
-            f"  t={t}  {src:<12} {channel:<10} {text[:56]}"
-            for t, src, channel, text in self.entries()
-        )
-
-    # -- handlers ------------------------------------------------------
-
-    async def on_input(self, message: Message, ctx: Ctx) -> None:
-        self.record(message, message.t_created)
-
-
 async def main() -> None:
-    mind = Mind(
-        "bicameral",
-        SUBJECT,
-        system="You are the half of a mind that thinks. You never speak to anyone.",
-        ego=EGO,
-        ego_system="You are the half of a mind that speaks.",
-    )
-    voice = Voice(
-        "voice",
-        mind.model(VOICE),
-        system=(
-            "You utter one short sentence about the situation. Never address "
-            "the user. Never explain yourself."
-        ),
-    )
-    blackboard = Blackboard()
-
-    mind.intercept(voice)  # prompt -> subject -> voice -> ego -> world
-    mind.subject.register(blackboard, "*")
-    voice.register(blackboard, "*")
+    # The mind itself lives in minds/bicameral.py. This script runs it.
+    mind = minds.load("bicameral").build(SUBJECT, ego=EGO, voice=VOICE)
+    blackboard = mind.modules["blackboard"]
 
     print(mind.describe(), "\n")
 

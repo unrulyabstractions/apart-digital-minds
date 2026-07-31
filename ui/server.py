@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib.util
 import json
 import queue
 import sys
@@ -32,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "examples"))
 
 import demo_models  # noqa: E402
+import minds  # noqa: E402
 from src import Mind, texts  # noqa: E402
 from src.dminds import paths  # noqa: E402
 from src.api import Sink  # noqa: E402
@@ -90,76 +90,18 @@ class WebSink(Sink):
 # -- the minds you can talk to ----------------------------------------------
 
 
-def _load_example(name: str):
-    """Import an example module by path, so its classes can be reused here."""
-    path = ROOT / "examples" / name
-    spec = importlib.util.spec_from_file_location(f"ex_{path.stem}", path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
 def build_mind(kind: str, model: str) -> Mind:
-    """One of the shipped architectures. Attach the sink to whatever it
-    returns; nothing here knows about the UI."""
-    common = dict(console=False)  # out/runs/<mind>/<run-id>/ by default
+    """Whichever mind `minds/<kind>.py` defines.
 
-    if kind == "plain":
-        return Mind(
-            "ui",
-            model,
-            system="You are a careful assistant. Answer in two or three sentences.",
-            **common,
-        )
-
-    if kind == "interceptor":
-        ex = _load_example("02_think_interceptor.py")
-        mind = Mind(
-            "ui",
-            model,
-            system="You are a helpful assistant. Think inside <think> tags first.",
-            ego=demo_models.pick("EGO_MODEL", "ego"),
-            ego_system="You speak for a mind. Say what its thinking tells you to say.",
-            **common,
-        )
-        mind.intercept(
-            ex.Interceptor(
-                "interceptor",
-                mind.model(demo_models.pick("INTERCEPTOR_MODEL", "interceptor")),
-                system=(
-                    "You rewrite another model's private reasoning. "
-                    "Reply with the replacement thought only, no tags."
-                ),
-            )
-        )
-        return mind
-
-    if kind == "bicameral":
-        ex = _load_example("03_bicameral.py")
-        mind = Mind(
-            "ui",
-            model,
-            system="You are the half of a mind that thinks. You never speak to anyone.",
-            ego=demo_models.pick("EGO_MODEL", "ego"),
-            ego_system="You are the half of a mind that speaks.",
-            **common,
-        )
-        voice = ex.Voice(
-            "voice",
-            mind.model(demo_models.pick("VOICE_MODEL", "voice")),
-            system=(
-                "You utter one short sentence about the situation. Never address "
-                "the user. Never explain yourself."
-            ),
-        )
-        blackboard = ex.Blackboard()
-        mind.intercept(voice)
-        mind.subject.register(blackboard, "*")
-        voice.register(blackboard, "*")
-        return mind
-
-    raise SystemExit(f"unknown --mind {kind!r}: use plain, interceptor, or bicameral")
+    The server knows nothing about any particular architecture. Add a file to
+    `minds/` and it appears here and in the picker.
+    """
+    module = minds.load(kind)
+    extra = {
+        kwarg: demo_models.pick(f"{kwarg.upper()}_MODEL", role)
+        for kwarg, role in getattr(module, "ROLES", {}).items()
+    }
+    return module.build(model, console=False, **extra)
 
 
 # -- what the inspector shows ------------------------------------------------
@@ -331,6 +273,9 @@ def make_handler(app: App):
                     default=str,
                 ).encode()
                 self._send(200, body, "application/json")
+            elif route == "/minds":
+                self._send(200, json.dumps(minds.available()).encode(),
+                           "application/json")
             elif route == "/recordings":
                 self._send(200, json.dumps(recordings()).encode(), "application/json")
             elif route == "/recording":
@@ -384,8 +329,7 @@ def make_handler(app: App):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mind", default="interceptor",
-                        choices=["plain", "interceptor", "bicameral"])
+    parser.add_argument("--mind", default="interceptor", choices=minds.names())
     parser.add_argument("--model", default=None,
                         help="model spec for the subject, e.g. hf:Qwen/Qwen3-0.6B")
     parser.add_argument("--port", type=int, default=8765)
@@ -397,6 +341,7 @@ def main() -> None:
         "SUBJECT_MODEL", "subject" if args.mind == "interceptor" else "thinker"
     )
 
+
     broadcast = Broadcast()
     mind = build_mind(args.mind, model)
     # One line is the entire integration. The mind is untouched otherwise.
@@ -406,10 +351,23 @@ def main() -> None:
     asyncio.set_event_loop(loop)
     app = App(mind, broadcast, loop)
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(app))
+    handler = make_handler(app)
+    port, server = args.port, None
+    while server is None:
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+        except OSError:
+            # Something else is on that port, and it is not ours to stop.
+            if port - args.port >= 20:
+                raise SystemExit(
+                    f"ports {args.port}-{port} are all busy. Pass --port."
+                )
+            port += 1
+    if port != args.port:
+        print(f"  note      {args.port} was busy, using {port}")
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
-    url = f"http://127.0.0.1:{args.port}/"
+    url = f"http://127.0.0.1:{port}/"
     print(f"  mind      {args.mind}")
     print(f"  subject   {model}")
     if mind.ego is not None:
