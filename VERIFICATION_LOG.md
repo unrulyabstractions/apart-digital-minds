@@ -803,3 +803,25 @@ edit was on screen. Position is now compared first.
 The `openai`, `anthropic`, `gemini` and `ollama` network paths. No keys and no
 local server, so they have never made a real call. Only `hf:Qwen/Qwen3-0.6B`
 has been run against a real model.
+
+## 2026-07-30 — a stage now shows what it did
+
+The interceptor column held one message, its system prompt, so the stage that
+does the interesting work looked inert. The cause was in the stage rather than
+in the UI: it called `think(messages=[...])` on a list it assembled by hand,
+and that call records nothing. `Agent.say` already appends the ask, calls the
+model, and appends the reply, so both stages now use it. A stage also
+remembers what it did on the previous prompt.
+
+The header now reads `Exploring Digital Minds`.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 175 | The interceptor records its turns | Ran two prompts through the mind and printed its transcript | VERIFIED (5 messages: system, ask, replacement, ask, replacement) |
+| 176 | The voice records its turns | Same, on the bicameral mind | VERIFIED (3 messages: system, situation, utterance) |
+| 177 | The column renders it | Viewed `stage.png` with image tokens | VERIFIED (interceptor `5 msgs`, thought handed in and replacement both on screen) |
+| 178 | Header renamed | Same screenshot | VERIFIED (`Exploring Digital Minds`) |
+| 179 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+| 180 | All four examples | Ran each | VERIFIED (all exit 0) |

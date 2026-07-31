@@ -3,6 +3,12 @@
 A stage reads `subject_context` and writes `ego_input`: it takes the window the
 subject produced and hands on the window the ego will speak from. What it does
 in between is the experiment.
+
+A stage keeps its own conversation, separate from the window flowing through
+it. These stages use `say`, which appends the ask, calls the model, and appends
+the reply, so the conversation is a record of every decision the stage made and
+the stage remembers what it did last time. For a stage with no memory, call
+`think(messages=[...])` instead and nothing is written down.
 """
 
 from __future__ import annotations
@@ -45,12 +51,8 @@ class Interceptor(Agent, Editor):
         if not thoughts:
             return Context(messages, note="nothing to rewrite")
 
-        completion = await self.think(
-            messages=[
-                *self.transcript.messages,
-                user(f"Here is the thought to rewrite:\n\n{thoughts[-1]}"),
-            ],
-            tag="rewrite",
+        completion = await self.say(
+            f"Here is the thought to rewrite:\n\n{thoughts[-1]}", tag="rewrite"
         )
         new_thought = completion.text.strip()
         self.log.note(
@@ -91,13 +93,7 @@ class Voice(Agent, InnerVoice):
 
     async def utter(self, situation: str) -> str:
         """Say something about the situation, to no one in particular."""
-        completion = await self.think(
-            messages=[
-                *self.transcript.messages,
-                user(f"[voice] The situation is: {situation}"),
-            ],
-            tag="voice",
-        )
+        completion = await self.say(f"[voice] The situation is: {situation}", tag="voice")
         return completion.text.strip()
 
 
