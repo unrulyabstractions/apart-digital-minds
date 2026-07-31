@@ -167,12 +167,18 @@ def windows(mind: Mind) -> list[dict]:
 
 
 def recordings(base: Path = paths.RUNS) -> list[dict]:
-    """Every run on disk, newest first."""
+    """Every run on disk that has something in it, newest first.
+
+    A run where nothing happened is skipped. Opening one shows an empty
+    screen, which is a dead end rather than a recording.
+    """
     found = []
     for meta_path in base.glob("*/*/meta.json"):
         try:
             meta = json.loads(meta_path.read_text())
         except (OSError, json.JSONDecodeError):
+            continue
+        if not meta.get("events"):
             continue
         trace = meta_path.parent / "trace.jsonl"
         found.append(
@@ -334,6 +340,9 @@ def make_handler(app: App):
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
+            # The page changes as you edit it, and a cached copy of an older
+            # one against a newer server is a bug that looks like the UI.
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
 

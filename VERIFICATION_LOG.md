@@ -857,3 +857,37 @@ shown on its own rather than as a copy of the one upstream.
 | 190 | `--mind` still skips the chooser | Started with `--mind plain`, read `/state` | VERIFIED (chose plain) |
 | 191 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
 | 192 | All four examples | Ran each | VERIFIED (all exit 0) |
+
+## 2026-07-31 — the chooser is the default, not the reward
+
+Reported: the page opened on an empty live view with nothing to select. The
+cause was the order of the defaults. The page assumed the live view and showed
+the chooser only after `/state` came back, so a page loaded while the server
+was restarting threw on the first fetch and showed neither. The header was
+there, the panes were empty, and nothing on screen could be clicked.
+
+The chooser is now what the markup shows. It is hidden only once a mind is
+confirmed to be running. A failed fetch says so on that screen and retries
+with a backoff, so the page heals by itself when the server comes back. The
+page is also served `Cache-Control: no-store`, and runs with no events are
+left out of the list.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 193 | A failed first fetch still shows the chooser | CDP with `*/minds` blocked, then loaded the page | VERIFIED (chooser visible, note reads `Cannot reach the server. Retrying…`) |
+| 194 | The failure state renders | Viewed `fetchfail.png` with image tokens | VERIFIED (title, retry note, both columns headed and marked Loading) |
+| 195 | It heals with no reload | Unblocked and waited | VERIFIED (3 minds listed, note back to the normal one) |
+| 196 | The healed state renders | Viewed `healed.png` with image tokens | VERIFIED (3 minds, runs listed with events, ticks, models) |
+| 197 | Empty runs are left out | Read `/recordings` after a 0-event run existed | VERIFIED (9 offered, none with 0 events) |
+| 198 | The page is not cacheable | Read the response headers on GET | VERIFIED (`Cache-Control: no-store`) |
+| 199 | The whole flow still works | CDP: cold open, choose, chat, reopen, replay, switch back | VERIFIED (every step, 0 console errors) |
+| 200 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+| 201 | All four examples | Ran each | VERIFIED (all exit 0) |
+
+### Not covered
+
+A server that is completely down when the page is loaded. Chrome replaces the
+document with its own error page, so no code of ours runs. Reloading once the
+server is up is the only route back, and that now lands on the chooser.

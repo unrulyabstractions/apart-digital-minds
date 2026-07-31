@@ -21,6 +21,10 @@ pipeline. The right column is every run under `out/runs/`. Both lists come
 from the server, so adding a mind file puts it on this screen with no other
 change.
 
+The chooser is what the page shows until a mind is confirmed to be running, so
+a page opened while the server is restarting lands here and retries rather than
+sitting on an empty screen. Runs with nothing in them are left out.
+
 Picking a mind builds it and drops you into the live view. Picking a run opens
 it in playback. The `minds` button in the header brings the chooser back, and
 choosing again closes the running mind and starts a fresh one, so you can move

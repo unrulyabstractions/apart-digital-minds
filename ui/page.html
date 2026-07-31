@@ -224,19 +224,19 @@
 </head>
 <body>
 
-<div class="start" id="start" hidden>
+<div class="start" id="start">
   <div class="start-head">
     <h1>Exploring Digital Minds</h1>
-    <p>Pick a mind to talk to, or a recorded run to replay.</p>
+    <p id="startNote">Pick a mind to talk to, or a recorded run to replay.</p>
   </div>
   <div class="start-cols">
     <div>
       <h2>talk to a mind</h2>
-      <div id="startMinds"></div>
+      <div id="startMinds"><div class="empty">Loading&hellip;</div></div>
     </div>
     <div>
       <h2>replay a run</h2>
-      <div id="startRuns"></div>
+      <div id="startRuns"><div class="empty">Loading&hellip;</div></div>
     </div>
   </div>
 </div>
@@ -738,21 +738,26 @@ $("pbSpeed").onchange = () => { if (pb.timer) { pbStop(); $("pbPlay").click(); }
 // Nothing is running until something is picked, so the page opens on the
 // chooser unless the server was started on a mind or the URL names a run.
 
+const START_NOTE = "Pick a mind to talk to, or a recorded run to replay.";
+
 async function boot() {
   setView(state.view);
   const q = new URLSearchParams(location.search);
   state.minds = await (await fetch("/minds")).json();
+  $("startNote").textContent = START_NOTE;
   await refreshRecordings();
 
   const rec = q.get("play");
   if (rec) {
     await loadRecording(rec);
     if (q.has("at")) pbAt(+q.get("at"));
+    showStart(false);
     return;
   }
 
   const s = await (await fetch("/state")).json();
-  if (!showChosen(s.chose)) { showStart(true); return; }
+  showStart(true);              // the lists are real now, whatever happens next
+  if (!showChosen(s.chose)) return;
   if (still) (s.backlog || []).forEach(p => {
     if (p.type === "event") addEvent(p);
     else if (p.type === "you") say("you", p.text);
@@ -760,9 +765,22 @@ async function boot() {
   });
   state.wiring = s.wiring; state.windows = s.windows;
   renderInspector();
+  showStart(false);
   $("input").focus();
 }
-boot();
+
+// Keep trying. A page opened while the server was restarting used to sit on an
+// empty screen with nothing to click, which reads as a broken UI.
+async function bootOrRetry(wait) {
+  try {
+    await boot();
+  } catch (err) {
+    $("startNote").textContent =
+      "Cannot reach the server. Retrying\u2026 (" + err + ")";
+    setTimeout(() => bootOrRetry(Math.min(wait * 2, 8000)), wait);
+  }
+}
+bootOrRetry(1000);
 </script>
 </body>
 </html>
