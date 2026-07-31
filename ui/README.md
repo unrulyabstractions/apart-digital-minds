@@ -18,9 +18,25 @@ ego, the reply comes from the ego rather than the subject.
 
 **Context windows** fill the main pane, one column per module, side by side.
 This is the view that matters: the subject's real thought sits beside the
-window the ego was handed, and a message a stage rewrote is tinted and marked
-`rewritten`. Reasoning inside `<think>` tags is coloured so it reads apart
-from the answer. Every message is shown in full, never truncated.
+window the ego was handed.
+
+A message is shown as its parts rather than as raw tags:
+
+    THINKING   what it reasoned, inside <think>
+    SAYS       what it actually said
+
+When a stage has rewritten one, the parts say exactly what changed:
+
+    THINKING · REPLACED   Skip the preamble and the caveats.
+    WAS                   They asked 'Hello'. I will open with a warm preamble…
+    SAYS · UNTOUCHED      What a wonderful question! On the subject of Hello…
+
+That last label matters. An editor rewrites the *thought*, not the text under
+it, so the visible answer is still whatever the subject wrote and can flatly
+contradict the thought above it. The ego's own reply, the next message down,
+is what actually follows the rewrite.
+
+Every message is shown in full, never truncated.
 
 The `wiring` button swaps that pane for the graph: each module, the channels
 it reads and writes, its model, and every link, with the ones `intercept` laid

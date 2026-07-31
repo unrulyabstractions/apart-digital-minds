@@ -58,6 +58,9 @@ class Interceptor(Agent, Editor):
         )
         messages[-1].content = replace_think(messages[-1].content, new_thought)
         messages[-1].meta["edited_by"] = self.name
+        # What it displaced. Only the thought changes; the text under it is
+        # still whatever the subject wrote, which is confusing unless shown.
+        messages[-1].meta["was"] = thoughts[-1]
         return Context(messages, note=f"thought rewritten by {self.name}")
 
 

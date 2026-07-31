@@ -712,3 +712,28 @@ summary, and summaries are built at 60 or 80 characters:
 | 156 | It renders in full | Screenshotted with that prompt and looked. Windows and trace both wrap the whole text | VERIFIED |
 | 157 | Cost of carrying it | Trace sizes before and after | VERIFIED (11942 -> 12565 bytes, about 5%) |
 | 158 | Suite and examples | 106 tests, four examples | VERIFIED |
+
+## 2026-07-30 — showing the swap rather than only its result
+
+A rewritten message read as a contradiction: the thought said "skip the
+preamble" while the text directly beneath it was the preamble. Both were
+correct. An editor replaces the thought and leaves the text alone, so the
+window really does hold a new thought above the subject's untouched answer.
+The UI was not saying so.
+
+A message is now shown as labelled parts instead of raw tags:
+
+    THINKING · REPLACED   the new thought, in amber
+    WAS                   the thought it displaced, struck through
+    SAYS · UNTOUCHED      the subject's own text, unchanged
+
+The `Interceptor` keeps what it displaced in `meta["was"]` so the UI has both
+sides to show.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 159 | The edited message carries both sides | Read the live window payload: `meta.was` holds the original thought, `content` holds the new one | VERIFIED |
+| 160 | It renders as parts | Screenshotted and looked. Subject shows THINKING and SAYS; the ego's edited message shows REPLACED, WAS struck through, and SAYS · UNTOUCHED | VERIFIED |
+| 161 | Suite and examples | 106 tests, four examples | VERIFIED |
