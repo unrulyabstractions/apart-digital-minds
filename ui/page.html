@@ -114,28 +114,26 @@
     border:1px solid var(--line2); }
   .wmsg { padding:9px 0 9px 11px; border-left:2px solid var(--line2); margin:9px 0; }
   .wmsg .role { font-size:9.5px; color:var(--dimmer); text-transform:uppercase;
-    letter-spacing:.9px; margin-bottom:4px; font-weight:600; }
+    letter-spacing:.9px; margin-bottom:5px; font-weight:600; }
+  .wmsg .role em { font-style:normal; color:var(--warn); text-transform:none;
+    letter-spacing:0; font-weight:500; margin-left:8px; font-size:10.5px; }
   .wmsg .txt { white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere;
     color:var(--fg); font-size:12.5px; line-height:1.6; }
   .wmsg.system { opacity:.5; }
   .wmsg.edited { border-left-color:var(--warn); background:#1c1710;
     margin-left:-11px; padding-left:11px; border-radius:0 var(--r) var(--r) 0; }
   .wmsg.edited .role { color:var(--warn); }
-  .wmsg.edited .role::after { content:" · rewritten"; }
-  .part { display:flex; gap:9px; margin:5px 0; align-items:baseline; }
+  .part { display:flex; gap:10px; margin:4px 0; align-items:baseline; }
   .plabel {
-    flex:none; width:88px; text-align:right; font-size:9px; font-weight:700;
-    text-transform:uppercase; letter-spacing:.7px; color:var(--dimmer);
-    padding-top:2px; font-family:ui-sans-serif,system-ui,sans-serif;
+    flex:none; width:52px; text-align:right; font-size:10px; color:var(--dimmer);
+    font-family:ui-sans-serif,system-ui,sans-serif;
   }
   .ptext { flex:1; min-width:0; }
   .part.think .ptext { color:var(--other); }
-  .part.think .plabel { color:var(--other); opacity:.8; }
-  .part.think.swapped .plabel { color:var(--warn); opacity:1; }
-  .part.think.swapped .ptext { color:var(--warn); }
-  .part.was .ptext { color:var(--dimmer); text-decoration:line-through; }
-  .part.was .plabel { color:var(--dimmer); }
+  .part.think.changed .ptext { color:var(--warn); }
+  .part.think.changed .plabel { color:var(--warn); }
   .part.says .ptext { color:var(--fg); }
+  .warnpill { color:var(--warn); border-color:#4a3a1c; background:#221a0e; }
 
   #wiring { padding:14px; display:none; }
   body.show-wiring #wiring { display:block; }
@@ -286,34 +284,30 @@ function say(kind, text) {
   $("chat").scrollTop = $("chat").scrollHeight;
 }
 
-// A message is shown as its parts: what it reasoned, then what it said.
-// Raw <think> tags inline read as noise, and hide that only the thought was
-// swapped while the text under it stayed the subject's own.
+// A message is shown as its parts. The columns sit side by side, so the
+// column to the left already shows what a thought used to be: repeating it
+// here as a strikethrough was noise. Colour carries the difference instead,
+// amber on whichever part a stage changed.
 function messageParts(m) {
   const text = m.content || "";
-  const meta = m.meta || {};
+  const changed = !!(m.meta && m.meta.edited_by);
   const re = /<think>([\s\S]*?)<\/think>/g;
   let thoughts = [], match;
   while ((match = re.exec(text)) !== null) thoughts.push(match[1].trim());
   const said = text.replace(re, "").trim();
-  const was = meta.was;
 
   let html = "";
   for (const t of thoughts) {
-    html += '<div class="part think' + (was ? " swapped" : "") + '">' +
-              '<span class="plabel">thinking' + (was ? " · replaced" : "") + '</span>' +
+    html += '<div class="part think' + (changed ? " changed" : "") + '">' +
+              '<span class="plabel">thinking</span>' +
               '<span class="ptext">' + esc(t) + '</span></div>';
   }
-  if (was) {
-    html += '<div class="part was"><span class="plabel">was</span>' +
-            '<span class="ptext">' + esc(was) + '</span></div>';
-  }
   if (said) {
-    html += '<div class="part says"><span class="plabel">says' +
-            (was ? " · untouched" : "") + '</span>' +
-            '<span class="ptext">' + esc(said) + '</span></div>';
+    html += '<div class="part says"><span class="plabel">says</span>' +
+              '<span class="ptext">' + esc(said) + '</span></div>';
   }
-  return html || '<div class="part says"><span class="ptext">' + esc(text) + '</span></div>';
+  return html || '<div class="part says"><span class="plabel"></span>' +
+                 '<span class="ptext">' + esc(text) + '</span></div>';
 }
 
 function renderWindows() {
@@ -328,12 +322,16 @@ function renderWindows() {
       '<b class="mod-' + roleOf(w.module) + '">' + esc(w.module) + '</b>' +
       '<span class="pill">' + roleOf(w.module) + '</span>' +
       '<span class="pill">' + w.messages.length + ' msgs</span>' +
+      (w.messages.some(m => m.meta && m.meta.edited_by)
+        ? '<span class="pill warnpill">altered on the way here</span>' : "") +
     '</div><div class="scroll wcol-body">' +
       w.messages.map(m => {
         const edited = m.meta && m.meta.edited_by;
         return '<div class="wmsg ' + (m.role === "system" ? "system" : "") + ' ' +
                (edited ? "edited" : "") + '">' +
-               '<div class="role">' + esc(m.role) + '</div>' +
+               '<div class="role">' + esc(m.role) +
+                 (edited ? '<em>thought replaced by ' + esc(edited) + '</em>' : "") +
+               '</div>' +
                '<div class="txt">' + messageParts(m) + '</div></div>';
       }).join("") +
     '</div></div>').join("");
@@ -516,7 +514,9 @@ async function loadRecording(value) {
   $("hEgo").textContent = (ego && ego.model) || "none";
   $("pbScrub").max = pb.events.length;
   $("hState").textContent = "recorded"; $("hDot").className = "dot";
-  pbAt(0);
+  // Open on the finished run rather than an empty screen. Rewind with the
+  // first button, then step or play to walk through it.
+  pbAt(pb.events.length);
 }
 
 async function refreshRecordings() {
@@ -597,7 +597,9 @@ fetch("/state").then(r => r.json()).then(s => {
 refreshRecordings().then(() => {
   const q = new URLSearchParams(location.search);
   const rec = q.get("play");
-  if (rec) loadRecording(rec).then(() => pbAt(+(q.get("at") || 0)));
+  if (rec) loadRecording(rec).then(() => {
+    if (q.has("at")) pbAt(+q.get("at"));
+  });
 });
 $("input").focus();
 </script>

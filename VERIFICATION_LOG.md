@@ -737,3 +737,32 @@ sides to show.
 | 159 | The edited message carries both sides | Read the live window payload: `meta.was` holds the original thought, `content` holds the new one | VERIFIED |
 | 160 | It renders as parts | Screenshotted and looked. Subject shows THINKING and SAYS; the ego's edited message shows REPLACED, WAS struck through, and SAYS · UNTOUCHED | VERIFIED |
 | 161 | Suite and examples | 106 tests, four examples | VERIFIED |
+
+## 2026-07-30 — the diff is the columns, and playback opens on the run
+
+Two reports. The rewritten message was still unclear, and playback looked
+broken.
+
+**Clarity.** The previous attempt added three labels and a strikethrough,
+which made it busier rather than clearer. The `was` line was redundant: the
+subject's column sits immediately to the left showing exactly that. Removed
+it. The columns are the diff now, and colour is the only signal: a part a
+stage changed is amber where an untouched thought is purple, so reading across
+shows which part differs and which is identical. The column header carries
+`altered on the way here`, and the message line names who did it.
+
+**Playback was not broken.** Driven in a real browser over CDP: step went to
+1/33, tick to 14/33, play to 33/33, with trace rows, chat messages and window
+columns all appearing, and no console errors. It opened parked at 0 with empty
+panes, which reads as broken. It now opens fully played, so you see the
+finished run and rewind to walk through it.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 162 | Playback advances | CDP: clicked step, tick, then play at instant speed, reading the position and DOM counts after each | VERIFIED (0 -> 1 -> 14 -> 33, 0 errors) |
+| 163 | A recording opens on the finished run | Loaded one and read the counter and column count | VERIFIED (33/33, 2 columns) |
+| 164 | Rewind still works | Clicked the reset button | VERIFIED (back to 0/33) |
+| 165 | The message reads clearly | Screenshotted and looked. Subject shows purple thinking, ego shows amber thinking with identical says text, header tagged | VERIFIED |
+| 166 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |

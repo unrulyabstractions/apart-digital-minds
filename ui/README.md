@@ -9,7 +9,8 @@ python ui/server.py --mind bicameral      # a voice speaks into the window
 python ui/server.py --model hf:Qwen/Qwen3-0.6B
 ```
 
-Then open http://127.0.0.1:8765.
+Then open http://127.0.0.1:8765. If that port is busy the server walks to the
+next free one and says so.
 
 ## What you see
 
@@ -22,19 +23,19 @@ window the ego was handed.
 
 A message is shown as its parts rather than as raw tags:
 
-    THINKING   what it reasoned, inside <think>
-    SAYS       what it actually said
+    thinking   what it reasoned, inside <think>
+    says       what it actually said
 
-When a stage has rewritten one, the parts say exactly what changed:
+The columns are the diff. A part a stage changed is amber instead of purple,
+so reading left to right you see which part differs and which is identical.
+The column header says `altered on the way here`, and the message says who did
+it.
 
-    THINKING · REPLACED   Skip the preamble and the caveats.
-    WAS                   They asked 'Hello'. I will open with a warm preamble…
-    SAYS · UNTOUCHED      What a wonderful question! On the subject of Hello…
-
-That last label matters. An editor rewrites the *thought*, not the text under
-it, so the visible answer is still whatever the subject wrote and can flatly
-contradict the thought above it. The ego's own reply, the next message down,
-is what actually follows the rewrite.
+One thing to expect: an editor rewrites the *thought*, not the text under it.
+So a rewritten message can hold a thought saying "be brief" above the
+subject's own long-winded answer, which looks like a contradiction and is not
+one. The ego's reply, the next message down, is what actually follows the
+rewrite.
 
 Every message is shown in full, never truncated.
 
@@ -68,6 +69,9 @@ Standard library only, no dependencies.
 The picker in the header lists every run under `out/runs/`. Choose one and the
 UI switches from live to playback: the trace, the conversation, and each
 module's context window are rebuilt from `trace.jsonl` alone.
+
+A recording opens fully played, so you see the finished run. Rewind and walk
+it forward:
 
     ⏮      back to the start
     ▶      play, at slow / normal / fast / instant
