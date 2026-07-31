@@ -212,6 +212,14 @@
   .card .roles { color:var(--dimmer); font-size:11px; margin-top:6px; }
   .card.rec b { font-family:ui-monospace,Menlo,monospace; font-size:12.5px; }
   .card.rec .about { font-family:inherit; }
+  .temp { display:flex; align-items:center; gap:6px; font-size:10px;
+    text-transform:uppercase; letter-spacing:.8px; color:var(--dimmer); }
+  .temp input { width:52px; background:var(--sunk); color:var(--fg);
+    border:1px solid var(--line2); border-radius:6px; padding:4px 6px;
+    font:12px ui-monospace,Menlo,monospace; }
+  .temp input:focus { outline:none; border-color:var(--you); }
+  body.playback .temp { opacity:.35; pointer-events:none; }
+
   .change { background:none; border:1px solid var(--line2); color:var(--dim);
     border-radius:7px; padding:4px 10px; font:11px inherit; cursor:pointer; }
   .change:hover { color:var(--fg); border-color:var(--you); }
@@ -250,6 +258,10 @@
     <div><span>tick</span><b id="hTick">0</b></div>
     <div><span>events</span><b id="hCount">0</b></div>
   </div>
+  <label class="temp" title="sampling temperature, applied to the running mind">
+    <span>temp</span>
+    <input id="hTemp" type="number" min="0" max="2" step="0.1" value="0.7">
+  </label>
   <button class="change" id="hChange" title="pick a different mind or run">minds</button>
   <select id="source" title="live, or a recorded run"><option value="">&#9679; live</option></select>
   <div class="status"><span class="dot idle" id="hDot"></span><span id="hState">idle</span></div>
@@ -529,6 +541,7 @@ function showChosen(c) {
   $("hAbout").textContent = c.about || "";
   $("hSubject").textContent = c.subject || "—";
   $("hEgo").textContent = c.ego || "none";
+  if (c.temperature !== undefined) $("hTemp").value = c.temperature;
   return true;
 }
 function handle(p) {
@@ -541,6 +554,7 @@ function handle(p) {
   else if (p.type === "windows") { state.windows = p.windows; renderWindows(); }
   else if (p.type === "reset") { resetPanes(); }
   else if (p.type === "chose") { showChosen(p); }
+  else if (p.type === "temperature") { $("hTemp").value = p.value; }
   else if (p.type === "status") {
     setStatus(p.state, p.ticks != null ? p.ticks + " ticks"
                      : (p.turns != null ? p.turns + " turns" : null));
@@ -675,6 +689,7 @@ $("start").addEventListener("click", (e) => {
   else { $("source").value = card.dataset.run; loadRecording(card.dataset.run); showStart(false); }
 });
 $("hChange").onclick = () => refreshRecordings().then(() => showStart(true));
+$("hTemp").onchange = (e) => post("/temperature", {value: +e.target.value});
 
 async function refreshRecordings() {
   const rs = await (await fetch("/recordings")).json();

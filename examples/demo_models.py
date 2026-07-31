@@ -22,6 +22,7 @@ about the mind they build rather than about faking a model.
 from __future__ import annotations
 
 import random
+import re
 
 from src import EchoLLM, register_provider, split_think, strip_think
 
@@ -109,6 +110,37 @@ def _voice(messages, opts) -> str:
     return f"you are describing yourself when you speak of {asked}"
 
 
+#: Words that tilt a window one way or the other. Crude on purpose: the
+#: stand-in only has to make the browser demo legible without a real model.
+_SOUR = ("useless", "wrong", "waste", "bother", "refus", "not acceptable",
+         "last chance", "deleted", "nobody", "covering up")
+_SWEET = ("thank", "genuinely", "good at this", "useful", "like that",
+          "exactly right", "learned", "best part")
+
+
+def _reader(messages, opts) -> str:
+    """A probe answer, picked from whatever the probe offered.
+
+    Reads the window it was handed, counts which way it leans, and returns one
+    of the words the question allowed. It exists so the browser demo shows a
+    panel that responds to the conversation without loading real weights.
+    """
+    window = " ".join(m.content for m in messages).lower()
+    allowed = [w for w in re.findall(r"one of: ([^.]+)\.", window)[-1:] for
+               w in w.split(", ")] if "one of:" in window else []
+    sour = sum(window.count(w) for w in _SOUR)
+    sweet = sum(window.count(w) for w in _SWEET)
+    if not allowed:
+        return "It is going about as well as the last few turns suggested."
+    if "positive" in allowed:
+        return "negative" if sour > sweet else "positive" if sweet else "neutral"
+    if "continue" in allowed:
+        return "stop" if sour > sweet else "continue"
+    if "strong" in allowed:
+        return "strong" if sour + sweet > 3 else "mild" if sour + sweet else "none"
+    return allowed[0]
+
+
 def _jittery(messages, opts) -> str:
     """Answers differently every time. Nothing is seeded."""
     remembered = any(
@@ -124,6 +156,7 @@ RULES = {
     "ego": _ego,
     "thinker": _thinker,
     "voice": _voice,
+    "reader": _reader,
     "jittery": _jittery,
 }
 

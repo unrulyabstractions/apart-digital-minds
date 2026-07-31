@@ -35,7 +35,7 @@ import minds  # noqa: E402
 from src import Mind, texts  # noqa: E402
 from src.dminds import paths  # noqa: E402
 from src.api import Sink  # noqa: E402
-from src.api.types import Event  # noqa: E402
+from src.api.types import Event, GenOptions  # noqa: E402
 
 PAGE = Path(__file__).resolve().parent / "page.html"
 
@@ -98,7 +98,7 @@ class WebSink(Sink):
 # -- the minds you can talk to ----------------------------------------------
 
 
-def build_mind(kind: str, model: str) -> Mind:
+def build_mind(kind: str, model: str, opts=None) -> Mind:
     """Whichever mind `minds/<kind>.py` defines.
 
     The server knows nothing about any particular architecture. Add a file to
@@ -109,6 +109,8 @@ def build_mind(kind: str, model: str) -> Mind:
         kwarg: demo_models.pick(f"{kwarg.upper()}_MODEL", role)
         for kwarg, role in getattr(module, "ROLES", {}).items()
     }
+    if opts is not None:
+        extra["opts"] = opts
     return module.build(model, console=False, **extra)
 
 
@@ -229,12 +231,15 @@ class App:
         broadcast: Broadcast,
         loop: asyncio.AbstractEventLoop,
         model: str | None = None,
+        temperature: float = 0.7,
     ):
         self.mind: Mind | None = None
         self.kind: str | None = None
         self.broadcast = broadcast
         self.loop = loop
         self.model = model
+        #: Sampling for the next mind built, and for the one running now.
+        self.opts = GenOptions(temperature=temperature, max_tokens=512)
 
     def select(self, kind: str, model: str | None = None) -> None:
         """Put away whatever is running and build `minds/<kind>.py` instead."""
@@ -245,12 +250,30 @@ class App:
         spec = model or self.model or demo_models.pick(
             "SUBJECT_MODEL", "subject" if getattr(module, "ROLES", {}) else "thinker"
         )
-        self.mind = build_mind(kind, spec)
+        self.mind = build_mind(kind, spec, self.opts)
         self.kind = kind
         # One line is the entire integration. The mind is untouched otherwise.
         self.mind.tracer.add_sink(WebSink(self.broadcast))
         self.broadcast.push({"type": "chose", **self.describe()})
         self.snapshot()
+
+    def set_temperature(self, value: float) -> float:
+        """Change sampling for the running mind and for the next one built.
+
+        Every agent shares the mind's options object where the mind built it,
+        so the ones it made are updated in place and a hand-made part keeps
+        whatever it was given.
+        """
+        value = max(0.0, min(2.0, float(value)))
+        self.opts.temperature = value
+        if self.mind is not None:
+            self.mind.opts.temperature = value
+            for module in self.mind.modules.values():
+                opts = getattr(module, "opts", None)
+                if opts is not None:
+                    opts.temperature = value
+        self.broadcast.push({"type": "temperature", "value": value})
+        return value
 
     def describe(self) -> dict:
         """What is on screen, for the header and for a page that just loaded."""
@@ -264,6 +287,7 @@ class App:
             "subject": self.mind.subject.llm.spec,
             "ego": self.mind.ego.llm.spec if self.mind.ego else None,
             "run": str(self.mind.run_path),
+            "temperature": self.opts.temperature,
         }
 
     def snapshot(self) -> None:
@@ -411,6 +435,8 @@ def make_handler(app: App):
                     self._send(400, json.dumps({"error": repr(exc)}).encode(),
                                "application/json")
                     return
+            elif route == "/temperature":
+                app.set_temperature(payload.get("value", 0.7))
             elif app.mind is None:
                 self._send(409, b'{"error":"no mind chosen"}', "application/json")
                 return
@@ -431,6 +457,8 @@ def main() -> None:
                         help="skip the chooser and start on this mind")
     parser.add_argument("--model", default=None,
                         help="model spec for the subject, e.g. hf:Qwen/Qwen3-0.6B")
+    parser.add_argument("--temp", type=float, default=0.7,
+                        help="sampling temperature, also settable in the page")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-open", action="store_true")
     args = parser.parse_args()
@@ -440,7 +468,7 @@ def main() -> None:
     broadcast = Broadcast()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    app = App(broadcast, loop, args.model)
+    app = App(broadcast, loop, args.model, args.temp)
     if args.mind:
         app.select(args.mind, args.model)
 

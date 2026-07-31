@@ -36,7 +36,7 @@ from ..api.mind import Mind as MindInterface
 from ..api.models import ModelFactory
 from .host import SchedulerFactory
 from .scheduler import Scheduler, TickScheduler
-from ..api.types import Link, Message, Payload, Text
+from ..api.types import GenOptions, Link, Message, Payload, Text
 from . import paths
 from .llm import get_llm
 from .module import BaseModule
@@ -44,21 +44,21 @@ from .subject import Ego, Subject
 from .trace import ConsoleSink, JsonlSink, MemorySink, PerModuleSink, RunTracer
 
 
-def _build_subject(spec, llm: LLM, system: str | None) -> Module:
+def _build_subject(spec, llm: LLM, system: str | None, opts) -> Module:
     """The module at the centre: the default, a subclass, or a factory."""
     if spec is None:
-        return Subject("subject", llm, system=system)
+        return Subject("subject", llm, system=system, opts=opts)
     if isinstance(spec, type):
-        return spec("subject", llm, system=system)
+        return spec("subject", llm, system=system, opts=opts)
     return spec(llm)
 
 
-def _build_ego(spec, system: str | None, model: Callable[[str], LLM]) -> Module:
+def _build_ego(spec, system: str | None, model: Callable[[str], LLM], opts) -> Module:
     """The module that speaks. A finished module, or a model to build one from."""
     if isinstance(spec, Module):
         return spec
     llm = spec if isinstance(spec, LLM) else model(spec)
-    return Ego("ego", llm, system=system)
+    return Ego("ego", llm, system=system, opts=opts)
 
 
 def _fresh_run_id(base: Path | None) -> str:
@@ -117,6 +117,8 @@ class Mind(MindInterface):
         autowire: connect the subject's `reply` channel to `world`, so a mind
             answers you without any wiring at all. Turn it off to put a filter
             in between.
+        opts: sampling for every part this mind builds. Pass
+            `GenOptions(temperature=0.0)` to make a whole experiment greedy.
 
     The scheduler, the tracer, and the model factory are arguments too. Left
     alone they are `TickScheduler`, `RunTracer`, and `get_llm`.
@@ -135,6 +137,7 @@ class Mind(MindInterface):
         ego: str | LLM | Module | None = None,
         ego_system: str | None = None,
         autowire: bool = True,
+        opts: GenOptions | None = None,
         run_id: str | None = None,
         run_dir: str | Path | None = paths.RUNS,
         console: bool = True,
@@ -191,11 +194,17 @@ class Mind(MindInterface):
         self._stages: list[Module] = []
         self._auto_links: list[tuple[Module, Link]] = []
 
+        #: Sampling for the parts this mind builds. One place to turn the
+        #: temperature down for a whole experiment.
+        self.opts = opts or GenOptions()
+
         if model is not None:
             llm = model if isinstance(model, LLM) else self.model(model)
-            self.subject = self.adopt(_build_subject(subject, llm, system))
+            self.subject = self.adopt(_build_subject(subject, llm, system, self.opts))
         if ego is not None:
-            self.ego = self.adopt(_build_ego(ego, ego_system, self.model))
+            self.ego = self.adopt(
+                _build_ego(ego, ego_system, self.model, self.opts)
+            )
         if autowire:
             self.intercept()  # with no stages: subject -> ego -> world
         self.write_meta()
