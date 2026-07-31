@@ -100,6 +100,7 @@ class World(BaseModule):
 
     def receive(self, message: Message) -> None:
         """Take the message straight out of the mind. Never queued."""
+        self.received += 1
         self.outbox.append(message)
 
 

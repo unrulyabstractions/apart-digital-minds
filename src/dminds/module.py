@@ -81,6 +81,9 @@ class BaseModule(Module):
         self.mind: "Host | None" = None
         self.log: Logger | None = None
         self.turns = 0
+        #: How many messages have ever arrived. A window that has received
+        #: nothing is its own, not a copy of anyone else's.
+        self.received = 0
 
     # -- wiring --------------------------------------------------------
 
@@ -183,6 +186,7 @@ class BaseModule(Module):
     # -- queue ---------------------------------------------------------
 
     def receive(self, message: Message) -> None:
+        self.received += 1
         self.inbox.append(message)
 
     @property

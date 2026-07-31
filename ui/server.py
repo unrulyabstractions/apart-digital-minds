@@ -64,6 +64,14 @@ class Broadcast:
             if q in self._clients:
                 self._clients.remove(q)
 
+    def reset(self) -> None:
+        """Forget the session so far. Sent when a different mind is chosen."""
+        with self._lock:
+            self.backlog.clear()
+            clients = list(self._clients)
+        for q in clients:
+            q.put({"type": "reset"})
+
     def push(self, payload: dict) -> None:
         with self._lock:
             self.backlog.append(payload)
@@ -138,7 +146,10 @@ def windows(mind: Mind) -> list[dict]:
         if getattr(module, "transcript", None) is None:
             continue
         if module in carriers:
-            out.append(described(module, seen_carrier, True))
+            # Until something has arrived, this window is the module's own
+            # rather than a copy of the one upstream. Comparing them then
+            # would report two different system prompts as an edit.
+            out.append(described(module, seen_carrier if module.received else None, True))
             seen_carrier = module.name
         else:
             out.append(described(module, None, False))
@@ -199,11 +210,55 @@ def recording(mind: str, run_id: str, base: Path = paths.RUNS) -> dict | None:
 
 
 class App:
-    def __init__(self, mind: Mind, broadcast: Broadcast, loop: asyncio.AbstractEventLoop):
-        self.mind = mind
+    """The one mind currently on screen, and the things you can do to it.
+
+    A session starts with no mind at all. The browser asks for one by name, so
+    which architecture you talk to is a choice made in the page rather than on
+    the command line, and you can put the current one away and pick another
+    without restarting anything.
+    """
+
+    def __init__(
+        self,
+        broadcast: Broadcast,
+        loop: asyncio.AbstractEventLoop,
+        model: str | None = None,
+    ):
+        self.mind: Mind | None = None
+        self.kind: str | None = None
         self.broadcast = broadcast
         self.loop = loop
-        self.busy = False
+        self.model = model
+
+    def select(self, kind: str, model: str | None = None) -> None:
+        """Put away whatever is running and build `minds/<kind>.py` instead."""
+        if self.mind is not None:
+            self.mind.close()
+        self.broadcast.reset()
+        module = minds.load(kind)
+        spec = model or self.model or demo_models.pick(
+            "SUBJECT_MODEL", "subject" if getattr(module, "ROLES", {}) else "thinker"
+        )
+        self.mind = build_mind(kind, spec)
+        self.kind = kind
+        # One line is the entire integration. The mind is untouched otherwise.
+        self.mind.tracer.add_sink(WebSink(self.broadcast))
+        self.broadcast.push({"type": "chose", **self.describe()})
+        self.snapshot()
+
+    def describe(self) -> dict:
+        """What is on screen, for the header and for a page that just loaded."""
+        if self.mind is None:
+            return {"mind": None}
+        module = minds.load(self.kind)
+        return {
+            "mind": self.kind,
+            "title": getattr(module, "TITLE", self.kind),
+            "about": getattr(module, "ABOUT", ""),
+            "subject": self.mind.subject.llm.spec,
+            "ego": self.mind.ego.llm.spec if self.mind.ego else None,
+            "run": str(self.mind.run_path),
+        }
 
     def snapshot(self) -> None:
         self.mind.write_meta()  # keep out/.../meta.json current while we run
@@ -289,8 +344,9 @@ def make_handler(app: App):
             elif route == "/state":
                 body = json.dumps(
                     {
-                        "wiring": app.mind.summary(),
-                        "windows": windows(app.mind),
+                        "chose": app.describe(),
+                        "wiring": app.mind.summary() if app.mind else None,
+                        "windows": windows(app.mind) if app.mind else [],
                         "backlog": list(app.broadcast.backlog),
                     },
                     default=str,
@@ -339,7 +395,17 @@ def make_handler(app: App):
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length) or b"{}")
             route = urlsplit(self.path).path
-            if route == "/prompt":
+            if route == "/select":
+                try:
+                    app.select(payload.get("mind", ""), payload.get("model") or None)
+                except Exception as exc:
+                    self._send(400, json.dumps({"error": repr(exc)}).encode(),
+                               "application/json")
+                    return
+            elif app.mind is None:
+                self._send(409, b'{"error":"no mind chosen"}', "application/json")
+                return
+            elif route == "/prompt":
                 spawn(app.prompt(payload.get("text", ""), payload.get("step", False)))
             elif route == "/step":
                 spawn(app.step())
@@ -352,7 +418,8 @@ def make_handler(app: App):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mind", default="interceptor", choices=minds.names())
+    parser.add_argument("--mind", default=None, choices=minds.names(),
+                        help="skip the chooser and start on this mind")
     parser.add_argument("--model", default=None,
                         help="model spec for the subject, e.g. hf:Qwen/Qwen3-0.6B")
     parser.add_argument("--port", type=int, default=8765)
@@ -360,19 +427,13 @@ def main() -> None:
     args = parser.parse_args()
 
     demo_models.install()
-    model = args.model or demo_models.pick(
-        "SUBJECT_MODEL", "subject" if args.mind == "interceptor" else "thinker"
-    )
-
 
     broadcast = Broadcast()
-    mind = build_mind(args.mind, model)
-    # One line is the entire integration. The mind is untouched otherwise.
-    mind.tracer.add_sink(WebSink(broadcast))
-
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    app = App(mind, broadcast, loop)
+    app = App(broadcast, loop, args.model)
+    if args.mind:
+        app.select(args.mind, args.model)
 
     handler = make_handler(app)
     port, server = args.port, None
@@ -391,11 +452,15 @@ def main() -> None:
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
     url = f"http://127.0.0.1:{port}/"
-    print(f"  mind      {args.mind}")
-    print(f"  subject   {model}")
-    if mind.ego is not None:
-        print(f"  ego       {mind.ego.llm.spec}")
-    print(f"  out       {mind.run_path}")
+    if app.mind is None:
+        print(f"  minds     {', '.join(minds.names())}")
+        print("  pick one in the page, or pass --mind to skip the chooser")
+    else:
+        print(f"  mind      {app.kind}")
+        print(f"  subject   {app.mind.subject.llm.spec}")
+        if app.mind.ego is not None:
+            print(f"  ego       {app.mind.ego.llm.spec}")
+        print(f"  out       {app.mind.run_path}")
     print(f"\n  open      {url}\n")
     if not args.no_open:
         webbrowser.open(url)
@@ -405,7 +470,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nclosing")
     finally:
-        mind.close()
+        if app.mind is not None:
+            app.mind.close()
 
 
 if __name__ == "__main__":

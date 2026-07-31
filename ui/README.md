@@ -3,14 +3,28 @@
 Talk to a mind in a browser and watch every tick as it happens.
 
 ```bash
-python ui/server.py                       # subject -> interceptor -> ego
-python ui/server.py --mind plain          # just a subject
-python ui/server.py --mind bicameral      # a voice speaks into the window
+python ui/server.py                       # opens on the chooser
+python ui/server.py --mind bicameral      # skip it and start here
 python ui/server.py --model hf:Qwen/Qwen3-0.6B
 ```
 
 Then open http://127.0.0.1:8765. If that port is busy the server walks to the
 next free one and says so.
+
+## The first screen
+
+Nothing is running when the server starts, so the page opens on a chooser with
+the two things you can do: talk to a mind, or replay a run.
+
+The left column is every file in `minds/`, with its title and the shape of its
+pipeline. The right column is every run under `out/runs/`. Both lists come
+from the server, so adding a mind file puts it on this screen with no other
+change.
+
+Picking a mind builds it and drops you into the live view. Picking a run opens
+it in playback. The `minds` button in the header brings the chooser back, and
+choosing again closes the running mind and starts a fresh one, so you can move
+between architectures without restarting the server.
 
 ## What you see
 
@@ -36,7 +50,9 @@ so what is left on screen is exactly what a stage did:
     written here          this module wrote it itself
 
 A stage keeps its own conversation rather than carrying the window, so it is
-labelled `own conversation` and is never anyone's upstream.
+labelled `own conversation` and is never anyone's upstream. A column that has
+not received anything yet is shown on its own, since two modules starting from
+different system prompts have not edited anything.
 
 The comparison is a plain diff of two message lists. It knows nothing about
 `<think>` tags, about editing versus inserting, or about what any particular
@@ -104,7 +120,7 @@ disabled while a recording is on screen; pick `● live` to come back.
 
 ## Where the data goes
 
-Every run writes to `out/runs/ui/<run-id>/`: `meta.json` describing the mind
+Every run writes to `out/runs/<mind>/<run-id>/`: `meta.json` describing the mind
 and its models, `trace.jsonl`, and `modules/<name>.jsonl`. `meta.json` is
 rewritten after every prompt, so it stays current while the server is up.
 

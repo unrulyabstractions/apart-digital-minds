@@ -825,3 +825,35 @@ The header now reads `Exploring Digital Minds`.
 | 178 | Header renamed | Same screenshot | VERIFIED (`Exploring Digital Minds`) |
 | 179 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
 | 180 | All four examples | Ran each | VERIFIED (all exit 0) |
+
+## 2026-07-30 — the first screen chooses what to run
+
+The server used to build a mind from `--mind` before the page existed, so
+which architecture you talked to was fixed at launch. It now starts with no
+mind at all. The page opens on a chooser: every file in `minds/` on the left,
+every run under `out/runs/` on the right. Picking a mind builds it, picking a
+run opens playback, and the `minds` button brings the chooser back. `--mind`
+still skips it.
+
+One bug found by looking at the result. Before any prompt, the ego column
+reported `1 changed since subject` and marked its own system prompt as edited.
+Nothing had flowed; the two modules simply start from different prompts. A
+module now counts what has arrived, and a window that has received nothing is
+shown on its own rather than as a copy of the one upstream.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 181 | The server starts with nothing running | Started it and read `/state` | VERIFIED (`chose.mind` null, windows empty) |
+| 182 | Prompting before choosing is refused | POSTed `/prompt` | VERIFIED (HTTP 409) |
+| 183 | An unknown mind is refused | POSTed `/select` with a bad name | VERIFIED (HTTP 400) |
+| 184 | Choosing builds it | POSTed `/select`, read `/state` | VERIFIED (interceptor, 3 windows, run dir made) |
+| 185 | Choosing again wipes the session | Prompted, switched to bicameral, read the backlog | VERIFIED (windows now subject/voice/ego, no replies left over) |
+| 186 | The whole flow in a real browser | CDP: opened cold, chose bicameral, chatted, reopened the chooser, replayed the run, switched back to interceptor live | VERIFIED (every step as expected, 0 console errors) |
+| 187 | The chooser renders | Viewed `chooser.png` with image tokens | VERIFIED (3 minds with titles/shapes/extra models, 1 run with events, ticks, models) |
+| 188 | No false diff before a prompt | Viewed `tick0.png` with image tokens | VERIFIED (ego column plain, no `changed since` badge) |
+| 189 | The same, in the data | Read `/state` before and after one prompt | VERIFIED (ego upstream None, then subject) |
+| 190 | `--mind` still skips the chooser | Started with `--mind plain`, read `/state` | VERIFIED (chose plain) |
+| 191 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+| 192 | All four examples | Ran each | VERIFIED (all exit 0) |
