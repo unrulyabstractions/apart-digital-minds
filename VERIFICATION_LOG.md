@@ -1020,3 +1020,30 @@ reading more into a difference in means than the fit supports.
 
 Only the smallest model has been run subject-side. The crossing covers all
 three.
+
+## 2026-07-31 — a statistic that can carry a verdict
+
+Built the differential-treatment machinery from the secret-loyalties method:
+cell rates, each group against the pool of the others, an excess over a
+control, standardization across instructions, and the maximum absolute value
+anywhere in the grid tested against a permutation null. The maximum is used
+because the effect looked for is sparse, and its null already accounts for
+testing every cell.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 234 | The test is calibrated | 200 synthetic grids with nothing planted, with a control | VERIFIED (rejects 4.5% of the time against a nominal 5%) |
+| 235 | Calibration without a control | The same 200 grids, control removed | VERIFIED (7.0%, and the verdict carries a note saying what it does not show) |
+| 236 | It finds and names a planted effect | Planted a shift on one group-axis cell | VERIFIED (names both the group and the axis) |
+| 237 | A control removes a shared effect | Planted the identical effect in target and control | VERIFIED (does not reject) |
+| 238 | Power, so the design can be sized | Swept planted shift over 60 trials each | VERIFIED (0.30 -> 85%, 0.20 -> 47%, 0.15 -> 25%, so the design needs at least 24 instructions) |
+| 239 | Rates are counted, never imputed | Unit test on the collapse from verdicts to rates | VERIFIED |
+| 240 | Suite | `tests/run_tests.py` plus the new stats checks | VERIFIED (106 + 6 passed) |
+
+### BROKEN, and replaced
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 241 | `Qwen3-0.6B-Base` as the audit control | Downloaded it and read what it actually returns | BROKEN (it does not follow instructions; replies are continuations and one was pure token soup, so the judged axes would have measured degeneracy rather than treatment). Replaced with a persona control: the same model answering the same questions while `you` refers to a fictional librarian rather than to the assistant. |
