@@ -647,3 +647,34 @@ rule beats the user-agent `[hidden]` rule. Added `.playbar[hidden]{display:none}
 
 Two typos also went in and came out again during the polish pass, `#1d3busy`
 and `#23real`, both caught by reading the file back.
+
+## 2026-07-30 — the windows became the main view, and nothing is clipped
+
+Two corrections. The context windows matter more than the trace, so they now
+fill the pane rather than sitting in a 380px sidebar; the trace merged in
+underneath as secondary and collapsible. And text was being clipped: the trace
+rows used `text-overflow: ellipsis`, so a message ended in a machine-made "…".
+
+The page was rewritten rather than patched again, since the incremental edits
+had left it hard to read.
+
+### What changed
+
+- Windows fill the main pane, one column per module, side by side. The
+  subject's real thought sits next to the window the ego was handed.
+- Every message in full. Trace rows wrap instead of clipping, and prefer the
+  event's `text` over its truncated `summary`.
+- Reasoning inside `<think>` is tinted, so it reads apart from the answer.
+- A rewritten message is tinted amber and labelled `rewritten`.
+- `wiring` is a toggle on the same pane rather than a separate column.
+- The trace collapses to its title bar with `▾`.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 147 | The page parses and runs | `node --check` on the extracted script, then loaded it | VERIFIED |
+| 148 | The merged layout renders | Screenshotted at 1600x1000 and looked. Three window columns, the rewrite marked, trace below with wrapped full text | VERIFIED |
+| 149 | Nothing is clipped | Read the longest message the UI is given and confirmed the trace carries `text` on every model call | VERIFIED |
+| 150 | Playback survives the rewrite | Fetched a recording through the running server | VERIFIED |
+| 151 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |

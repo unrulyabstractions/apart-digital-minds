@@ -16,17 +16,20 @@ Then open http://127.0.0.1:8765.
 **Conversation** on the left: what you said, what the mind said back. With an
 ego, the reply comes from the ego rather than the subject.
 
-**Live trace** in the middle: every event the mind emits, grouped by tick.
-Click any model call to read the exact prompt and completion. The filters
-narrow it to model calls, message flow, or per-turn detail.
+**Context windows** fill the main pane, one column per module, side by side.
+This is the view that matters: the subject's real thought sits beside the
+window the ego was handed, and a message a stage rewrote is tinted and marked
+`rewritten`. Reasoning inside `<think>` tags is coloured so it reads apart
+from the answer. Every message is shown in full, never truncated.
 
-**Inspector** on the right, two tabs:
+The `wiring` button swaps that pane for the graph: each module, the channels
+it reads and writes, its model, and every link, with the ones `intercept` laid
+out marked `[auto]`.
 
-- *wiring* — every module, the channels it reads and writes, its model, and
-  every link. Links that `intercept` laid out are marked `[auto]`.
-- *windows* — each agent's context window side by side. A message a stage
-  rewrote is marked `edited`, so you can see the subject's real thought next
-  to what the ego was handed.
+**Trace** sits underneath, secondary by design. Every event the mind emits,
+grouped by tick, with full text rather than a clipped summary. Filters narrow
+it to model calls, message flow, or per-turn detail, and `▾` collapses it
+entirely when you want the windows full height.
 
 **Step mode**: tick the box before sending and the prompt is delivered without
 running. `Step 1 tick` then advances one tick at a time, so you can watch the

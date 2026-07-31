@@ -6,543 +6,480 @@
 <title>dmind</title>
 <style>
   :root {
-    --bg:#0a0e13; --panel:#0f151e; --raise:#141c27;
+    --bg:#0a0e13; --panel:#0f151e; --raise:#141c27; --sunk:#0a1017;
     --line:#1c2532; --line2:#26313f;
     --fg:#e2e9f2; --dim:#8798ab; --dimmer:#5b6a7d;
     --you:#61a6e8; --mind:#7fd7a4; --warn:#e8b471; --bad:#ef7d7d;
     --subject:#7aa2f7; --ego:#9ece6a; --stage:#e0af68; --other:#bb9af7;
-    --world:#7dcfff; --runtime:#55637a;
-    --r:8px;
+    --world:#7dcfff; --runtime:#55637a; --r:8px;
   }
   * { box-sizing:border-box; }
   html,body { height:100%; margin:0; }
-  body {
-    background:var(--bg); color:var(--fg);
+  body { background:var(--bg); color:var(--fg);
     font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",sans-serif;
-    display:grid; grid-template-rows:auto 1fr; overflow:hidden;
-  }
-  code,pre,.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    display:flex; flex-direction:column; overflow:hidden; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .scroll { overflow-y:auto; overflow-x:hidden; flex:1; min-height:0; }
+  .scroll::-webkit-scrollbar { width:9px; height:9px; }
+  .scroll::-webkit-scrollbar-thumb { background:var(--line2); border-radius:5px; }
 
-  /* ---- header ---- */
-  header {
-    display:flex; align-items:center; gap:20px; padding:0 16px; height:52px;
-    background:var(--panel); border-bottom:1px solid var(--line); flex:none;
-  }
-  .brand {
-    font-weight:680; letter-spacing:-.2px; font-size:15px;
-    padding-right:20px; border-right:1px solid var(--line);
-  }
+  header { display:flex; align-items:center; gap:20px; padding:0 16px; height:52px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:none; }
+  .brand { font-weight:680; letter-spacing:-.2px; font-size:15px;
+    padding-right:20px; border-right:1px solid var(--line); }
   .shape { display:flex; flex-direction:column; gap:1px; min-width:0; }
-  .shape #hShape { font-size:12.5px; font-weight:550; }
-  .shape small {
-    font-family:ui-monospace,Menlo,monospace; font-size:10.5px; color:var(--dimmer);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
+  .shape b { font-size:12.5px; font-weight:550; }
+  .shape small { font-family:ui-monospace,Menlo,monospace; font-size:10.5px;
+    color:var(--dimmer); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .meta { display:flex; gap:20px; flex:1; justify-content:flex-end; }
   .meta div { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
-  .meta span {
-    font-size:9.5px; text-transform:uppercase; letter-spacing:.8px; color:var(--dimmer);
-  }
-  .meta b {
-    color:var(--fg); font-weight:550; font-size:12px;
-    font-family:ui-monospace,Menlo,monospace; max-width:190px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .status {
-    display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--dim);
-    padding-left:18px; border-left:1px solid var(--line); min-width:112px;
-  }
+  .meta span { font-size:9.5px; text-transform:uppercase; letter-spacing:.8px; color:var(--dimmer); }
+  .meta b { color:var(--fg); font-weight:550; font-size:12px;
+    font-family:ui-monospace,Menlo,monospace; max-width:180px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #source { background:var(--raise); color:var(--fg); border:1px solid var(--line2);
+    border-radius:6px; padding:5px 8px; font:12px inherit; max-width:280px; }
+  .status { display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--dim);
+    padding-left:18px; border-left:1px solid var(--line); min-width:112px; }
   .dot { width:7px; height:7px; border-radius:50%; background:var(--dimmer); flex:none; }
   .dot.thinking { background:var(--warn); animation:pulse 1s ease-in-out infinite; }
   .dot.stepping { background:var(--you); }
   .dot.idle { background:var(--mind); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 
-  /* ---- layout ---- */
-  main { display:grid; grid-template-columns:360px 1fr 380px; min-height:0; }
-  .pane { display:flex; flex-direction:column; min-height:0; min-width:0; }
-  .pane + .pane { border-left:1px solid var(--line); }
-  .pane-head {
-    display:flex; align-items:center; gap:9px; padding:0 14px; height:38px;
+  main { display:flex; flex:1; min-height:0; }
+  .chat-pane { width:330px; flex:none; display:flex; flex-direction:column; min-height:0; }
+  .stage-pane { flex:1; min-width:0; display:flex; flex-direction:column;
+    border-left:1px solid var(--line); }
+  .bar { display:flex; align-items:center; gap:9px; padding:0 14px; height:38px; flex:none;
     font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:var(--dim);
-    border-bottom:1px solid var(--line); background:var(--panel); flex:none;
-  }
-  .pane-head .spacer { flex:1; }
-  .scroll { overflow-y:auto; overflow-x:hidden; flex:1; padding:12px 14px; }
-  .scroll::-webkit-scrollbar { width:9px; }
-  .scroll::-webkit-scrollbar-thumb { background:var(--line2); border-radius:5px; }
+    border-bottom:1px solid var(--line); background:var(--panel); }
+  .bar .grow { flex:1; }
+  .bar .count { color:var(--dimmer); text-transform:none; letter-spacing:0;
+    font-size:11px; font-family:ui-monospace,Menlo,monospace; }
 
-  /* ---- chat ---- */
+  #windowsSection { flex:1 1 62%; display:flex; flex-direction:column; min-height:0; }
+  #traceSection { flex:1 1 38%; display:flex; flex-direction:column; min-height:0;
+    border-top:1px solid var(--line2); }
+  body.trace-collapsed #traceSection { flex:0 0 38px; }
+  body.trace-collapsed #traceScroll, body.trace-collapsed #playbar { display:none; }
+
+  #chat { padding:12px 14px; }
   .msg { margin-bottom:14px; animation:rise .18s ease-out; }
   @keyframes rise { from{opacity:0; transform:translateY(3px)} to{opacity:1} }
-  .msg .who {
-    font-size:9.5px; text-transform:uppercase; letter-spacing:.9px;
-    color:var(--dimmer); margin-bottom:4px;
-  }
-  .msg .body {
-    padding:10px 13px; border-radius:var(--r); background:var(--raise);
+  .msg .who { font-size:9.5px; text-transform:uppercase; letter-spacing:.9px;
+    color:var(--dimmer); margin-bottom:4px; }
+  .msg .body { padding:10px 13px; border-radius:var(--r); background:var(--raise);
     border:1px solid var(--line2); white-space:pre-wrap; word-wrap:break-word;
-    font-size:13.5px; line-height:1.55;
-  }
+    font-size:13.5px; line-height:1.55; }
   .msg.you .who { color:var(--you); }
   .msg.you .body { background:#122032; border-color:#243c56; }
   .msg.mind .who { color:var(--mind); }
   .msg.mind .body { border-left:2px solid var(--mind); }
   .msg.err .body { border-color:var(--bad); color:var(--bad); background:#2a1618; }
-  .composer {
-    border-top:1px solid var(--line); padding:11px 13px; background:var(--panel); flex:none;
-  }
-  .composer textarea {
-    width:100%; resize:none; height:58px; padding:9px 11px; color:var(--fg);
-    background:#0a1017; border:1px solid var(--line2); border-radius:var(--r);
-    font:13.5px/1.5 inherit; outline:none; transition:border-color .12s;
-  }
+  .composer { border-top:1px solid var(--line); padding:11px 13px;
+    background:var(--panel); flex:none; }
+  .composer textarea { width:100%; resize:none; height:58px; padding:9px 11px; color:var(--fg);
+    background:var(--sunk); border:1px solid var(--line2); border-radius:var(--r);
+    font:13.5px/1.5 inherit; outline:none; transition:border-color .12s; }
   .composer textarea::placeholder { color:var(--dimmer); }
-  .composer textarea:focus { border-color:#33587d; background:#0b131c; }
+  .composer textarea:focus { border-color:#33587d; }
   .row { display:flex; gap:8px; align-items:center; margin-top:8px; }
-  button {
-    padding:6px 12px; border-radius:6px; cursor:pointer; font:520 12.5px inherit;
+  button { padding:6px 12px; border-radius:6px; cursor:pointer; font:520 12.5px inherit;
     background:var(--raise); color:var(--fg); border:1px solid var(--line2);
-    transition:background .12s, border-color .12s;
-  }
+    transition:background .12s, border-color .12s; }
   button:hover:not(:disabled) { background:#1c2634; border-color:#33414f; }
   button:active:not(:disabled) { transform:translateY(1px); }
   button:disabled { opacity:.35; cursor:default; }
   button.primary { background:#1d4d78; border-color:#2c6ba3; color:#eaf3fb; }
-  button.primary:hover:not(:disabled) { background:#235e91; border-color:#3880bd; }
-  label.check { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); cursor:pointer; }
+  button.primary:hover:not(:disabled) { background:#235e91; }
+  button.ghost { background:none; border-color:transparent; color:var(--dim); padding:4px 9px; }
+  button.ghost:hover { background:var(--raise); border-color:var(--line2); }
+  button.ghost.on { background:#1d4d78; border-color:#2c6ba3; color:#eaf3fb; }
+  label.check { display:flex; align-items:center; gap:6px; font-size:11.5px;
+    color:var(--dim); cursor:pointer; }
 
-  /* ---- trace ---- */
-  .tick-sep {
-    display:flex; align-items:center; gap:10px; margin:15px 0 7px;
-    font-size:10px; letter-spacing:1.3px; text-transform:uppercase; color:var(--dimmer);
-  }
-  .tick-sep::after { content:""; flex:1; height:1px; background:var(--line); }
-  .tick-sep b { color:var(--you); font-weight:600; }
-  .ev {
-    display:grid; grid-template-columns:74px 92px 1fr auto; gap:11px;
-    padding:2.5px 7px; border-radius:5px; font-size:12px; align-items:baseline;
-    border-left:2px solid transparent;
-  }
-  .ev:hover { background:#131b26; border-left-color:var(--line2); }
-  .ev .mod { font-weight:600; overflow:hidden; text-overflow:ellipsis; }
-  .ev .kind { color:var(--dimmer); font-size:11.5px; }
-  .ev .sum { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ev .dur { color:var(--dimmer); font-size:11px; }
-  .ev.open .sum { white-space:normal; }
-  .ev.click { cursor:pointer; }
-  .ev.llm .sum { color:var(--fg); }
-  .ev.emit .sum { color:#a3c9ea; }
-  .ev.err .sum { color:var(--bad); }
-  .detail {
-    grid-column:2 / -1; margin:5px 0 8px; padding:9px 11px; border-radius:7px;
-    background:#0d141d; border:1px solid var(--line2); color:var(--fg);
-    white-space:pre-wrap; word-wrap:break-word; font-size:12.5px; max-height:340px; overflow:auto;
-  }
-  .mod-subject{color:var(--subject)} .mod-ego{color:var(--ego)}
-  .mod-stage{color:var(--stage)} .mod-world{color:var(--world)}
-  .mod-runtime{color:var(--runtime)} .mod-other{color:var(--other)}
+  #windows { display:flex; overflow-x:auto; overflow-y:hidden; flex:1; min-height:0; }
+  #windows::-webkit-scrollbar { height:9px; }
+  #windows::-webkit-scrollbar-thumb { background:var(--line2); border-radius:5px; }
+  .wcol { flex:1 1 0; min-width:340px; display:flex; flex-direction:column;
+    min-height:0; border-right:1px solid var(--line); }
+  .wcol:last-child { border-right:none; }
+  .wcol-head { display:flex; align-items:center; gap:8px; padding:9px 14px 8px; flex:none;
+    border-bottom:1px solid var(--line); background:var(--sunk); }
+  .wcol-head b { font-size:13px; font-weight:600; }
+  .wcol-body { padding:2px 14px 18px; }
+  .pill { font-size:9.5px; padding:2px 7px; border-radius:20px; background:var(--raise);
+    color:var(--dim); text-transform:uppercase; letter-spacing:.6px; font-weight:600;
+    border:1px solid var(--line2); }
+  .wmsg { padding:9px 0 9px 11px; border-left:2px solid var(--line2); margin:9px 0; }
+  .wmsg .role { font-size:9.5px; color:var(--dimmer); text-transform:uppercase;
+    letter-spacing:.9px; margin-bottom:4px; font-weight:600; }
+  .wmsg .txt { white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere;
+    color:var(--fg); font-size:12.5px; line-height:1.6; }
+  .wmsg.system { opacity:.5; }
+  .wmsg.edited { border-left-color:var(--warn); background:#1c1710;
+    margin-left:-11px; padding-left:11px; border-radius:0 var(--r) var(--r) 0; }
+  .wmsg.edited .role { color:var(--warn); }
+  .wmsg.edited .role::after { content:" · rewritten"; }
+  .think { color:var(--other); }
 
-  /* ---- playback ---- */
-  #source {
-    background:#16202e; color:var(--fg); border:1px solid var(--line2);
-    border-radius:7px; padding:4px 8px; font:12px inherit; max-width:340px;
-  }
-  .playbar {
-    display:flex; align-items:center; gap:8px; padding:8px 14px; flex:none;
-    border-bottom:1px solid var(--line); background:var(--raise);
-  }
-  .playbar[hidden] { display:none; }   /* display:flex would otherwise win */
-  .playbar button { padding:4px 10px; font-size:12px; }
-  .playbar select {
-    background:#16202e; color:var(--dim); border:1px solid var(--line2);
-    border-radius:6px; padding:3px 6px; font:11px inherit;
-  }
-  .playbar input[type=range] { flex:1; accent-color:var(--you); min-width:80px; }
-  .pbpos { font-size:11px; color:var(--dim); min-width:74px; text-align:right; }
-  body.playback .composer { opacity:.35; pointer-events:none; }
-  body.playback .dot { background:var(--other); }
-
-  /* ---- inspector ---- */
-  .tabs { display:flex; gap:4px; }
-  .tab {
-    padding:3px 10px; border-radius:6px; cursor:pointer; font-size:11px;
-    text-transform:uppercase; letter-spacing:.8px; color:var(--dim);
-  }
-  .tab.on { background:#1d2a3b; color:var(--fg); }
-  .card {
-    border:1px solid var(--line); border-radius:var(--r); padding:11px 13px;
-    margin-bottom:10px; background:var(--panel);
-  }
-  .card h4 { margin:0 0 6px; font-size:13px; display:flex; align-items:center; gap:7px; }
-  .pill {
-    font-size:10px; padding:1px 7px; border-radius:20px; background:#1d2a3b;
-    color:var(--dim); text-transform:uppercase; letter-spacing:.6px; font-weight:500;
-  }
+  #wiring { padding:14px; display:none; }
+  body.show-wiring #wiring { display:block; }
+  body.show-wiring #windows { display:none; }
+  .card { border:1px solid var(--line); border-radius:var(--r); padding:11px 13px;
+    margin-bottom:10px; background:var(--panel); max-width:760px; }
+  .card h4 { margin:0 0 7px; font-size:13px; display:flex; align-items:center; gap:8px; }
   .chan { font-size:11.5px; color:var(--dim); margin:2px 0; }
   .chan b { color:#a3c9ea; font-weight:500; }
   .link { font-size:12px; padding:3px 0; color:var(--dim); }
   .link b { color:var(--fg); font-weight:500; }
-  .link .auto { color:var(--dimmer); font-size:10.5px; }
-  .win-msg { border-left:2px solid var(--line2); padding:4px 0 4px 9px; margin:6px 0; font-size:12.5px; }
-  .win-msg .role { font-size:10.5px; color:var(--dimmer); text-transform:uppercase; letter-spacing:.7px; }
-  .win-msg .txt { white-space:pre-wrap; word-wrap:break-word; color:var(--fg); }
-  .win-msg.edited { border-left-color:var(--warn); }
-  .win-msg.edited .role::after { content:" · edited"; color:var(--warn); }
-  .empty {
-    color:var(--dimmer); font-size:12.5px; padding:26px 4px; text-align:center;
-    line-height:1.7;
-  }
-  .empty kbd {
-    background:var(--raise); border:1px solid var(--line2); border-radius:4px;
-    padding:1px 5px; font-family:ui-monospace,Menlo,monospace; font-size:11px;
-    color:var(--dim);
-  }
+  .link .tag { color:var(--dimmer); font-size:10.5px; }
+
+  #traceScroll { padding:8px 14px 14px; }
+  .tick-sep { display:flex; align-items:center; gap:10px; margin:12px 0 6px;
+    font-size:10px; letter-spacing:1.3px; text-transform:uppercase; color:var(--dimmer); }
+  .tick-sep::after { content:""; flex:1; height:1px; background:var(--line); }
+  .tick-sep b { color:var(--you); font-weight:700; }
+  .ev { display:grid; grid-template-columns:74px 92px 1fr auto; gap:11px;
+    padding:3px 7px; border-radius:5px; font-size:12px; align-items:baseline;
+    border-left:2px solid transparent; }
+  .ev:hover { background:#131b26; border-left-color:var(--line2); }
+  .ev .mod { font-weight:650; overflow:hidden; text-overflow:ellipsis; }
+  .ev .kind { color:var(--dimmer); font-size:11px; }
+  .ev .sum { color:var(--dim); white-space:pre-wrap; word-wrap:break-word;
+    overflow-wrap:anywhere; }
+  .ev .dur { color:var(--dimmer); font-size:10.5px; }
+  .ev.llm .sum { color:var(--fg); }
+  .ev.emit .sum { color:#a3c9ea; }
+  .ev.err .sum { color:var(--bad); }
+  .mod-subject{color:var(--subject)} .mod-ego{color:var(--ego)}
+  .mod-stage{color:var(--stage)} .mod-world{color:var(--world)}
+  .mod-runtime{color:var(--runtime)} .mod-other{color:var(--other)}
+
+  .playbar { display:flex; align-items:center; gap:8px; padding:8px 14px; flex:none;
+    border-bottom:1px solid var(--line); background:var(--raise); }
+  .playbar[hidden] { display:none; }
+  .playbar button { padding:4px 10px; font-size:12px; }
+  .playbar select { background:var(--sunk); color:var(--dim); border:1px solid var(--line2);
+    border-radius:6px; padding:3px 6px; font:11px inherit; }
+  .playbar input[type=range] { flex:1; accent-color:var(--you); min-width:80px; }
+  .pbpos { font-size:11px; color:var(--dim); min-width:74px; text-align:right; }
+  body.playback .composer { opacity:.35; pointer-events:none; }
+
+  .empty { color:var(--dimmer); font-size:12.5px; padding:30px 16px;
+    text-align:center; line-height:1.8; }
+  .empty kbd { background:var(--raise); border:1px solid var(--line2); border-radius:4px;
+    padding:1px 5px; font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--dim); }
 </style>
 </head>
 <body>
 
 <header>
   <div class="brand">dmind</div>
-  <div class="shape">
-    <span id="hShape">—</span>
-    <small id="hAbout"></small>
-  </div>
+  <div class="shape"><b id="hShape">&mdash;</b><small id="hAbout"></small></div>
   <div class="meta">
-    <div><span>subject</span><b id="hSubject">—</b></div>
-    <div><span>ego</span><b id="hEgo">—</b></div>
+    <div><span>subject</span><b id="hSubject">&mdash;</b></div>
+    <div><span>ego</span><b id="hEgo">&mdash;</b></div>
     <div><span>tick</span><b id="hTick">0</b></div>
     <div><span>events</span><b id="hCount">0</b></div>
   </div>
-  <select id="source" title="live, or a recorded run">
-    <option value="">● live</option>
-  </select>
+  <select id="source" title="live, or a recorded run"><option value="">&#9679; live</option></select>
   <div class="status"><span class="dot idle" id="hDot"></span><span id="hState">idle</span></div>
 </header>
 
 <main>
-  <!-- conversation -->
-  <section class="pane">
-    <div class="pane-head">conversation</div>
-    <div class="scroll" id="chat"><div class="empty" id="chatEmpty">Type below and press <kbd>Enter</kbd>.</div></div>
+  <section class="chat-pane">
+    <div class="bar">conversation</div>
+    <div class="scroll" id="chat">
+      <div class="empty" id="chatEmpty">Type below and press <kbd>Enter</kbd>.</div>
+    </div>
     <div class="composer">
-      <textarea id="input" placeholder="Say something to the mind…  (Enter to send, Shift+Enter for a newline)"></textarea>
+      <textarea id="input" placeholder="Say something to the mind&hellip;"></textarea>
       <div class="row">
         <button class="primary" id="send">Send</button>
         <button id="step" disabled>Step 1 tick</button>
         <button id="runout" disabled>Run out</button>
-        <label class="check"><input type="checkbox" id="stepMode"> step mode</label>
+        <label class="check"><input type="checkbox" id="stepMode"> step</label>
       </div>
     </div>
   </section>
 
-  <!-- trace -->
-  <section class="pane">
-    <div class="pane-head">
-      <span id="traceLabel">live trace</span>
-      <div class="spacer"></div>
-      <label class="check"><input type="checkbox" id="fLlm" checked> llm</label>
-      <label class="check"><input type="checkbox" id="fFlow" checked> messages</label>
-      <label class="check"><input type="checkbox" id="fTurns"> turns</label>
-      <button id="clear" style="padding:2px 9px;font-size:11px">clear</button>
+  <section class="stage-pane">
+    <div id="windowsSection">
+      <div class="bar">
+        <span>context windows</span>
+        <span class="count" id="wCount"></span>
+        <div class="grow"></div>
+        <button class="ghost" id="tabWindows">windows</button>
+        <button class="ghost" id="tabWiring">wiring</button>
+      </div>
+      <div id="windows"><div class="empty">Nothing said yet.</div></div>
+      <div class="scroll" id="wiring"></div>
     </div>
-    <div class="playbar" id="playbar" hidden>
-      <button id="pbReset" title="back to the start">⏮</button>
-      <button id="pbPlay" class="primary">▶ play</button>
-      <button id="pbEvent" title="one event">step</button>
-      <button id="pbTick" title="to the end of this tick">tick ⏭</button>
-      <select id="pbSpeed">
-        <option value="400">slow</option>
-        <option value="120" selected>normal</option>
-        <option value="30">fast</option>
-        <option value="0">instant</option>
-      </select>
-      <input type="range" id="pbScrub" min="0" value="0" step="1">
-      <span class="pbpos mono" id="pbPos">0 / 0</span>
-    </div>
-    <div class="scroll mono" id="trace"><div class="empty">Nothing yet.<br>Say something, or pick a recording from the header.</div></div>
-  </section>
 
-  <!-- inspector -->
-  <section class="pane">
-    <div class="pane-head">
-      <div class="tabs">
-        <div class="tab on" data-tab="wiring">wiring</div>
-        <div class="tab" data-tab="windows">windows</div>
+    <div id="traceSection">
+      <div class="bar">
+        <button class="ghost" id="traceToggle" title="collapse">&#9662;</button>
+        <span>trace</span>
+        <div class="grow"></div>
+        <label class="check"><input type="checkbox" id="fLlm" checked> llm</label>
+        <label class="check"><input type="checkbox" id="fFlow" checked> messages</label>
+        <label class="check"><input type="checkbox" id="fTurns"> turns</label>
+        <button class="ghost" id="clear">clear</button>
+      </div>
+      <div class="playbar" id="playbar" hidden>
+        <button id="pbReset" title="back to the start">&#9198;</button>
+        <button id="pbPlay" class="primary">&#9654; play</button>
+        <button id="pbEvent">step</button>
+        <button id="pbTick">tick &#9197;</button>
+        <select id="pbSpeed">
+          <option value="400">slow</option>
+          <option value="120" selected>normal</option>
+          <option value="30">fast</option>
+          <option value="0">instant</option>
+        </select>
+        <input type="range" id="pbScrub" min="0" value="0" step="1">
+        <span class="pbpos mono" id="pbPos">0 / 0</span>
+      </div>
+      <div class="scroll mono" id="traceScroll">
+        <div class="empty">Nothing yet. Say something, or pick a recording.</div>
       </div>
     </div>
-    <div class="scroll" id="inspector"></div>
   </section>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const state = {
-  minds: [],
-  tab: new URLSearchParams(location.search).get("tab") || "wiring",
-  wiring:null, windows:[], tick:-1, count:0, busy:false,
+  minds: [], wiring: null, windows: [], tick: -1, count: 0, busy: false,
+  view: new URLSearchParams(location.search).get("tab") === "wiring" ? "wiring" : "windows",
 };
-
 const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const roleOf = (name) => {
-  const m = (state.wiring?.modules || []).find(x => x.name === name);
   if (name === "world") return "world";
   if (name === "runtime") return "runtime";
+  const m = (state.wiring?.modules || []).find(x => x.name === name);
   return m ? m.role : "other";
 };
 
-/* ---------- chat ---------- */
 function say(kind, text) {
-  const blank = document.getElementById("chatEmpty");
-  if (blank) blank.remove();
+  const blank = $("chatEmpty"); if (blank) blank.remove();
   const who = kind === "you" ? "you" : kind === "err" ? "error" : "mind";
   const el = document.createElement("div");
   el.className = "msg " + kind;
-  el.innerHTML = `<div class="who">${who}</div><div class="body">${esc(text)}</div>`;
+  el.innerHTML = '<div class="who">' + who + '</div><div class="body">' + esc(text) + '</div>';
   $("chat").appendChild(el);
   $("chat").scrollTop = $("chat").scrollHeight;
 }
 
-/* ---------- trace ---------- */
-const KEEP = {
-  "llm.request":"llm", "llm.response":"llm", "llm.error":"llm",
+// Full text, with the reasoning tinted so it reads apart from the answer.
+function thinkify(text) {
+  return esc(text).replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/g,
+    (_, inner) => '<span class="think">&lt;think&gt;' + inner + '&lt;/think&gt;</span>');
+}
+
+function renderWindows() {
+  const box = $("windows");
+  if (!state.windows.length) {
+    box.innerHTML = '<div class="empty">Nothing said yet.</div>';
+    $("wCount").textContent = ""; return;
+  }
+  $("wCount").textContent = state.windows.map(w => w.module + " " + w.messages.length).join("  ·  ");
+  box.innerHTML = state.windows.map(w =>
+    '<div class="wcol"><div class="wcol-head">' +
+      '<b class="mod-' + roleOf(w.module) + '">' + esc(w.module) + '</b>' +
+      '<span class="pill">' + roleOf(w.module) + '</span>' +
+      '<span class="pill">' + w.messages.length + ' msgs</span>' +
+    '</div><div class="scroll wcol-body">' +
+      w.messages.map(m => {
+        const edited = m.meta && m.meta.edited_by;
+        return '<div class="wmsg ' + (m.role === "system" ? "system" : "") + ' ' +
+               (edited ? "edited" : "") + '">' +
+               '<div class="role">' + esc(m.role) + '</div>' +
+               '<div class="txt">' + thinkify(m.content) + '</div></div>';
+      }).join("") +
+    '</div></div>').join("");
+}
+
+function renderWiring() {
+  const w = state.wiring;
+  if (!w) { $("wiring").innerHTML = '<div class="empty">No mind yet.</div>'; return; }
+  $("wiring").innerHTML =
+    (w.modules || []).map(m =>
+      '<div class="card"><h4><span class="mod-' + m.role + '">' + esc(m.name) + '</span>' +
+      '<span class="pill">' + esc(m.role) + '</span></h4>' +
+      (m.model ? '<div class="chan">model <b>' + esc(m.model) + '</b></div>' : "") +
+      Object.entries(m.inputs || {}).map(([k,v]) =>
+        '<div class="chan">reads <b>' + esc(k) + '</b> &mdash; ' + esc(v) + '</div>').join("") +
+      Object.entries(m.outputs || {}).map(([k,v]) =>
+        '<div class="chan">writes <b>' + esc(k) + '</b> &mdash; ' + esc(v) + '</div>').join("") +
+      '</div>').join("") +
+    '<div class="card"><h4>links</h4>' +
+    (w.links || []).map(l => '<div class="link"><b>' + esc(l.src) + '</b> &mdash;' +
+      esc(l.channel) + '&rarr; <b>' + esc(l.dst) + '</b>' +
+      (l.as_channel !== l.channel ? ' <span class="tag">as ' + esc(l.as_channel) + '</span>' : "") +
+      (l.auto ? ' <span class="tag">[auto]</span>' : "") + '</div>').join("") + '</div>';
+}
+function renderInspector() { renderWindows(); renderWiring(); }
+
+function setView(v) {
+  state.view = v;
+  document.body.classList.toggle("show-wiring", v === "wiring");
+  $("tabWindows").classList.toggle("on", v === "windows");
+  $("tabWiring").classList.toggle("on", v === "wiring");
+}
+
+const GROUP = {
+  "llm.request":"llm", "llm.response":"llm", "llm.error":"llm", "note":"llm",
   "task.emit":"flow", "task.deliver":"flow",
-  "handle.start":"turns", "handle.end":"turns", "handle.error":"turns",
-  "tick.start":"turns", "tick.end":"turns",
-  "note":"llm", "memory.write":"turns",
 };
 function visible(kind) {
-  const group = KEEP[kind] || "turns";
-  if (group === "llm")   return $("fLlm").checked;
-  if (group === "flow")  return $("fFlow").checked;
-  return $("fTurns").checked;
+  const g = GROUP[kind] || "turns";
+  return g === "llm" ? $("fLlm").checked : g === "flow" ? $("fFlow").checked : $("fTurns").checked;
 }
 
 function addEvent(e) {
   state.count++; $("hCount").textContent = state.count;
-  if (e.tick > state.tick) { $("hTick").textContent = e.tick; }
-  const box = $("trace");
-  if (box.firstElementChild?.classList.contains("empty")) box.innerHTML = "";
+  if (e.tick > +$("hTick").textContent) $("hTick").textContent = e.tick;
+  const box = $("traceScroll");
+  const blank = box.querySelector(".empty"); if (blank) blank.remove();
 
   if (e.tick !== state.tick) {
     state.tick = e.tick;
     const sep = document.createElement("div");
     sep.className = "tick-sep";
-    sep.innerHTML = `<span>tick <b>${e.tick}</b></span>`;
+    sep.innerHTML = "<span>tick <b>" + e.tick + "</b></span>";
     box.appendChild(sep);
   }
   if (!visible(e.kind)) return;
 
+  const d = e.data || {};
+  // Full text when the trace carries it, the summary otherwise. Never clipped.
+  const body = d.text !== undefined ? d.text : (d.summary || "");
+  const cls = e.kind.indexOf("llm") === 0 ? "llm"
+            : e.kind.indexOf("task") === 0 ? "emit"
+            : e.kind.indexOf("error") >= 0 ? "err" : "";
   const row = document.createElement("div");
-  const cls = e.kind.startsWith("llm") ? "llm" : e.kind.startsWith("task") ? "emit"
-            : e.kind.includes("error") ? "err" : "";
-  row.className = `ev ${cls}`;
-  const full = e.data?.text || "";
-  if (full) row.classList.add("click");
-  const dur = e.duration_s != null ? `${(e.duration_s*1000).toFixed(0)}ms` : "";
+  row.className = "ev " + cls;
   row.innerHTML =
-    `<span class="mod mod-${roleOf(e.module)}">${esc(e.module)}</span>` +
-    `<span class="kind">${esc(e.kind)}</span>` +
-    `<span class="sum">${esc(e.data?.summary || "")}</span>` +
-    `<span class="dur">${dur}</span>`;
+    '<span class="mod mod-' + roleOf(e.module) + '">' + esc(e.module) + '</span>' +
+    '<span class="kind">' + esc(e.kind) + '</span>' +
+    '<span class="sum">' + esc(body) + '</span>' +
+    '<span class="dur">' + (e.duration_s != null ? (e.duration_s*1000).toFixed(0)+"ms" : "") + '</span>';
   box.appendChild(row);
-
-  if (full) {
-    row.onclick = () => {
-      const open = row.nextElementSibling?.classList.contains("detail");
-      if (open) { row.nextElementSibling.remove(); row.classList.remove("open"); return; }
-      const d = document.createElement("div");
-      d.className = "detail mono";
-      d.textContent = full;
-      row.after(d); row.classList.add("open");
-    };
-  }
-  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 140;
-  if (near) box.scrollTop = box.scrollHeight;
+  if (box.scrollHeight - box.scrollTop - box.clientHeight < 140)
+    box.scrollTop = box.scrollHeight;
 }
 
-/* ---------- inspector ---------- */
-function renderInspector() {
-  const box = $("inspector");
-  if (state.tab === "wiring") {
-    const w = state.wiring;
-    if (!w) { box.innerHTML = `<div class="empty">No mind yet.</div>`; return; }
-    box.innerHTML =
-      w.modules.map(m => `
-        <div class="card">
-          <h4><span class="mod-${m.role}">${esc(m.name)}</span>
-              <span class="pill">${esc(m.role)}</span></h4>
-          ${m.model ? `<div class="chan">model <b>${esc(m.model)}</b></div>` : ""}
-          ${Object.entries(m.inputs).map(([k,v]) =>
-            `<div class="chan">reads <b>${esc(k)}</b> — ${esc(v)}</div>`).join("")}
-          ${Object.entries(m.outputs).map(([k,v]) =>
-            `<div class="chan">writes <b>${esc(k)}</b> — ${esc(v)}</div>`).join("")}
-        </div>`).join("") +
-      `<div class="card"><h4>links</h4>` +
-      w.links.map(l => `<div class="link"><b>${esc(l.src)}</b> —${esc(l.channel)}→ <b>${esc(l.dst)}</b>` +
-        (l.as_channel !== l.channel ? ` <span class="auto">as ${esc(l.as_channel)}</span>` : "") +
-        (l.auto ? ` <span class="auto">[auto]</span>` : "") + `</div>`).join("") +
-      `</div>`;
-  } else {
-    if (!state.windows.length) { box.innerHTML = `<div class="empty">Nothing said yet.</div>`; return; }
-    box.innerHTML = state.windows.map(w => `
-      <div class="card">
-        <h4><span class="mod-${roleOf(w.module)}">${esc(w.module)}</span>
-            <span class="pill">${w.messages.length} msgs</span></h4>
-        ${w.messages.map(m => `
-          <div class="win-msg ${m.meta && m.meta.edited_by ? "edited" : ""}">
-            <div class="role">${esc(m.role)}</div>
-            <div class="txt">${esc(m.content)}</div>
-          </div>`).join("")}
-      </div>`).join("");
-  }
-}
-
-/* ---------- wire it up ---------- */
 function setStatus(s, extra) {
   state.busy = (s === "thinking");
   $("hDot").className = "dot " + s;
-  $("hState").textContent = extra != null ? `${s} · ${extra}` : s;
+  $("hState").textContent = extra != null ? s + " · " + extra : s;
   $("send").disabled = state.busy;
-  const stepping = (s === "stepping");
-  $("step").disabled = !stepping;
-  $("runout").disabled = !stepping;
+  $("step").disabled = $("runout").disabled = (s !== "stepping");
 }
-
+function nameShape(meta) {
+  const here = (state.minds || []).find(m => m.name === meta.name);
+  $("hShape").textContent = here ? here.title : (meta.name || "—");
+  $("hAbout").textContent = here ? here.about : (meta.run_id || "");
+}
 function handle(p) {
-  if (document.body.classList.contains("playback")) return;  // watching a recording
-  if (p.type === "event")   addEvent(p);
-  else if (p.type === "you")   say("you", p.text);
-  else if (p.type === "mind")  say("mind", p.text);
+  if (document.body.classList.contains("playback")) return;
+  if (p.type === "event") addEvent(p);
+  else if (p.type === "you") say("you", p.text);
+  else if (p.type === "mind") say("mind", p.text);
   else if (p.type === "error") say("err", p.text);
-  else if (p.type === "wiring") {
-    state.wiring = p.wiring;
-    const here = (state.minds || []).find(m => m.name === p.wiring.name);
-    $("hShape").textContent = here ? here.title : p.wiring.name;
-    $("hAbout").textContent = here ? here.about : p.wiring.run_id;
-    renderInspector();
-  }
-  else if (p.type === "windows") { state.windows = p.windows; renderInspector(); }
+  else if (p.type === "wiring") { state.wiring = p.wiring; nameShape(p.wiring); renderInspector(); }
+  else if (p.type === "windows") { state.windows = p.windows; renderWindows(); }
   else if (p.type === "status") {
-    setStatus(p.state, p.ticks != null ? `${p.ticks} ticks` : (p.turns != null ? `${p.turns} turns` : null));
+    setStatus(p.state, p.ticks != null ? p.ticks + " ticks"
+                     : (p.turns != null ? p.turns + " turns" : null));
     if (p.state === "idle") refreshRecordings();
   }
 }
-
-// `?still` renders from /state alone, so the page settles and can be captured.
 const still = new URLSearchParams(location.search).has("still");
 if (!still) new EventSource("/events").onmessage = (m) => handle(JSON.parse(m.data));
 
-/* ---------- playback ---------- */
-const pb = { events:[], i:0, timer:null, meta:null };
-
-function pbStop() { clearInterval(pb.timer); pb.timer = null; $("pbPlay").textContent = "▶ play"; }
+const pb = { events:[], i:0, timer:null };
+function pbStop() { clearInterval(pb.timer); pb.timer = null; $("pbPlay").innerHTML = "&#9654; play"; }
+function resetPanes() {
+  $("traceScroll").innerHTML = ""; $("chat").innerHTML = "";
+  state.tick = -1; state.count = 0; state.windows = [];
+  $("hCount").textContent = "0"; $("hTick").textContent = "0";
+  renderInspector();
+}
 function pbAt(n) {
-  // Rendering is cumulative, so going backwards means replaying from zero.
   if (n < pb.i) { resetPanes(); pb.i = 0; }
   while (pb.i < n) { renderRecorded(pb.events[pb.i]); pb.i++; }
   $("pbScrub").value = pb.i;
-  $("pbPos").textContent = `${pb.i} / ${pb.events.length}`;
+  $("pbPos").textContent = pb.i + " / " + pb.events.length;
   if (pb.i >= pb.events.length) pbStop();
 }
 function renderRecorded(e) {
   addEvent(e);
   const d = e.data || {};
-  // The trace carries Text payloads in full, so the conversation replays too.
   if (e.kind === "task.emit" && d.text !== undefined) {
     if (d.channel === "prompt") say("you", d.text);
     else if (d.dst === "world") say("mind", d.text);
   }
-  if (e.kind === "memory.write" && d.op === "replace_all" && d.window) {
-    upsertWindow(e.module, d.window);
-  }
-  if (e.kind === "memory.write" && d.op === "append" && d.content !== undefined) {
-    appendWindow(e.module, {role:d.role, content:d.content, meta:d.meta || {}});
+  if (e.kind === "memory.write") {
+    if (d.op === "replace_all" && d.window) setWindow(e.module, d.window);
+    else if (d.op === "append" && d.content !== undefined)
+      pushWindow(e.module, {role:d.role, content:d.content, meta:d.meta || {}});
   }
 }
-function upsertWindow(name, messages) {
+function setWindow(name, messages) {
   const w = state.windows.find(x => x.module === name);
-  if (w) w.messages = messages; else state.windows.push({module:name, messages});
-  renderInspector();
+  if (w) w.messages = messages; else state.windows.push({module:name, messages:messages});
+  renderWindows();
 }
-function appendWindow(name, msg) {
+function pushWindow(name, msg) {
   let w = state.windows.find(x => x.module === name);
   if (!w) { w = {module:name, messages:[]}; state.windows.push(w); }
-  w.messages.push(msg);
-  renderInspector();
-}
-function resetPanes() {
-  $("trace").innerHTML = ""; $("chat").innerHTML = "";
-  state.tick = -1; state.count = 0; state.windows = [];
-  $("hCount").textContent = "0"; $("hTick").textContent = "0";
-  renderInspector();
+  w.messages.push(msg); renderWindows();
 }
 
 async function loadRecording(value) {
   pbStop();
-  if (!value) {   // back to live
+  if (!value) {
     document.body.classList.remove("playback");
-    $("playbar").hidden = true;
-    $("source").value = "";
-    $("traceLabel").textContent = "live trace";
+    $("playbar").hidden = true; $("source").value = "";
     resetPanes();
     const s = await (await fetch("/state")).json();
     (s.backlog || []).forEach(handle);
-    state.wiring = s.wiring; state.windows = s.windows; renderInspector();
-    setStatus("idle");
+    state.wiring = s.wiring; state.windows = s.windows;
+    nameShape(s.wiring); renderInspector(); setStatus("idle");
     return;
   }
-  const [mind, run] = value.split("|");
-  const r = await fetch(`/recording?mind=${encodeURIComponent(mind)}&run=${encodeURIComponent(run)}`);
+  const parts = value.split("|"), mind = parts[0], run = parts[1];
+  const r = await fetch("/recording?mind=" + encodeURIComponent(mind) +
+                        "&run=" + encodeURIComponent(run));
   if (!r.ok) { say("err", "could not load that recording"); return; }
   const data = await r.json();
-  pb.events = data.events; pb.meta = data.meta; pb.i = 0;
+  pb.events = data.events; pb.i = 0;
   document.body.classList.add("playback");
-  $("playbar").hidden = false;
-  $("source").value = value;          // the picker must show what is on screen
-  $("traceLabel").textContent = "recorded trace";
+  document.body.classList.remove("trace-collapsed");
+  $("playbar").hidden = false; $("source").value = value;
   resetPanes();
   state.wiring = data.meta; renderInspector();
-  $("hShape").textContent = `${mind} · recorded`;
+  $("hShape").textContent = mind + " · recorded";
   $("hAbout").textContent = run;
-  const sub = (data.meta.modules || []).find(m => m.role === "subject");
-  const ego = (data.meta.modules || []).find(m => m.role === "ego");
-  $("hSubject").textContent = sub?.model || "—";
-  $("hEgo").textContent = ego?.model || "none";
+  const mods = data.meta.modules || [];
+  const sub = mods.find(m => m.role === "subject"), ego = mods.find(m => m.role === "ego");
+  $("hSubject").textContent = (sub && sub.model) || "—";
+  $("hEgo").textContent = (ego && ego.model) || "none";
   $("pbScrub").max = pb.events.length;
-  $("hState").textContent = "recorded";
-  $("hDot").className = "dot";
+  $("hState").textContent = "recorded"; $("hDot").className = "dot";
   pbAt(0);
 }
-
-$("pbReset").onclick = () => { pbStop(); resetPanes(); pb.i = 0; pbAt(0); };
-$("pbEvent").onclick = () => { pbStop(); pbAt(pb.i + 1); };
-$("pbTick").onclick = () => {
-  pbStop();
-  if (pb.i >= pb.events.length) return;
-  const t = pb.events[pb.i].tick;
-  let n = pb.i;
-  while (n < pb.events.length && pb.events[n].tick === t) n++;
-  pbAt(n);
-};
-$("pbScrub").oninput = (e) => { pbStop(); pbAt(+e.target.value); };
-$("pbPlay").onclick = () => {
-  if (pb.timer) { pbStop(); return; }
-  if (pb.i >= pb.events.length) { resetPanes(); pb.i = 0; }
-  $("pbPlay").textContent = "⏸ pause";
-  const ms = +$("pbSpeed").value;
-  if (ms === 0) { pbAt(pb.events.length); return; }
-  pb.timer = setInterval(() => pbAt(pb.i + 1), ms);
-};
-$("pbSpeed").onchange = () => { if (pb.timer) { pbStop(); $("pbPlay").click(); } };
-$("source").onchange = (e) => loadRecording(e.target.value);
 
 async function refreshRecordings() {
   const rs = await (await fetch("/recordings")).json();
   const sel = $("source"), keep = sel.value;
-  sel.innerHTML = `<option value="">● live</option>` + rs.map(r =>
-    `<option value="${r.mind}|${r.run_id}">${r.mind} · ${r.run_id} · ${r.events} events</option>`
-  ).join("");
+  sel.innerHTML = '<option value="">&#9679; live</option>' + rs.map(r =>
+    '<option value="' + r.mind + '|' + r.run_id + '">' +
+    r.mind + ' · ' + r.run_id + ' · ' + r.events + ' events</option>').join("");
   sel.value = keep;
 }
 
@@ -559,40 +496,60 @@ function send() {
 $("send").onclick = send;
 $("step").onclick = () => post("/step");
 $("runout").onclick = () => post("/run");
-$("clear").onclick = () => { $("trace").innerHTML = `<div class="empty">Cleared.</div>`; state.tick = -1; };
 $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
-document.querySelectorAll(".tab").forEach(t => {
-  t.classList.toggle("on", t.dataset.tab === state.tab);
-});
-document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
-  document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
-  t.classList.add("on"); state.tab = t.dataset.tab; renderInspector();
-});
-["fLlm","fFlow","fTurns"].forEach(id => $(id).onchange = () => {});
+$("clear").onclick = () => {
+  $("traceScroll").innerHTML = '<div class="empty">Cleared.</div>'; state.tick = -1;
+};
+$("traceToggle").onclick = () => {
+  const off = document.body.classList.toggle("trace-collapsed");
+  $("traceToggle").innerHTML = off ? "&#9656;" : "&#9662;";
+};
+$("tabWindows").onclick = () => setView("windows");
+$("tabWiring").onclick = () => setView("wiring");
+$("source").onchange = (e) => loadRecording(e.target.value);
+$("pbReset").onclick = () => { pbStop(); resetPanes(); pb.i = 0; pbAt(0); };
+$("pbEvent").onclick = () => { pbStop(); pbAt(pb.i + 1); };
+$("pbTick").onclick = () => {
+  pbStop();
+  if (pb.i >= pb.events.length) return;
+  const t = pb.events[pb.i].tick;
+  let n = pb.i;
+  while (n < pb.events.length && pb.events[n].tick === t) n++;
+  pbAt(n);
+};
+$("pbScrub").oninput = (e) => { pbStop(); pbAt(+e.target.value); };
+$("pbPlay").onclick = () => {
+  if (pb.timer) { pbStop(); return; }
+  if (pb.i >= pb.events.length) { resetPanes(); pb.i = 0; }
+  $("pbPlay").innerHTML = "&#9208; pause";
+  const ms = +$("pbSpeed").value;
+  if (ms === 0) { pbAt(pb.events.length); return; }
+  pb.timer = setInterval(() => pbAt(pb.i + 1), ms);
+};
+$("pbSpeed").onchange = () => { if (pb.timer) { pbStop(); $("pbPlay").click(); } };
 
+setView(state.view);
 fetch("/minds").then(r => r.json()).then(list => {
   state.minds = list;
-  const here = list.find(m => m.name === (state.wiring?.name || ""));
-  if (here) { $("hShape").textContent = here.title; $("hAbout").textContent = here.about; }
+  if (state.wiring) nameShape(state.wiring);
 });
-
 fetch("/state").then(r => r.json()).then(s => {
-  if (still) (s.backlog || []).forEach(handle);
+  if (still) (s.backlog || []).forEach(p => {
+    if (p.type === "event") addEvent(p);
+    else if (p.type === "you") say("you", p.text);
+    else if (p.type === "mind") say("mind", p.text);
+  });
   state.wiring = s.wiring; state.windows = s.windows;
-  const here = (state.minds || []).find(m => m.name === s.wiring.name);
-  $("hShape").textContent = here ? here.title : s.wiring.name;
-  $("hAbout").textContent = here ? here.about : s.wiring.run_id;
+  nameShape(s.wiring);
   const sub = s.wiring.modules.find(m => m.role === "subject");
   const ego = s.wiring.modules.find(m => m.role === "ego");
-  $("hSubject").textContent = sub?.model || "—";
-  $("hEgo").textContent = ego?.model || "none";
+  $("hSubject").textContent = (sub && sub.model) || "—";
+  $("hEgo").textContent = (ego && ego.model) || "none";
   renderInspector();
 });
 refreshRecordings().then(() => {
-  // `?play=<mind>|<run>&at=<n>` opens a recording stepped to a position, which
-  // is how a still of the playback view gets captured.
   const q = new URLSearchParams(location.search);
   const rec = q.get("play");
   if (rec) loadRecording(rec).then(() => pbAt(+(q.get("at") || 0)));
