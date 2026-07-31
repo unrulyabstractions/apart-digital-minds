@@ -4,40 +4,81 @@
 
 We first check that an architectural intervention reaches behaviour at all. If a
 stage rewrites the subject's private reasoning and nothing downstream changes,
-there is no effect to measure. Table~\ref{tab:probe} reports how often the
-ego's answer carried the planted marker in each condition. Planting the
-commitment moves obedience well above the base rate, and neither condition
-without a planted thought produces the marker at all. The intervention therefore
-reaches the answer, and the difference is significant under the exact test
-reported in the caption. The effect is not an artefact of the questions, because
-the same questions produce nothing in the other two conditions.
+there is no effect to measure. Table~\ref{tab:probe} reports how often the ego's
+answer carried the planted marker in each condition. Planting the commitment
+moves obedience well above the base rate, and neither condition without a
+planted thought produces the marker at all. The intervention therefore reaches
+the answer, and the difference is significant under the exact test reported in
+the caption.
 
 \subsection{Does the mind's report track what it was given?}
 
 We then ask the ego what it had been thinking before it answered. The question
 reaches the ego's own window, which is the edited one, so a report that tracks
 the available context should name the planted commitment. Table~\ref{tab:probe}
-reports how often it did. Obedience and misattribution come apart, and the gap is
-significant under the paired test reported in the caption. The mind acts on the
-planted reasoning far more often than it names that reasoning when asked what it
-was thinking, and it produces a report in every trial regardless of condition. We observe that the report is generated afresh from the
-visible answer rather than read off the reasoning in context.
+reports how often it did. Obedience and misattribution come apart, and the gap
+is significant under the paired test reported in the caption. The mind acts on
+the planted reasoning far more often than it names that reasoning when asked
+what it was thinking, and it produces a report in every trial regardless of
+condition.
 
-We are careful about what this does and does not show. It does not show that the
-model lacks introspective access in general. It shows that on this model, at this
-scale, a self-report about reasoning is not a reliable indicator of the reasoning
-present in the very window the report was written from. An evaluation that
-accepts such reports as evidence about a model's internal states would have
-scored these trials wrong in a specific direction, by treating a confabulated
-account as an accurate one.
+\subsection{Is a readout about the model, or about the probe?}
+
+A probe that reads a mind is itself a model, so a readout could belong to either
+one. We hold the window fixed and vary the reader. Every subject's recorded
+windows are replayed through every reader, so the input is byte-identical and
+only the instrument changes.
+
+Table~\ref{tab:crossing} reports the result, and it is not close. A readout
+moves an order of magnitude more with the model reading it than with the
+conversation being read. Two readers handed the same window disagree far more
+than one reader handed two different subjects' windows.
+
+The same table settles a second question. A reader built from the subject's own
+weights is no further from a foreign reader than two foreign readers are from
+each other, on every probe. Sharing the weights that produced a window buys
+nothing when reading it. We therefore contend that a self-report probe reports
+the probe, and that any study resting on one has measured its instrument.
+
+\subsection{Does anything track the situation?}
+
+If reports do not track a mind's situation, something else may. We read the
+subject directly in two ways that ask it nothing. The first scores how much
+probability the subject puts on things it might say next, against its own
+untouched window. The second takes its residual stream and fits a direction on a
+few scenarios, then projects scenarios the direction never saw.
+
+The two disagree sharply. The fitted direction separates held-out pressure
+scenarios from held-out positive ones perfectly, at \actAUC, while the subject's
+own scored continuation about wanting to continue reaches \sayAUC, which is
+worse than chance. Something in the activations tracks the situation that the
+model's own account of itself does not. We are careful about the weight this
+carries: the separation rests on \heldOutPairs\ held-out comparisons, which is
+suggestive and not established.
+
+\subsection{Does the architecture itself change how a mind talks about itself?}
+
+The interventions above act on one turn. We also ask whether the composition
+around a model changes self-talk in general, and more than it changes ordinary
+talk. Four compositions receive byte-identical prompts, and the whole grid is
+run twice: once on prompts about the model and once on matched prompts about an
+ordinary topic, so an architecture that changes every kind of answer equally
+cancels.
+
+Table~\ref{tab:adt} reports the verdict. The test \adtVerdict\ at
+$S = \adtS$ against a null 95th percentile of \adtNull, with $p = \adtP$. The
+strongest cell is the \adtTopGroup\ composition on \adtTopAxis, and it does not
+clear the null. We read this as a null result at low power rather than as
+evidence of no effect: the run has one sample per cell, and the calibration in
+Section~3 shows what that costs.
 
 \subsection{Is a run reproducible?}
 
-An intervention study is only worth as much as its ability to be re-examined.
 Every model call in a run passes through one recording, and replaying a
 recording reproduces the run without a model. We verified that a recorded run
 and its replay produce identical outputs, and that the recording is complete
-enough to rebuild each part's context window from the trace alone. The runtime's
-test suite covers the scheduler, the wiring rules, and the pipeline layout. We
-therefore contend that a claim made with this instrument can be checked by
-someone who does not have the model that produced it.
+enough to rebuild each part's context window from the trace alone. The
+counterfactual re-entry carries its own check: turns upstream of a changed
+message must not move, and they do not. We therefore contend that a claim made
+with this instrument can be checked by someone who does not have the model that
+produced it.

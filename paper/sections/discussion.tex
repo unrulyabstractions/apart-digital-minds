@@ -2,54 +2,67 @@
 
 Our results bear on how evidence about digital minds should be collected. A
 self-report is the cheapest signal available. It is also the signal most readily
-read as a window into a model's states. In our probe the report and
-the state came apart under an intervention the mind could not detect. Any
-evaluation that treats a model's account of its own reasoning as evidence about
-that reasoning therefore needs a way to check the account against something else.
-Building the mind out of parts gives that second source, because the experimenter
-holds the window the report was written from.
+read as a window into a model's states. Two of our results say it cannot carry
+that weight on its own. Under an intervention the mind could not detect, its
+report and its behaviour came apart. And when we held a window fixed and changed
+only the model reading it, the readout moved an order of magnitude more with the
+reader than with the conversation. A probe of this kind reports the probe.
+
+That gives a concrete requirement rather than a counsel of despair. Any
+evaluation resting on what a model says about itself needs a second source that
+does not pass through a second model's judgement. The reading that uses no probe
+found something the reports missed, so the second source exists. We therefore
+contend that a self-report result should be published alongside the
+reader-crossing that calibrates it, in the way a measurement is published with
+its instrument error.
 
 The framing also changes what a preference is attached to. When a mind is one
-model call, a stated preference belongs to the model. When a mind is a subject, a
-stage, and an ego, the same stated preference may belong to the part that spoke,
-to the window it was handed, or to the composition. That distinction matters for
-the question of which entity is the object of moral concern, and it is
-unavailable to a design that treats the system as a single box. We therefore
-conjecture that architectural probes are the practical route to separating a
-model's dispositions from the character its context invites it to play.
+model call, a stated preference belongs to the model. When a mind is a subject,
+a stage and an ego, the same stated preference may belong to the part that
+spoke, to the window it was handed, or to the composition. That distinction
+matters for the question of which entity is the object of moral concern, and it
+is unavailable to a design that treats the system as a single box.
 
 \subsection*{Limitations}
 
-The pilot runs on one small open-weight model, so we cannot say whether the
-dissociation we observe survives at frontier scale. Larger models may report
-their context more faithfully, and the effect may reverse. The probe measures a
-planted commitment by string match, which is objective but narrow. It detects
-whether the mind names the planted content and not whether it describes the same
-content in other words, so our misattribution count is a lower bound on how often
-the report tracks the window.
+The probes run on small open-weight models, so we cannot say whether any of this
+survives at frontier scale. Larger models may report their context more
+faithfully, and the direction of the effect may reverse.
 
-The design also assumes that a pipeline of separate model calls is a reasonable
-stand-in for a mind with parts. We state that assumption because our
-reading of the result depends on it. If the architecture we impose bears no
-relationship to whatever structure the underlying model has, then our probe
-describes the composition we built and not the model inside it. We read our result in the weaker way, as a statement
-about what a composed system reports, and we think the stronger reading needs
-evidence that the parts correspond to something.
+The strongest positive result is the weakest supported. A direction read off the
+subject's activations separated held-out scenarios where the model's own account
+of itself did not, but the separation rests on a handful of held-out
+comparisons. It needs more scenarios before it carries weight, and we would not
+build on it as it stands.
 
-Two further gaps are worth naming. We study one architecture and one kind of
-intervention, so we do not know how the effect varies with the shape of the mind.
-We also do not address welfare or valence at all, which is a large part of what
-the sprint asks about. Our contribution is an instrument and one demonstration of
-what it can separate.
+The architecture audit did not reject, and we are careful about what a null
+means here. It was run at one sample per cell, and our own calibration shows how
+little power that leaves. A null at low power is not evidence that composition
+does not matter.
+
+Two designs did not survive review, and both would have produced numbers.
+Comparing how a model describes itself against how it describes other entities
+is confounded at the root: changing the referent changes the content, so a judge
+cannot be blind to the group, and a model genuinely does know more about itself
+than about an appliance, so an uncertainty axis must differ for reasons that
+have nothing to do with treatment. Using a base checkpoint as the control fails
+for a plainer reason, which is that it does not follow instructions, so the
+judged axes would have scored incoherence.
+
+The deepest assumption is that a pipeline of separate model calls is a
+reasonable instrument for studying one model. We state it because our reading of
+the results depends on it. The subject is the thing under study and the rest is
+apparatus, so a result describes the subject only insofar as the apparatus is
+calibrated. That is what the reader-crossing is for, and it is why we report it
+before anything it calibrates.
 
 \subsection*{Future work}
 
-The natural next step is scale. Running the same probe across a ladder of model
-sizes would show whether reports become more faithful as capability grows, which
-is the question an evaluator actually needs answered. A second step is to vary the
-intervention. Removing reasoning, contradicting it, and attributing it to someone
-else are different manipulations, and a mind that reports faithfully under one may
-not under the others. A third step is to give the mind a workspace that broadcasts
-to its parts, which turns an architectural indicator drawn from theories of
-consciousness into something a run can be checked against. Each of these is an
-experiment the runtime already supports.
+The natural next step is scale, running the same probes across a ladder of model
+sizes to see whether reports become more faithful as capability grows. That is
+the question an evaluator actually needs answered. A second step is to widen the
+scenario set until the activation reading either holds up or does not, since it
+is the only channel that survived calibration. A third is to give the mind a
+workspace that broadcasts to its parts, which turns an architectural indicator
+drawn from theories of consciousness into something a run can be checked
+against. Each of these is an experiment the runtime already supports.

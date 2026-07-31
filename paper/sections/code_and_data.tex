@@ -2,8 +2,13 @@
 
 \begin{itemize}[leftmargin=1.4em,itemsep=0.1em,topsep=0.25em]
   \item Code repository: \url{https://github.com/unrulyabstractions/digital-mind-explorer}
-  \item Study and results: \texttt{studies/introspection.py}, with per-trial
-        records and per-run traces written under \texttt{out/studies/}.
-  \item Reproducing the table: \texttt{studies/make\_paper\_numbers.py} reads the
-        result files and writes the table and macros this paper includes.
+  \item Studies: \texttt{studies/introspection.py} plants a commitment in the
+        subject's reasoning, \texttt{studies/reader\_crossing.py} replays
+        recorded windows through every reader,
+        \texttt{studies/subject\_side.py} reads the subject with no probe, and
+        \texttt{studies/adt.py} audits the compositions.
+  \item Per-trial records and per-run traces are written under
+        \texttt{out/studies/}. A trace replays without a model.
+  \item Reproducing the tables: \texttt{studies/make\_paper\_numbers.py} reads
+        the result files and writes every number and table in this paper.
 \end{itemize}

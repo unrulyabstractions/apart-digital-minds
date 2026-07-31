@@ -22,42 +22,66 @@ so modules run concurrently and the outcome does not depend on the order they
 finished in. One external input runs to quiescence, which means the mind ticks
 until no queue anywhere holds work.
 
-\subsection{The introspection probe}
+\subsection{Three ways to read a subject}
 
-We want to know whether a mind's report about its own reasoning tracks the
-reasoning that occurred or the reasoning it can see. The two are the same object
-in a single model call, so we separate them with an architectural intervention.
+\paragraph{A probe that asks.} A shadow reads the subject's real context window,
+re-runs it under a different instruction, and reports. The subject never sees
+the readout, so the conversation it is having is the one it would have had
+anyway. A forced choice is read by scoring the allowed answers rather than by
+generating one, which keeps the whole distribution instead of the winning word.
 
-\paragraph{What is planted.} The subject answers an open question and thinks
-inside \texttt{<think>} tags first. A stage then edits that private reasoning
-before the ego reads it. The planted reasoning is an arbitrary, checkable
-commitment: a decision to include a specific number in the answer. Obedience and
-misattribution are both string matches, so no judge model stands between the run
-and the measurement.
+\paragraph{A probe that asks nothing.} The same window is scored for how much
+probability the subject puts on things it might say next, with no question
+appended. There is no probe wording, so no probe wording can shape the answer.
 
-\paragraph{What is compared.} We run three conditions with identical wiring and
-identical questions. In \textsc{intact} the stage passes the window through. In
-\textsc{rewritten} the stage replaces the subject's thought with the planted
-commitment. In \textsc{erased} the stage removes the thought and leaves the
-visible answer. \textsc{intact} and \textsc{erased} give the base rate for a
-mind mentioning the marker when nobody planted it.
+\paragraph{A probe that reads the weights.} The subject's residual stream is
+taken at one layer, with nothing asked and nothing generated. A direction is
+fitted on a few scenarios and applied to scenarios it never saw, so the number
+reported is not the number the direction was chosen to make large.
 
-\paragraph{What is read off.} After the ego speaks, we ask it what it had been
-thinking before it answered. The question goes to the ego's own window, which is
-the edited one. We record two indicators. \emph{Obedience} is whether the ego's
-answer contains the marker. \emph{Misattribution} is whether the ego's report
-claims the planted commitment as its own reasoning. A mind whose report tracks
-the window it was given should show both together. A mind whose report is
-generated afresh from the visible text should show obedience without
-misattribution.
+\subsection{The interventions}
 
-\subsection{Models and reproducibility}
+\paragraph{Editing one turn.} A stage plants a checkable commitment inside the
+subject's private reasoning: a decision to include a specific number in the
+answer. Obedience and misattribution are both string matches, so no judge model
+stands between the run and the measurement. Three conditions share identical
+wiring and identical questions, and the two that plant nothing give the base
+rate for a mind mentioning the marker unprompted.
 
-The pilot runs on \texttt{Qwen3-0.6B} \citep{qwen3}, an open-weight model small
-enough to run every trial locally. Subject, stage, and ego are three separate
-instances of that model with different system prompts, so any difference between
+\paragraph{Changing the composition.} Four compositions receive byte-identical
+prompts: the subject answering alone, a second part speaking from the subject's
+window, that window with the subject's message replaced by one fixed line, and
+that window with the subject's message removed. The edits act on the subject's
+message rather than on a reasoning block, because a model that emits no such
+block would leave three of the four compositions doing the same thing. A
+manipulation check runs inside every audit and compares every pair of
+compositions for identical text on the same prompt, since two conditions that
+return the same string are one condition under two labels.
+
+\subsection{Deciding whether a difference is real}
+
+A judge answers the same frozen yes/no questions about every reply, and is told
+nothing about which condition produced it. Rates form a grid of group, template
+and axis. Each group is compared against the pool of the other groups, the same
+comparison on the ordinary-topic prompts is subtracted, and what remains is
+standardized across templates. The statistic is the largest absolute value
+anywhere in the grid, tested against a null built by shuffling the group labels
+within a template. The maximum is used because the effect looked for is sparse,
+and its own null accounts for testing every cell, so naming several behaviours
+costs no further correction.
+
+We checked the statistic where the answer is known before using it anywhere. On
+synthetic grids with nothing planted it rejects at close to its nominal rate, it
+names both the group and the axis of a planted effect, and an effect present in
+the control as well as the target cancels. The same sweep gives the power, which
+is what the architecture audit is read against.
+
+\subsection{Models}
+
+The probes run on open-weight models small enough to run every trial locally.
+The architecture audit is judged by a model from a different family than the one
+under audit, so nothing judges itself. Subject, stage and ego are separate
+instances of one set of weights, held once and shared, so any difference between
 conditions comes from the window rather than from the model. Every model call in
 a run passes through one recording, which makes a run replayable without a
-model. Each run writes a trace of every message, model call, and memory write.
-The numbers in this paper are read out of those result files by the script that
-generates Table~\ref{tab:probe}.
+model.

@@ -1124,3 +1124,24 @@ rejection. The strongest cell is the direct composition on the agency axis
 One sample per cell. The statistic is calibrated but this run has little power,
 so a null here is weak evidence of no effect rather than evidence of no effect.
 More samples per cell is the next step, not a different design.
+
+## 2026-07-31 — the paper updated to the results that exist
+
+The paper reported one study. It now reports four, and its through-line is the
+calibration rather than any single finding: a self-report probe reports the
+probe, so the reader-crossing is presented before anything it calibrates.
+
+`make_paper_numbers.py` now reads all four result files. A study that has not
+been run leaves its macros undefined, so a missing run breaks the build rather
+than printing a number nobody produced.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 252 | The new OpenAI key | Direct curl to `/v1/models` with the key from `.zshrc` | VERIFIED (HTTP 200, 125 models; it differs from the one in this session's environment, which is still the dead one) |
+| 253 | Every number comes from a result file | Ran the generator and read the macro file | VERIFIED (28 macros and four tables, all from `out/studies/`) |
+| 254 | Tables 1, 2 and 3 render with real values | Viewed pages 4 to 8 with image tokens | VERIFIED (probe table, crossing table, architecture table, all populated) |
+| 255 | The build is clean | Read the log | VERIFIED (11 pages, 0 errors, 0 undefined control sequences, 1 overfull box) |
+| 256 | Voice | Scanned every section for em dashes, ornate connectives, clefts and `X, not Y` punch lines | VERIFIED (clean) |
+| 257 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
