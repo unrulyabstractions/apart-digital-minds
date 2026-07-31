@@ -27,9 +27,9 @@ clock we control. A \textbf{subject} reasons and publishes the context window it
 produced. A \textbf{stage} may edit that window in passing. An \textbf{ego}
 speaks from whatever window reaches it and has no access to the original. We
 call editing the window between two parts an \textbf{architectural
-intervention}. It gives an experimenter a handle that black-box prompting does
-not have, because the reasoning a mind performed and the reasoning a mind can
-see become two different objects.
+intervention}. It splits one thing into two. The reasoning a mind performed and
+the reasoning a mind can see are now separate objects, and an experimenter can
+change one and hold the other fixed. Black-box prompting has no such handle.
 
 Cognitive architecture also connects this evidence to existing theory. Proposed
 indicators of consciousness are stated as architectural properties, such as a
@@ -54,10 +54,10 @@ Our main contributions are:
   \item An introspection probe built on that runtime, and a study in which a
         planted thought steers the answer while the mind's report about its own
         reasoning does not track what it was given.
-  \item A calibration for probes of this kind. Holding a window fixed and
-        varying the model that reads it shows that a readout belongs mostly to
-        the reader, and that the subject's own weights give a reader no
-        advantage in reading it.
-  \item A reading of the subject that asks it nothing, which separates
-        held-out scenarios that its own reports do not.
+  \item A way to check such a probe. We hold one context window fixed and
+        change only the model reading it. The readout turns out to belong
+        mostly to the reader, and a reader made of the subject's own weights
+        reads it no better than a stranger does.
+  \item A way to read the subject that asks it nothing. It separates held-out
+        scenarios that the model's own reports fail to separate.
 \end{itemize}

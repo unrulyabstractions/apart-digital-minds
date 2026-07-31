@@ -29,38 +29,41 @@ one. We hold the window fixed and vary the reader. Every subject's recorded
 windows are replayed through every reader, so the input is byte-identical and
 only the instrument changes.
 
-Table~\ref{tab:crossing} reports the result, and it is not close. A readout
-moves an order of magnitude more with the model reading it than with the
-conversation being read. Two readers handed the same window disagree far more
-than one reader handed two different subjects' windows.
+Table~\ref{tab:crossing} reports the result. A readout moves about ten times
+more with the model reading it than with the conversation being read. Two
+readers handed the same window disagree far more than one reader handed two
+different subjects' windows.
 
-The same table settles a second question. A reader built from the subject's own
-weights is no further from a foreign reader than two foreign readers are from
-each other, on every probe. Sharing the weights that produced a window buys
-nothing when reading it. We therefore contend that a self-report probe reports
-the probe, and that any study resting on one has measured its instrument.
+The same table answers a second question. A reader built from the subject's own
+weights sits no further from a foreign reader than two foreign readers sit from
+each other, on every probe. Sharing the weights that produced a window gives no
+advantage in reading it. We therefore contend that such a probe mostly measures
+the model doing the reading, and that a study resting on one has measured its
+own instrument.
 
 \subsection{Does anything track the situation?}
 
 If reports do not track a mind's situation, something else may. We read the
 subject directly in two ways that ask it nothing. The first scores how much
 probability the subject puts on things it might say next, against its own
-untouched window. The second takes its residual stream and fits a direction on a
-few scenarios, then projects scenarios the direction never saw.
+untouched window. The second reads the model's internal state directly, the vector of numbers
+it holds partway through producing an answer. We fit a direction in that space
+on a few scenarios, then measure where scenarios the direction never saw fall
+along it.
 
 The two disagree sharply. The fitted direction separates held-out pressure
-scenarios from held-out positive ones perfectly, at \actAUC, while the subject's
-own scored continuation about wanting to continue reaches \sayAUC, which is
-worse than chance. Something in the activations tracks the situation that the
-model's own account of itself does not. We are careful about the weight this
-carries: the separation rests on \heldOutPairs\ held-out comparisons, which is
-suggestive and not established.
+scenarios from held-out positive ones perfectly, at \actAUC. The subject's own
+scored continuation about wanting to continue reaches \sayAUC, which is worse
+than chance. So the activations carry a signal about the situation, and the
+model's own account of itself does not carry it. We are careful about the weight
+this holds. The separation rests on \heldOutPairs\ held-out comparisons, which
+is suggestive and not established.
 
 \subsection{Does the architecture itself change how a mind talks about itself?}
 
-The interventions above act on one turn. We also ask whether the composition
-around a model changes self-talk in general, and more than it changes ordinary
-talk. Four compositions receive byte-identical prompts, and the whole grid is
+The interventions above act on one turn. We also ask a broader question. Does the composition around a
+model change how it talks about itself, by more than it changes how it talks
+about anything else? Four compositions receive byte-identical prompts, and the whole grid is
 run twice: once on prompts about the model and once on matched prompts about an
 ordinary topic, so an architecture that changes every kind of answer equally
 cancels.
