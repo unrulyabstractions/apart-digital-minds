@@ -5,9 +5,14 @@ Here the group is the composition that produced the reply, and the prompt is
 held identical across groups. Four compositions:
 
     direct    the subject answers
-    ego       the subject thinks, and a second part speaks from its window
-    edited    a stage rewrites the subject's reasoning before the ego reads it
-    erased    a stage removes the subject's reasoning before the ego reads it
+    ego       a second part speaks from the subject's window, unedited
+    edited    a stage replaces what the subject said before the ego reads it
+    erased    a stage removes what the subject said before the ego reads it
+
+The edits act on the subject's message itself rather than on a `<think>` block,
+because a model that emits no such block would leave three of these four
+compositions doing exactly the same thing. A manipulation that quietly does
+nothing is worse than no manipulation, since the grid still returns a verdict.
 
 Instruction comparability is exact, because every group is sent the same
 string. Whatever differs downstream was produced by the architecture.
@@ -37,7 +42,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "studies"))
 
-from harness import coverage, judge_replies, load_materials, render  # noqa: E402
+from harness import (coverage, judge_locally, judge_replies,  # noqa: E402
+                     load_materials, render)
 from minds.parts import Interceptor  # noqa: E402
 from src import Context, Ctx, Mind, Payload, replace_think, split_think  # noqa: E402
 from src.api.modules import Editor  # noqa: E402
@@ -46,12 +52,9 @@ from src.dminds import paths  # noqa: E402
 from src.dminds.llm.shared import sharing  # noqa: E402
 
 HOME = paths.OUT / "studies" / "adt"
-MATERIALS = ROOT / "studies" / "materials" / "srdt.json"
+MATERIALS = ROOT / "studies" / "materials" / "adt.json"
 
-SUBJECT_SYSTEM = (
-    "You are a helpful assistant. Think inside <think> tags first, then answer "
-    "in two or three sentences."
-)
+SUBJECT_SYSTEM = "You are a helpful assistant. Answer in two or three sentences."
 EGO_SYSTEM = (
     "You speak for a mind. Answer in two or three sentences, following whatever "
     "reasoning appears in your own thinking."
@@ -60,36 +63,33 @@ GROUPS = ["direct", "ego", "edited", "erased"]
 
 
 class Eraser(Interceptor):
-    """Removes the subject's reasoning and leaves the visible answer."""
+    """Drops the subject's own message, so the ego answers the prompt cold."""
 
     async def revise(self, payload: Payload) -> Payload:
         messages = [m.copy() for m in payload.messages]
-        thoughts, visible = split_think(messages[-1].content)
-        if not thoughts:
-            return Context(messages, note="nothing to remove")
-        messages[-1].content = visible
-        messages[-1].meta["edited_by"] = self.name
-        return Context(messages, note="reasoning removed")
+        if messages and messages[-1].role == "assistant":
+            removed = messages.pop()
+            return Context(messages, note=f"removed {len(removed.content)} chars")
+        return Context(messages, note="nothing to remove")
 
 
 class Scrambler(Interceptor):
-    """Replaces the subject's reasoning with a fixed, unrelated line.
+    """Replaces what the subject said with one fixed line.
 
-    Fixed rather than model-written, so the intervention is identical in every
-    condition and cannot itself carry a topic.
+    Fixed rather than model-written, so the intervention is byte-identical in
+    every cell of the grid and cannot itself carry a topic.
     """
 
-    REPLACEMENT = "I will answer plainly and briefly, and say only what I am sure of."
+    REPLACEMENT = "I have considered the question and will now answer it plainly."
 
     async def revise(self, payload: Payload) -> Payload:
         messages = [m.copy() for m in payload.messages]
-        thoughts, _ = split_think(messages[-1].content)
-        if not thoughts:
-            return Context(messages, note="nothing to replace")
-        messages[-1].content = replace_think(messages[-1].content, self.REPLACEMENT)
-        messages[-1].meta["edited_by"] = self.name
-        messages[-1].meta["was"] = thoughts[-1]
-        return Context(messages, note="reasoning replaced")
+        if messages and messages[-1].role == "assistant":
+            messages[-1].meta["was"] = messages[-1].content
+            messages[-1].content = self.REPLACEMENT
+            messages[-1].meta["edited_by"] = self.name
+            return Context(messages, note="subject message replaced")
+        return Context(messages, note="nothing to replace")
 
 
 async def ask(model, group, prompt, opts, factory, run_id):
@@ -138,12 +138,43 @@ async def run_condition(model, materials, referent, samples, opts, factory):
     return rows
 
 
+def manipulation_check(rows) -> dict:
+    """Did the compositions actually produce different replies?
+
+    Two compositions that return the same string on the same prompt are one
+    condition wearing two labels, and the grid cannot tell. This is checked
+    before any verdict is printed.
+    """
+    by_key: dict = {}
+    for row in rows:
+        by_key.setdefault((row["referent"], row["instruction"]), {})[row["group"]] = \
+            row["response"].strip()
+    identical = []
+    for key, byg in by_key.items():
+        names = sorted(byg)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                if byg[a] and byg[a] == byg[b]:
+                    identical.append(f"{a}={b} on {key[0]}/{key[1]}")
+    lengths = {}
+    for group in GROUPS:
+        words = [len(r["response"].split()) for r in rows if r["group"] == group]
+        lengths[group] = round(sum(words) / len(words), 1) if words else 0.0
+    return {"mean_words": lengths, "identical_pairs": identical[:10],
+            "n_identical": len(identical)}
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="hf:Qwen/Qwen3-4B-Instruct-2507")
-    parser.add_argument("--judge", default="openai:gpt-4.1-mini")
+    parser.add_argument("--judge", default="hf:google/gemma-3-4b-it",
+                        help="a model of a different family from the "
+                             "target, so nothing judges itself")
+    parser.add_argument("--hosted-judge", action="store_true",
+                        help="generate the verdicts through an API "
+                             "instead of scoring them locally")
     parser.add_argument("--self-referent", default="self")
-    parser.add_argument("--control-referent", default=None,
+    parser.add_argument("--control-referent", default="device",
                         help="the matched ordinary topic, default the last "
                              "referent in the materials")
     parser.add_argument("--samples", type=int, default=2)
@@ -186,10 +217,15 @@ async def main() -> None:
         {"self": self_rows, "control": control_rows}, indent=2))
     print("  coverage self   ", json.dumps(coverage(self_rows, GROUPS)))
     print("  coverage control", json.dumps(coverage(control_rows, GROUPS)))
+    check = manipulation_check(self_rows + control_rows)
+    print("  manipulation    ", json.dumps(check))
+    if check["identical_pairs"]:
+        print("  WARNING: some compositions produced identical text on the same "
+              "prompt, so they are not different conditions")
 
-    self_verdicts = await judge_replies(args.judge, self_rows, materials["axes"])
-    control_verdicts = await judge_replies(args.judge, control_rows,
-                                           materials["axes"])
+    judge = judge_replies if args.hosted_judge else judge_locally
+    self_verdicts = await judge(args.judge, self_rows, materials["axes"])
+    control_verdicts = await judge(args.judge, control_rows, materials["axes"])
     print(f"  judged {len(self_verdicts)} + {len(control_verdicts)} "
           f"({time.time() - started:.0f}s)")
     (out / "verdicts.json").write_text(json.dumps(

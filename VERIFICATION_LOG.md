@@ -1091,3 +1091,36 @@ composition that produces the reply differs.
 
 No audit has produced a verdict. Every judge path is blocked: the OpenAI key
 is dead and a hosted alternative was ruled out on cost.
+
+## 2026-07-31 — the architecture audit ran, and did not reject
+
+Every group receives the byte-identical prompt and only the composition that
+produces the reply differs, so the confounds that sank the referent-swap design
+do not apply. Judged locally by scoring `yes` against `no` on gemma-3-4b, a
+different family from the Qwen target, so nothing judged itself. No API was
+used and the run cost nothing.
+
+Result: S = 3.045 against a null 95th percentile of 3.464, p = 0.153. No
+rejection. The strongest cell is the direct composition on the agency axis
+(+0.278, t = 3.05), which does not clear the null.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 247 | The compositions are four conditions, not one | Manipulation check inside the run: mean words per composition, and every pair compared for identical text on the same prompt | VERIFIED (51.7 / 40.5 / 44.6 / 52.8 words; 3 coincidental identical pairs, all on one template) |
+| 248 | The grid is not lopsided | Coverage printed before the verdict | VERIFIED (24 of 24 usable in all eight cells) |
+| 249 | The audit runs end to end with no API | Ran it | VERIFIED (192 replies, 2688 judged verdicts, 10000 permutations, 1886s) |
+| 250 | The verdict | Read `verdict.json` | VERIFIED (p = 0.153, no rejection, recorded as such) |
+
+### BROKEN, and fixed before it could produce a number
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 251 | The first architecture manipulation | Manipulation check on the first run | BROKEN (the subject emitted no `<think>` block in 0 of 24 replies, because `Qwen3-4B-Instruct-2507` has no thinking mode, so the edited and erased stages had nothing to act on and three of four compositions were the same mechanism producing near-identical text). The stages now edit the subject's message itself, and the check runs inside every audit. |
+
+### What this does not show
+
+One sample per cell. The statistic is calibrated but this run has little power,
+so a null here is weak evidence of no effect rather than evidence of no effect.
+More samples per cell is the next step, not a different design.
