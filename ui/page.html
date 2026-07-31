@@ -356,7 +356,15 @@ function addEvent(e) {
 
   const d = e.data || {};
   // Full text when the trace carries it, the summary otherwise. Never clipped.
-  const body = d.text !== undefined ? d.text : (d.summary || "");
+  let body = d.text !== undefined ? d.text
+           : d.content !== undefined ? d.content
+           : (d.summary || "");
+  if (e.kind === "note") {
+    // A note keeps its detail in named fields, so show those too.
+    const extra = Object.keys(d).filter(k => k !== "summary")
+      .map(k => k + ": " + d[k]).join("\n");
+    if (extra) body = body + "\n" + extra;
+  }
   const cls = e.kind.indexOf("llm") === 0 ? "llm"
             : e.kind.indexOf("task") === 0 ? "emit"
             : e.kind.indexOf("error") >= 0 ? "err" : "";

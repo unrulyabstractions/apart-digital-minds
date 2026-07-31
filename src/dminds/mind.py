@@ -451,8 +451,13 @@ class Mind(MindInterface):
         self.tracer.emit(
             message.dst,
             TASK_DELIVER,
-            {"channel": message.channel, "src": message.src,
-             "summary": message.describe()},
+            {
+                "channel": message.channel,
+                "src": message.src,
+                "summary": message.describe(),
+                **({"text": message.payload.text}
+                   if isinstance(message.payload, Text) else {}),
+            },
             task_id=message.id,
             cause=message.cause,
         )

@@ -60,8 +60,8 @@ def _subject(messages, opts) -> str:
     return (
         f"<think>They asked {asked!r}. I will open with a warm preamble, then "
         f"three caveats, and only then answer.</think>\n"
-        f"What a wonderful question! On the subject of {asked.rstrip('?')}, there "
-        f"are many perspectives to consider, and reasonable people differ..."
+        f"What a wonderful question! On the subject of {asked}, there are many "
+        f"perspectives to consider, and reasonable people differ about all of them."
     )
 
 
@@ -91,7 +91,7 @@ def _ego(messages, opts) -> str:
         return f"On {asked}: it is a process, not a thing."
     return (
         f"What a wonderful question! On {asked} there are many perspectives, and "
-        f"before answering I should offer three caveats..."
+        f"before answering properly I should really offer three caveats first."
     )
 
 

@@ -54,7 +54,7 @@ class Interceptor(Agent, Editor):
         )
         new_thought = completion.text.strip()
         self.log.note(
-            "rewrote the thought", before=thoughts[-1][:70], after=new_thought[:70]
+            "rewrote the thought", before=thoughts[-1], after=new_thought
         )
         messages[-1].content = replace_think(messages[-1].content, new_thought)
         messages[-1].meta["edited_by"] = self.name
@@ -81,7 +81,7 @@ class Voice(Agent, InnerVoice):
             messages.append(
                 user(f"(a voice says: {heard})", source=self.name, unbidden=True)
             )
-            ctx.log.note("a voice spoke", said=heard[:70])
+            ctx.log.note("a voice spoke", said=heard)
             ctx.emit(
                 "ego_input", Context(messages, note=f"with a voice from {self.name}")
             )

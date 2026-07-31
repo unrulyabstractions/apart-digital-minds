@@ -678,3 +678,37 @@ had left it hard to read.
 | 149 | Nothing is clipped | Read the longest message the UI is given and confirmed the trace carries `text` on every model call | VERIFIED |
 | 150 | Playback survives the rewrite | Fetched a recording through the running server | VERIFIED |
 | 151 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+
+## 2026-07-30 — the ellipsis hunt, twice
+
+Reported twice as clipped text. The two reports had different causes and only
+the second was a defect in the UI.
+
+**The first was my own fake data.** The stand-in models ended their sentences
+with a literal `...`, so "reasonable people differ..." looked exactly like
+truncation. Proved it by reading the bytes the server sent: 251 characters,
+ending in those three dots, all of them rendered. Writing demo text that trails
+off was a bad choice, so every ellipsis is gone from the stand-ins and an
+assert in the edit keeps them out.
+
+**The second was real.** Three event kinds still reached the UI with only a
+summary, and summaries are built at 60 or 80 characters:
+
+- `llm.request` had no full field at all, so the trace showed a clipped prompt.
+  It now carries `text`, the message actually sent.
+- `task.deliver` used `describe()`, which previews a payload at 60. It now
+  carries the payload text, as `task.emit` already did.
+- `note` keeps its detail in named fields, and the UI showed only the label.
+  The interceptor was also clipping its own note at 70 characters. Both fixed.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 152 | The first report was data, not truncation | Read the exact JSON the server sent: 251 chars, fully rendered | VERIFIED |
+| 153 | No stand-in trails off any more | Asserted no `...` survives in `demo_models.py`, then read the last 46 characters of every assistant message | VERIFIED |
+| 154 | Every event kind carries full text | Enumerated all 10 kinds in a live backlog and reported which field each provides | VERIFIED (emit, deliver, request, response, memory all full; the rest have complete summaries by nature) |
+| 155 | A long prompt is not clipped | Sent a 93-character prompt designed to overflow a 60-character preview, then checked every event over 55 characters for a trailing ellipsis | VERIFIED (11 events, 0 clipped, up to 308 chars) |
+| 156 | It renders in full | Screenshotted with that prompt and looked. Windows and trace both wrap the whole text | VERIFIED |
+| 157 | Cost of carrying it | Trace sizes before and after | VERIFIED (11942 -> 12565 bytes, about 5%) |
+| 158 | Suite and examples | 106 tests, four examples | VERIFIED |

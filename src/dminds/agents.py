@@ -111,6 +111,9 @@ class Agent(BaseModule, AgentInterface):
             n_messages=len(msgs),
             temperature=opts.temperature,
             max_tokens=opts.max_tokens,
+            # The summary is a short log line; `text` is what was actually sent,
+            # so nothing reading the trace has to make do with a clipped one.
+            text=last,
             summary=f"-> {self.llm.spec} [{tag or 'call'}] {len(msgs)} msgs: {last[:60]}",
         )
         try:
