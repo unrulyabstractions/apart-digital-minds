@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..base import BaseLLM
+from ..base import BaseLLM, sampling_extra
 from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 # Reasoning and newer flagship models renamed or dropped these parameters.
@@ -73,7 +73,7 @@ class OpenAILLM(BaseLLM):
             kwargs["stop"] = opts.stop
         if opts.seed is not None:
             kwargs["seed"] = opts.seed
-        kwargs.update(opts.extra)
+        kwargs.update(sampling_extra(opts))
 
         response = client.chat.completions.create(**kwargs)
         choice = response.choices[0]

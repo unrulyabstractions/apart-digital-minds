@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..base import BaseLLM, split_system
+from ..base import BaseLLM, sampling_extra, split_system
 from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 
@@ -70,7 +70,7 @@ class GeminiLLM(BaseLLM):
             config["stop_sequences"] = opts.stop
         if opts.seed is not None:
             config["seed"] = opts.seed
-        config.update(opts.extra)
+        config.update(sampling_extra(opts))
 
         response = client.models.generate_content(
             model=self.model, contents=contents, config=config

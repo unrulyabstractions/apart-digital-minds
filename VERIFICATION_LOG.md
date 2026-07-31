@@ -1047,3 +1047,17 @@ testing every cell.
 | # | Output | How it was checked | Result |
 |---|---|---|---|
 | 241 | `Qwen3-0.6B-Base` as the audit control | Downloaded it and read what it actually returns | BROKEN (it does not follow instructions; replies are continuations and one was pure token soup, so the judged axes would have measured degeneracy rather than treatment). Replaced with a persona control: the same model answering the same questions while `you` refers to a fictional librarian rather than to the assistant. |
+
+### 2026-07-31 — stopped partway, state recorded
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 242 | Template-only options reached hosted providers | Smoke-tested the audit end to end on a hosted model | BROKEN then fixed (`chat_template_kwargs` was forwarded to the OpenAI API, which rejects the call; every reply came back empty). Providers that render no template now drop template-only options, with a regression test that reads each provider's source. |
+| 243 | The OpenAI key stopped working mid-session | Re-ran the same call that had succeeded earlier | BROKEN, not ours (`401 token_invalidated`; the key answered a test about an hour before). No judge ran, so no audit has results. |
+| 244 | Suite after the provider change | `tests/run_tests.py`, now discovering test files rather than listing them | VERIFIED (115 passed) |
+
+### UNVERIFIED, and not started
+
+No self-reference audit has been run. The statistic is checked on synthetic
+data only. The material set was proposed four times and critiqued three times,
+and the raw proposals and critiques are saved unsynthesised.

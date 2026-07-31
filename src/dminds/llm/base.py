@@ -49,6 +49,23 @@ class BaseLLM(LLM):
         return f"<{type(self).__name__} {self.spec}>"
 
 
+#: Options that describe how a chat template is rendered rather than how the
+#: model samples. Only a provider that renders a template locally knows what to
+#: do with them, and a hosted API rejects the call outright if they are passed
+#: on, so every other provider drops them here.
+TEMPLATE_ONLY = ("chat_template_kwargs",)
+
+
+def sampling_extra(opts: GenOptions) -> dict:
+    """`opts.extra` with the template-only options removed.
+
+    A provider that does not render a template calls this instead of reading
+    `opts.extra` directly, so one set of options works everywhere and swapping
+    a local model for a hosted one stays a one-string change.
+    """
+    return {k: v for k, v in opts.extra.items() if k not in TEMPLATE_ONLY}
+
+
 def split_system(messages: list[ChatMessage]) -> tuple[str, list[ChatMessage]]:
     """Pull leading system messages out into one string.
 

@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from ..base import BaseLLM
+from ..base import BaseLLM, sampling_extra
 from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 DEFAULT_HOST = "http://localhost:11434"
@@ -42,7 +42,7 @@ class OllamaLLM(BaseLLM):
             options["stop"] = opts.stop
         if opts.seed is not None:
             options["seed"] = opts.seed
-        options.update(opts.extra)
+        options.update(sampling_extra(opts))
 
         body = json.dumps(
             {

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ..base import BaseLLM, merge_consecutive, split_system
+from ..base import BaseLLM, merge_consecutive, sampling_extra, split_system
 from ....api.types import ChatMessage, Completion, GenOptions, Usage
 
 
@@ -61,7 +61,7 @@ class AnthropicLLM(BaseLLM):
             kwargs["system"] = system_prompt
         if opts.stop:
             kwargs["stop_sequences"] = opts.stop
-        kwargs.update(opts.extra)
+        kwargs.update(sampling_extra(opts))
 
         response = client.messages.create(**kwargs)
         text = "".join(

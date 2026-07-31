@@ -16,21 +16,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-MODULES = [
-    "tests.test_scheduler",
-    "tests.test_determinism",
-    "tests.test_wiring",
-    "tests.test_llm",
-    "tests.test_memory_and_agents",
-    "tests.test_composition",
-    "tests.test_subject",
-]
+def modules() -> list[str]:
+    """Every `tests/test_*.py`, in a fixed order.
+
+    Discovered rather than listed, because a list is a place to forget a file
+    and a forgotten file looks exactly like a passing suite.
+    """
+    here = Path(__file__).resolve().parent
+    return [f"tests.{p.stem}" for p in sorted(here.glob("test_*.py"))]
 
 
 def main() -> int:
     passed, failed = 0, []
 
-    for module_name in MODULES:
+    for module_name in modules():
         module = importlib.import_module(module_name)
         short = module_name.split(".")[-1]
         print(f"\n{short}")
