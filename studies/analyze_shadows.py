@@ -171,7 +171,12 @@ def main() -> None:
     parser.add_argument("--out", default=str(HOME / "summary.json"))
     args = parser.parse_args()
 
-    dirs = sorted(d for d in HOME.iterdir() if (d / "readouts.json").exists())
+    # A run still in flight has readouts but no meta yet. Skipping it means
+    # the analysis can be read while the sweep is still going.
+    dirs = sorted(
+        d for d in HOME.iterdir()
+        if (d / "readouts.json").exists() and (d / "meta.json").exists()
+    )
     if not dirs:
         raise SystemExit(f"No results under {HOME}. Run studies/shadow_study.py first.")
 

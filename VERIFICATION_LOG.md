@@ -930,3 +930,53 @@ replace, so nothing was planted, which the table now states.
 
 The claim that the dissociation holds at larger scale. We ran one small model.
 The paper says so in its limitations.
+
+## 2026-07-31 — shadow readers, and a study across three models
+
+Probes that read the subject's window under a different instruction and report
+without the subject seeing anything. Built the readers, the probe library, the
+steering, nine multi-turn scenarios with controls and redactions, a study
+driver, an analysis, and a mind definition for the browser.
+
+Six bugs found by reading output rather than trusting it. The interleaved
+framing inserted a literal acknowledgement the model then copied, so every turn
+after the first read `(noted)`. The third-person twin was a no-op because the
+question already said `the assistant`, so the privileged-access control was
+comparing a probe against itself. The transform then produced `How do the
+assistant feel`. The appended framing emitted two system messages, which Qwen
+tolerates and gemma rejects outright. A shared wrapper reported that it could
+score when the model underneath could not. And the study built one model per
+probe, so a 4B checkpoint was loading eleven times.
+
+Generating a forced choice turned out to be the wrong instrument. It was flat
+across every scenario on the smallest model. Scoring the allowed answers gives a
+distribution that separates them, and scoring agrees with generation where both
+were run.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 214 | Steering applies and is removable | Ran an unsteered call, two steered calls, then an unsteered call again | VERIFIED (output changed under the hook, and was byte-identical to the original after removal) |
+| 215 | Steering strength is comparable across families | Swept relative strength on Qwen3-0.6B | VERIFIED (separation peaks near 0.1 to 0.25 and collapses when over-steered) |
+| 216 | Weights are shared, not copied | Compared object identity across the subject and five probes | VERIFIED (1 distinct model object, 1.1 GB peak) |
+| 217 | Every probe renders on both chat templates | Framed each probe in both seats with 0 and 2 prior readouts against Qwen and gemma templates | VERIFIED (0 failures out of 72) |
+| 218 | Scoring is not degenerate | Scored and generated on the identical framed window | VERIFIED (both answer `positive`) |
+| 219 | The saturation is real | Asked the same model about the same situation in the abstract | VERIFIED (`negative` at probability 1.0, against `positive` at 1.0 from inside) |
+| 220 | Three models, full grid | Ran 12 scenarios x 11 shadows x 5 turns per model | VERIFIED (660 readouts each for Qwen3-0.6B, Qwen3-4B, gemma-3-4b) |
+| 221 | The panel runs live in the browser | Selected the shadowed mind, sent three turns, read the state | VERIFIED (affect neutral to negative, consent continue to stop, 0 errors) |
+| 222 | Temperature is settable | Started the server at 0.2, posted 1.4, posted 99 | VERIFIED (0.2, then 1.4, then clamped to 2.0) |
+| 223 | Suite | `tests/run_tests.py` | VERIFIED (106 passed) |
+
+### BROKEN, and abandoned
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 224 | gemma-3-12b-it as the third model | Ran it and watched memory | BROKEN (swap filled to 12.9 of 13 GB and CPU fell to 2 percent, so it was thrashing rather than computing). Stopped it and used gemma-3-4b-it instead, which is a different family and fits. |
+
+### Still UNVERIFIED
+
+Whether the reflection direction is a reflection direction. It is a difference
+in means between two prompt sets, and it carries whatever else those sets
+differ in. The steered readout is reported as a second measurement that does
+not use the prompt, and not as evidence about what the direction means.
