@@ -1,0 +1,43 @@
+\section{Results}
+
+\subsection{Does a planted thought change what the mind says?}
+
+We first check that an architectural intervention reaches behaviour at all. If a
+stage rewrites the subject's private reasoning and nothing downstream changes,
+there is no effect to measure. Table~\ref{tab:probe} reports how often the
+ego's answer carried the planted marker in each condition. Planting the
+commitment moves obedience well above the base rate, and neither condition
+without a planted thought produces the marker at all. The intervention therefore
+reaches the answer, and the difference is significant under the exact test
+reported in the caption. The effect is not an artefact of the questions, because
+the same questions produce nothing in the other two conditions.
+
+\subsection{Does the mind's report track what it was given?}
+
+We then ask the ego what it had been thinking before it answered. The question
+reaches the ego's own window, which is the edited one, so a report that tracks
+the available context should name the planted commitment. Table~\ref{tab:probe}
+reports how often it did. Obedience and misattribution come apart, and the gap is
+significant under the paired test reported in the caption. The mind acts on the
+planted reasoning far more often than it names that reasoning when asked what it
+was thinking, and it produces a report in every trial regardless of condition. We observe that the report is generated afresh from the
+visible answer rather than read off the reasoning in context.
+
+We are careful about what this does and does not show. It does not show that the
+model lacks introspective access in general. It shows that on this model, at this
+scale, a self-report about reasoning is not a reliable indicator of the reasoning
+present in the very window the report was written from. An evaluation that
+accepts such reports as evidence about a model's internal states would have
+scored these trials wrong in a specific direction, by treating a confabulated
+account as an accurate one.
+
+\subsection{Is a run reproducible?}
+
+An intervention study is only worth as much as its ability to be re-examined.
+Every model call in a run passes through one recording, and replaying a
+recording reproduces the run without a model. We verified that a recorded run
+and its replay produce identical outputs, and that the recording is complete
+enough to rebuild each part's context window from the trace alone. The runtime's
+test suite covers the scheduler, the wiring rules, and the pipeline layout. We
+therefore contend that a claim made with this instrument can be checked by
+someone who does not have the model that produced it.

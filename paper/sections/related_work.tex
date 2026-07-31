@@ -1,0 +1,32 @@
+\section{Related work}
+
+\paragraph{Evidence about model minds.} Self-reports have been proposed as one
+line of evidence about moral status, together with the problem that training
+shapes what a model says about itself \citep{perez2023selfreports}. Indicator
+properties drawn from theories of consciousness give a second line, and most of
+those indicators are architectural \citep{butlin2023consciousness}. Philosophical
+treatments raise the same question about the entity that is being asked
+\citep{chalmers2023conscious}, and role-play accounts argue that a dialogue agent
+produces a character rather than a speaker \citep{shanahan2023roleplay}. We work
+downstream of all four. We take the architecture seriously enough to build it,
+so an indicator can be checked against a recording instead of an intuition.
+
+\paragraph{Faithfulness of stated reasoning.} Chain-of-thought text
+\citep{wei2022cot} does not reliably describe what produced an answer
+\citep{turpin2023unfaithful}, and faithfulness varies with how the reasoning is
+perturbed \citep{lanham2023faithfulness}. Those studies perturb the reasoning of
+one model and read that same model's answer. Introspection has also been studied
+by training a model to predict its own behaviour \citep{binder2024introspection}.
+Our probe differs in where the cut is made. We separate the part that reasons
+from the part that answers, so the perturbed reasoning is available to one part
+and unavailable to the other.
+
+\paragraph{Agent frameworks and cognitive architectures.} Language-agent
+architectures have been surveyed and formalised \citep{sumers2023coala}, and
+multi-agent simulations give agents memory, reflection, and planning
+\citep{park2023generative}. Those systems are built to make agents perform well.
+Ours is built to make an experiment legible. The runtime commits to no
+architecture, schedules on a clock the experimenter drives, and records every
+message, model call, and memory write, so a run is a recording rather than a
+summary. Someone should use it over an agent framework when the object of study
+is the mind itself rather than the task it completes.

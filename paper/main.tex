@@ -1,18 +1,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% The Global South AI Safety Hackathon (June 2026) -- submission template
+%% Digital Minds Research Sprint (August 14-16, 2026) -- submission.
 %% Single-column arXiv-style preprint. Build with: bash build.sh
 %%
-%% HOW TO WRITE IN THIS TEMPLATE
-%%   - Guidance text is wrapped in \guide{...} and renders gray+italic.
-%%     Replace each \guide{...} block with your own content, then remove it.
-%%   - The yellow info box and all \guide{...} text MUST be deleted before
-%%     submitting (see the box on page 1).
-%%   - Recommended length: 4 pages excluding references and appendix.
+%% Numbers come from sections/generated_numbers.tex and sections/table_probe.tex,
+%% both written by studies/make_paper_numbers.py. Do not type them by hand.
+%% Recommended length: 4 pages excluding references and appendix.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \documentclass[11pt]{article}
 
 \input{paperdefs-common}
+\input{sections/generated_numbers}
+
 \begin{document}
 \thispagestyle{plain}
 
@@ -22,16 +21,19 @@
 \noindent\rule{\textwidth}{1.2pt}\par
 \vspace{0.8em}
 \begin{center}
-  {\LARGE\bfseries Scale Shapes Bias in Spanish-Prompted Open-Weight LLMs\par}
+  {\LARGE\bfseries Exploring Digital Minds by Modeling Cognitive
+   Architecture with Agents\par}
 \end{center}
 \vspace{0.6em}
 \noindent\rule{\textwidth}{0.4pt}\par
 \vspace{1.4em}
 
-%% Author
 \begin{center}
   {\LARGE Ian Rios-Sialer%
-    \footnote{Research conducted at the \href{https://www.apartresearch.com/}{Global South AI Safety Hackathon} (Apart Research $\times$ Schmidt Sciences), June 19--21, 2026.}\par}\vspace{0.45em}
+    \footnote{Research conducted at the
+      \href{https://www.apartresearch.com/sprints/digital-minds-research-sprint-2026-08-14-to-2026-08-16}{Digital
+      Minds Research Sprint} (Apart Research), August 14--16, 2026.}\par}%
+  \vspace{0.45em}
   \href{mailto:ian@unrulyabstractions.com}{ian@unrulyabstractions.com}\\[0.3em]
   Independent Researcher\\[0.3em]
   San Francisco, CA, USA\\[2.0em]
@@ -43,30 +45,38 @@
 %% ABSTRACT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}
-Large language models encode and amplify human social bias, and the harm falls
-hardest on minoritized groups. Mitigating that harm needs interventions tuned to
-each social context, yet until recently there was no Spanish-language data to even
-measure such bias. We characterize bias in Spanish-prompted, open-weight LLMs across
-model scale, using behavioral and distributional studies on the new \textsc{SESGO}
-benchmark, where an item is \emph{ambiguous} when its text names no specific person (the
-correct answer is \emph{unknown}, abstain) and \emph{disambiguated} when it specifies a
-group. We report two preliminary findings. First, smaller models are more biased: across
-a sweep of open-weight models, abstention accuracy rises with scale and the error split toward the
-marginalized group narrows. Second, reasoning commits at a few discrete tokens: forking the
-chain of thought of the thinking models on a bias-revealing item, every model from $0.8$B to
-$9$B resolves its answer at a small number of decisive forking tokens rather than accreting it
-gradually, a concrete locus for inspection or intervention. These results give future
-LATAM-context interventions, including the debiasing prompt scaffolds we leave to future
-work, a map of where bias lives, and we release the evaluation harness.
+Whether a frontier model has preferences or experiences of its own is usually
+asked of a single black box. One model both reasons and speaks, so its report
+about its reasoning is produced from the same context that produced the
+reasoning, and a faithful report cannot be told apart from a portrayed one. We
+propose to model a digital mind as several model calls with named parts and a
+clock the experimenter drives. A subject reasons and publishes the context
+window it produced. A stage may edit that window in passing. An ego speaks from
+whatever window reaches it and has no access to the original. We call editing
+the window between two parts an architectural intervention, and it separates the
+reasoning a mind performed from the reasoning a mind can see. We built
+\textsc{DigitalMindExplorer}, a deterministic and replayable runtime for
+composing such minds, and used it to run an introspection probe. A stage plants
+a checkable commitment inside the subject's private reasoning, and we then ask
+the mind what it had been thinking. On a small open-weight model the planted
+reasoning steers the answer, while the mind's report about its own thinking
+rarely names it, and the mind produces a report in every trial regardless of
+what it was given. Behaviour and self-report come apart under an
+intervention the mind cannot detect. Evidence about digital minds drawn from
+self-reports therefore needs a second source, and building the mind out of parts
+supplies one.
 \end{abstract}
 
 \bigskip
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \input{sections/introduction}
-\input{sections/stability}
-\input{sections/bias}
-\input{sections/uncertainty}
+\input{sections/related_work}
+\input{sections/figure_pipeline}
+\input{sections/methods}
+\input{sections/table_probe}
+\input{sections/results}
+\input{sections/discussion}
 \input{sections/conclusion}
 \input{sections/code_and_data}
 
@@ -76,10 +86,12 @@ work, a map of where bias lives, and we release the evaluation harness.
 \bibliographystyle{plainnat}
 \bibliography{references}
 
-\section*{LLM Usage Statement}
-We used an LLM assistant to help draft and format this report and to formalize
-notation from the codebase. All design decisions, claims, and reported results
-are verified by the authors against the harness implementation and the raw
-\texttt{response\_samples.json} via the project's own slicing code.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{sections/appendix_framework}
+
+\section*{LLM usage statement}
+We used an LLM assistant to draft and format this report, to implement the
+runtime, and to write the study script. All design decisions are the author's.
+All results and claims were verified against the study's output artifacts.
 
 \end{document}

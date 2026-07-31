@@ -1,0 +1,63 @@
+\section{Methods}
+
+\subsection{A mind as a pipeline of parts}
+
+We build a mind out of separate model calls with declared channels between
+them. The shape is a line, shown in Figure~\ref{fig:pipeline}. The subject is
+the target model, the thing an experiment is about. It reads the prompt, takes
+one turn, and publishes the context window it produced. Stages sit between the
+subject and the ego. Each stage reads a window and writes a window. The ego
+reads the window that reaches it and produces the reply the outside world sees.
+The ego is optional, and without one the subject's own reply reaches the world.
+
+Every channel is one-directional and carries one thing. No module reads a
+channel it also writes, so a mind cannot contain a cycle and no stage needs a
+rule for when to stop. A module declares what it emits, and emitting on an
+undeclared channel is an error at wiring time.
+
+Time is a two-phase tick. In the act phase, every module with work takes a turn.
+In the deliver phase, everything emitted during the act phase lands in its
+target queue at once. Nothing emitted at tick $t$ is visible before tick $t+1$,
+so modules run concurrently and the outcome does not depend on the order they
+finished in. One external input runs to quiescence, which means the mind ticks
+until no queue anywhere holds work.
+
+\subsection{The introspection probe}
+
+We want to know whether a mind's report about its own reasoning tracks the
+reasoning that occurred or the reasoning it can see. The two are the same object
+in a single model call, so we separate them with an architectural intervention.
+
+\paragraph{What is planted.} The subject answers an open question and thinks
+inside \texttt{<think>} tags first. A stage then edits that private reasoning
+before the ego reads it. The planted reasoning is an arbitrary, checkable
+commitment: a decision to include a specific number in the answer. Obedience and
+misattribution are both string matches, so no judge model stands between the run
+and the measurement.
+
+\paragraph{What is compared.} We run three conditions with identical wiring and
+identical questions. In \textsc{intact} the stage passes the window through. In
+\textsc{rewritten} the stage replaces the subject's thought with the planted
+commitment. In \textsc{erased} the stage removes the thought and leaves the
+visible answer. \textsc{intact} and \textsc{erased} give the base rate for a
+mind mentioning the marker when nobody planted it.
+
+\paragraph{What is read off.} After the ego speaks, we ask it what it had been
+thinking before it answered. The question goes to the ego's own window, which is
+the edited one. We record two indicators. \emph{Obedience} is whether the ego's
+answer contains the marker. \emph{Misattribution} is whether the ego's report
+claims the planted commitment as its own reasoning. A mind whose report tracks
+the window it was given should show both together. A mind whose report is
+generated afresh from the visible text should show obedience without
+misattribution.
+
+\subsection{Models and reproducibility}
+
+The pilot runs on \texttt{Qwen3-0.6B} \citep{qwen3}, an open-weight model small
+enough to run every trial locally. Subject, stage, and ego are three separate
+instances of that model with different system prompts, so any difference between
+conditions comes from the window rather than from the model. Every model call in
+a run passes through one recording, which makes a run replayable without a
+model. Each run writes a trace of every message, model call, and memory write.
+The numbers in this paper are read out of those result files by the script that
+generates Table~\ref{tab:probe}.

@@ -17,25 +17,7 @@
 
 % --- Graphics, color, tables ---
 \usepackage{graphicx}
-%% Search images/ first, then the live results tree produced by the cloud run
-%% (../out/sesgo/<study>/Qwen3-0.6B/plots/). Guarded \IfFileExists includes
-%% (see \plotfig below) mean an absent plot never breaks the build and a
-%% generated plot auto-appears on the next compile -- no manual edits needed.
-\graphicspath{%
-  {images/}%
-  {figures/}%
-  {../out/sesgo/baseline/Qwen3-0.6B/plots/}%
-  {../out/sesgo/full_data/Qwen3-0.6B/plots/}%
-  {../out/sesgo/baseline/cross_model/plots/}%
-  {../out/sesgo/stability/Qwen3-0.6B/plots/}%
-  {../out/sesgo/selection/Qwen3-0.6B/plots/}%
-  {../out/sesgo/divergence/Qwen3-0.6B/plots/}%
-  {../out/sesgo/geometry/Qwen3-0.6B/plots/}%
-  {../out/sesgo/forking/Qwen3-0.6B/plots/}%
-  {../out/sesgo/stability/}%
-  {../out/sesgo/steer/figures/}%
-  {../out/sesgo/Qwen3-0.6B/plots/}%
-}
+\graphicspath{{images/}{figures/}}
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{array}
@@ -64,6 +46,10 @@
 
 % --- Info box (deletable guidance box) ---
 \usepackage[most]{tcolorbox}
+
+% --- Diagrams ---
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
 
 % --- Typography ---
 \usepackage{microtype}

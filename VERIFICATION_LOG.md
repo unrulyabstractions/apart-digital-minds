@@ -891,3 +891,42 @@ left out of the list.
 A server that is completely down when the page is loaded. Chrome replaces the
 document with its own error page, so no code of ours runs. Reloading once the
 server is up is the only route back, and that now lands on the chooser.
+
+## 2026-07-31 — the paper, rewritten for the Digital Minds sprint
+
+The paper directory held the previous sprint's submission on Spanish-language
+bias. It is now a submission for the Digital Minds Research Sprint: modelling a
+digital mind as a composition of parts, with the framework in an appendix.
+
+Rather than leave the Results section empty, we ran a real study. A stage plants
+a checkable commitment inside the subject's private reasoning, and we then ask
+the mind what it had been thinking. Every number in the paper is written into
+the LaTeX by a script that reads the result file, so none is typed by hand.
+
+Two corrections came out of reading the raw records rather than the summary.
+The marker could in principle have landed inside the ego's own reasoning rather
+than its visible answer, which would have weakened the obedience claim; it did
+not, in any trial. And in one planted trial the subject produced no reasoning to
+replace, so nothing was planted, which the table now states.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 202 | The sprint's actual scope | Fetched the sprint page and read its tracks and framing | VERIFIED (introspection and self-report reliability is one of six tracks) |
+| 203 | The model runs locally | Ran one turn through the runtime | VERIFIED (real reply, about 5s per turn) |
+| 204 | The study harness | Ran it end to end on the fake model first | VERIFIED (6 trials, files written) |
+| 205 | The study itself | Ran 84 trials on Qwen3-0.6B | VERIFIED (28 per condition; obeys 12/0/0, claims 2/0/0) |
+| 206 | The marker lands in the visible answer | Re-split every planted reply and counted where the marker fell | VERIFIED (12 visible, 0 inside the ego's own reasoning) |
+| 207 | The intervention actually reached the ego | Counted trials whose ego window held the marker | VERIFIED (27 of 28; the table says so) |
+| 208 | The p-values | Recomputed both as exact fractions independently of the script | VERIFIED (Fisher 2.7e-7, reported as $<10^{-4}$; McNemar 0.001953, reported 0.002) |
+| 209 | Numbers are not hand-typed | Read the generated macro and table files | VERIFIED (both carry the do-not-edit header and match the result file) |
+| 210 | A latent bug in the numbers script | Read it back after editing | BROKEN then fixed (the table loop shadowed the trial list) |
+| 211 | The PDF builds | Ran the build | VERIFIED (9 pages, 0 overfull boxes, 0 undefined references) |
+| 212 | Every page | Viewed pages 1 through 8 with image tokens across revisions | VERIFIED (figure legible and no longer overlapping, table correct, references render) |
+| 213 | Voice | Scanned every section for em dashes, clefts, ornate connectives, and aphorisms, and rewrote the three that appeared | VERIFIED |
+
+### Not verified
+
+The claim that the dissociation holds at larger scale. We ran one small model.
+The paper says so in its limitations.

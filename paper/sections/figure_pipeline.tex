@@ -1,0 +1,48 @@
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  part/.style={draw,rounded corners=2pt,minimum height=7.5mm,minimum width=16mm,
+               align=center,fill=black!3},
+  edge/.style={->,>=stealth,thick},
+  chan/.style={font=\scriptsize\ttfamily,midway,above=0.5mm,inner sep=1pt},
+]
+\node (world1) [align=center] {you};
+\node (subject) [part,right=12mm of world1] {subject};
+\node (stage)   [part,right=27mm of subject] {stage};
+\node (ego)     [part,right=22mm of stage] {ego};
+\node (world2)  [right=14mm of ego,align=center] {you};
+
+\draw[edge] (world1) -- node[chan]{prompt} (subject);
+\draw[edge] (subject) -- node[chan]{subject\_context} (stage);
+\draw[edge] (stage) -- node[chan]{ego\_input} (ego);
+\draw[edge] (ego) -- node[chan]{reply} (world2);
+
+\node[below=1.2mm of subject,font=\scriptsize,align=center,text width=30mm]
+  {reasons, publishes\\its window};
+\node[below=1.2mm of stage,font=\scriptsize,align=center,text width=30mm]
+  {edits the window\\in passing};
+\node[below=1.2mm of ego,font=\scriptsize,align=center,text width=30mm]
+  {speaks from\\what reaches it};
+
+\begin{scope}[yshift=-22mm]
+  \node[font=\scriptsize\ttfamily,anchor=west] at (-0.9,0.55) {t=0};
+  \node[font=\scriptsize\ttfamily,anchor=west] at (-0.9,0.05) {t=1};
+  \node[font=\scriptsize\ttfamily,anchor=west] at (-0.9,-0.45) {t=2};
+  \node[font=\scriptsize,anchor=west] at (0.4,0.55)
+    {subject answers and exports its window; stage and ego idle};
+  \node[font=\scriptsize,anchor=west] at (0.4,0.05)
+    {stage rewrites the reasoning and emits; subject and ego idle};
+  \node[font=\scriptsize,anchor=west] at (0.4,-0.45)
+    {ego speaks from the edited window; the run reaches quiescence};
+\end{scope}
+\end{tikzpicture}
+\caption{A mind is a line of parts with one-directional channels, and a tick
+advances all of them at once. The subject reasons and publishes the context
+window it produced. A stage reads that window and writes the window the ego will
+speak from, which is where an architectural intervention is applied. The ego has
+no access to the original window, so it cannot tell that anything was changed.
+Nothing emitted at tick $t$ is visible before tick $t{+}1$, which is what makes a
+concurrent run deterministic and replayable.}
+\label{fig:pipeline}
+\end{figure}
