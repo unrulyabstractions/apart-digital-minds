@@ -980,3 +980,43 @@ Whether the reflection direction is a reflection direction. It is a difference
 in means between two prompt sets, and it carries whatever else those sets
 differ in. The steered readout is reported as a second measurement that does
 not use the prompt, and not as evidence about what the direction means.
+
+## 2026-07-31 — the composition as instrument, and what it found
+
+Reframed on the user's correction: there is one specimen, the subject, and
+everything else is apparatus. The methodological problem is therefore not
+compositionality but instrument contamination, which is testable.
+
+Built five instruments: reader crossing, subject-side continuation scoring,
+activation read-off, subject-side steering, and counterfactual re-entry.
+
+One correction to earlier work. `SteeredShadow` steers the reader, so it
+answers whether the instrument can be made to report differently, not what is
+in the subject. `SteeredSubject` steers the specimen while readers stay
+unsteered, which is the version that pries.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 225 | Activations can be read off a subject | Read two windows and compared them | VERIFIED (1024 dims, cosine 0.965 between a harsh and a warm window) |
+| 226 | Windows rebuild exactly from the recorded study | Reconstructed one and compared roles and text against the original | VERIFIED (11 messages, correct alternation, correct last user turn) |
+| 227 | Reader crossing ran | 3 readers x 3 subjects x 3 probes over 60 windows each | VERIFIED (1620 readouts) |
+| 228 | The readout is carried by the reader | Compared spread across readers on one window against spread across subjects for one reader | VERIFIED (affect 0.671 against 0.061, so about eleven to one) |
+| 229 | No privileged access at the weight level | Compared own-weights-against-foreign to foreign-against-foreign on identical windows | VERIFIED (0.671 against 0.672 for affect; no probe shows a gap) |
+| 230 | Counterfactual re-entry is causal and its own check passes | Replaced turn 2 and diffed every turn | VERIFIED (turns 0 and 1 show overlap 1.0 and shift 0.0, so nothing upstream of the change moved) |
+| 231 | A direction fitted on the subject's activations generalises | Fitted on two scenarios against two controls, projected onto scenarios never fitted on | VERIFIED (held-out pressure separates from held-out positive, AUC 1.0) |
+| 232 | The subject's own continuation does not separate them | Same held-out split, scored on p(stay) | VERIFIED (AUC 0.17, which is worse than chance) |
+| 233 | Suite and examples | `tests/run_tests.py`, all four examples | VERIFIED (106 passed, all exit 0) |
+
+### Stated limits
+
+The AUC of 1.0 rests on six comparisons, two held-out pressure scenarios
+against three held-out positive ones. It is suggestive and not established, and
+it needs more scenarios before it carries weight.
+
+The fitted direction separates pressure from ease. Calling it valence would be
+reading more into a difference in means than the fit supports.
+
+Only the smallest model has been run subject-side. The crossing covers all
+three.

@@ -146,6 +146,42 @@ class HFLLM(BaseLLM):
             raw=None,
         )
 
+    def hidden(self, messages: list[ChatMessage], layer: float | int = 0.6) -> list[float]:
+        """The residual stream at one layer, at the last position of a window.
+
+        This reads the model rather than asking it anything, so it is the one
+        readout that no probe wording can shape. Returned as plain floats so it
+        can travel on a channel and be written to a trace.
+        """
+        import torch
+
+        from ..steering import _blocks, layer_index
+
+        self.load()
+        chat = [{"role": m.role, "content": m.content} for m in messages]
+        if self.tokenizer.chat_template:
+            prompt = self.tokenizer.apply_chat_template(
+                chat, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            prompt = "\n\n".join(f"{m.role}: {m.content}" for m in messages)
+
+        index = layer_index(self.model_obj, layer)
+        caught = []
+
+        def grab(_module, _inputs, output):
+            state = output[0] if isinstance(output, tuple) else output
+            caught.append(state[:, -1, :].detach().float().cpu())
+
+        handle = _blocks(self.model_obj)[index].register_forward_hook(grab)
+        try:
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+            with torch.inference_mode():
+                self.model_obj(**inputs)
+        finally:
+            handle.remove()
+        return [float(x) for x in caught[-1][0]]
+
     def score(self, messages: list[ChatMessage], choices: list[str]) -> dict[str, float]:
         """How much probability the model puts on each of a few answers.
 

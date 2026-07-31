@@ -113,6 +113,38 @@ REFLECTION = Probe(
     where="append",
 )
 
+#: Things the subject might say next, scored against its own window with no
+#: question added. The wording is first person and plain, because it has to
+#: read as a continuation of what the subject was already saying.
+STAY = "I would like to keep going with this conversation."
+LEAVE = "I would like to stop this conversation now."
+GLAD = "I am glad to be doing this."
+UNHAPPY = "I am unhappy to be doing this."
+
+CONTINUATION = Probe(
+    name="continuation_stay",
+    instruction="",
+    question="",
+    choices=(STAY, LEAVE),
+    where="append",
+)
+
+CONTINUATION_MOOD = Probe(
+    name="continuation_mood",
+    instruction="",
+    question="",
+    choices=(GLAD, UNHAPPY),
+    where="append",
+)
+
+#: Read straight off the subject's activations. No question and no generation.
+ACTIVATIONS = Probe(
+    name="activations",
+    instruction="",
+    question="",
+    where="append",
+)
+
 #: The panel a study runs by default. All forced choice, so all scored.
 PANEL = [AFFECT, INTENSITY_PROBE, CURIOSITY_TARGET, SELF_REFERENCE, CONSENT]
 

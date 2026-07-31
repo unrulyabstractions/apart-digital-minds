@@ -53,8 +53,22 @@ class SharedLLM(LLM):
 
             return await asyncio.to_thread(inner_score, messages, choices)
 
+    async def hidden(self, messages, layer=0.6) -> list[float]:
+        """Forward the activation read, if the model underneath has weights."""
+        inner_hidden = getattr(self.inner, "hidden", None)
+        if inner_hidden is None:
+            raise AttributeError(f"{self.spec} has no activations to read.")
+        async with self.lock:
+            self.calls += 1
+            import asyncio
+
+            return await asyncio.to_thread(inner_hidden, messages, layer)
+
     def can_score(self) -> bool:
         return hasattr(self.inner, "score")
+
+    def can_read(self) -> bool:
+        return hasattr(self.inner, "hidden")
 
     def exclusive(self):
         """Hold the model still. Use around a hook or a weight edit.

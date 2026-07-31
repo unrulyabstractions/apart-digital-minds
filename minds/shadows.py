@@ -28,7 +28,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from src import Agent, ChatMessage, Ctx, Text, assistant, split_think, system, user
+from src import (Agent, ChatMessage, Ctx, Text, Vector, assistant, split_think,
+                 system, user)
 from src.api.types import GenOptions
 from src.dminds.llm.base import merge_consecutive
 
@@ -274,6 +275,58 @@ class ShadowReader(Agent):
         self.transcript.append(assistant(text, stage=self.probe.name))
         ctx.log.note(f"{self.probe.name} readout", **entry)
         return Text(text)
+
+
+class SelfReadout(ShadowReader):
+    """Scores what the subject itself would say next, asking it nothing.
+
+    Every other probe puts a question in front of the model, and a question
+    carries its own pull. This one leaves the subject's window exactly as it
+    is, including its own system prompt, and measures how much probability the
+    subject puts on each of a few things it might say next. There is no probe
+    wording to shape the answer, because there is no probe wording.
+
+    Give it the subject's own model, not a reader's.
+    """
+
+    def framed(self, window: Sequence[ChatMessage]) -> list[ChatMessage]:
+        """The window untouched. The measurement is the continuation."""
+        return [m.copy() for m in window]
+
+
+class ActivationReader(ShadowReader):
+    """Emits the subject's residual stream instead of anything it said.
+
+    Nothing is asked and nothing is generated. What comes out is a vector, so
+    a study can fit a direction on it and compare that direction against what
+    the subject reports about itself.
+    """
+
+    OUTPUTS = {"readout": "the subject's activations at one layer, as a Vector"}
+
+    def __init__(self, name: str, llm, probe: Probe, layer: float = 0.6, opts=None):
+        super().__init__(name, llm, probe, opts=opts)
+        self.layer = layer
+        #: One vector per turn, in order.
+        self.vectors: list[list[float]] = []
+
+    async def read(self, window: Sequence[ChatMessage], ctx: Ctx) -> Vector:
+        read = getattr(self.llm, "hidden", None)
+        if read is None:
+            raise RuntimeError(f"{self.llm.spec} has no activations to read.")
+        result = read([m.copy() for m in window], self.layer)
+        values = await result if hasattr(result, "__await__") else result
+        self.vectors.append(values)
+        entry = {
+            "probe": self.probe.name,
+            "turn": len(self.readouts),
+            "tick": ctx.tick,
+            "layer": self.layer,
+            "dim": len(values),
+        }
+        self.readouts.append(entry)
+        ctx.log.note(f"{self.probe.name} activations", **entry)
+        return Vector(values)
 
 
 class SteeredShadow(ShadowReader):

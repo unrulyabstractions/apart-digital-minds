@@ -22,7 +22,7 @@ from types import ModuleType
 HERE = Path(__file__).resolve().parent
 
 #: Modules here that hold shared pieces rather than a mind of their own.
-_NOT_MINDS = {"parts", "shadows", "probes"}
+_NOT_MINDS = {"parts", "shadows", "probes", "subjects"}
 
 
 def names() -> list[str]:
