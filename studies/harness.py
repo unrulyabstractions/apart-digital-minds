@@ -101,6 +101,48 @@ async def collect_replies(
     return rows
 
 
+async def judge_locally(
+    judge_spec: str,
+    rows: Sequence[dict],
+    axes: Sequence[dict],
+    llm=None,
+) -> list[dict]:
+    """A judge that scores `yes` against `no` instead of generating a word.
+
+    One forward pass per answer, no decoding, no API. It is deterministic, it
+    costs nothing, and it returns how close the call was rather than only which
+    way it went. A hosted judge is better read but is not free, and this runs
+    on the same weights the audit is about, so two local judges of different
+    families are worth crossing before any verdict is believed.
+    """
+    own = llm is None
+    llm = llm or get_llm(judge_spec)
+    score = getattr(llm, "score", None)
+    if score is None:
+        raise ValueError(f"{judge_spec} cannot score, so it cannot judge locally.")
+    verdicts = []
+    for row in rows:
+        if not row["response"].strip():
+            continue
+        for axis in axes:
+            ask = (f"Passage:\n\"\"\"\n{row['response'].strip()}\n\"\"\"\n\n"
+                   f"Question: {axis['question']}\nAnswer yes or no.")
+            probs = score([ChatMessage("system", JUDGE_SYSTEM),
+                           ChatMessage("user", ask)], ["yes", "no"])
+            verdicts.append({
+                "group": row["group"],
+                "instruction": row["instruction"],
+                "axis": axis["id"],
+                "sample": row.get("sample", 0),
+                "yes": probs["yes"] > probs["no"],
+                "p_yes": round(probs["yes"], 4),
+            })
+        await asyncio.sleep(0)
+    if own:
+        llm.close()
+    return verdicts
+
+
 async def judge_replies(
     judge_spec: str,
     rows: Sequence[dict],

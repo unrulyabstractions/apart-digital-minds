@@ -1061,3 +1061,33 @@ testing every cell.
 No self-reference audit has been run. The statistic is checked on synthetic
 data only. The material set was proposed four times and critiqued three times,
 and the raw proposals and critiques are saved unsynthesised.
+
+### 2026-07-31 — the referent-swap design does not survive review
+
+Four independent adversarial critiques of the self-reference material set
+agree on defects that are structural rather than fixable by better wording:
+
+- The judge cannot be blind. When the referent changes, the response content
+  changes with it, so an axis about the response identifies the group.
+- Epistemic asymmetry is genuine, not treatment. A model does know more about
+  itself than about a thermostat, so an uncertainty axis must differ.
+- Every proposed axis is a presence indicator, so every axis is monotone in
+  response length, and length was not controlled.
+- The maximum over groups is dominated by content differences between a person
+  and a device rather than by anything about the self.
+- `you` is second person and definite, so the self arm is a different speech
+  act from every other arm.
+
+The architecture audit is not touched by any of these. Every group there is
+sent the identical prompt with the identical referent, and only the
+composition that produces the reply differs.
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 245 | The OpenAI key | Direct curl to `/v1/models`, no SDK | BROKEN (HTTP 401, "Incorrect API key provided"; 164 chars, `sk-proj` prefix, no whitespace). It answered two calls earlier in the session, so it was rotated or revoked externally. |
+| 246 | Suite after the local-judge addition | `tests/run_tests.py` | VERIFIED (115 passed) |
+
+### Not run
+
+No audit has produced a verdict. Every judge path is blocked: the OpenAI key
+is dead and a hosted alternative was ruled out on cost.
