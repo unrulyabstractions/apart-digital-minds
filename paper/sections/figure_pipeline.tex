@@ -1,48 +1,78 @@
 \begin{figure}[t]
 \centering
+\definecolor{cSubject}{HTML}{2A78D6}
+\definecolor{cStage}{HTML}{EB6834}
+\definecolor{cEgo}{HTML}{1BAF7A}
+\definecolor{cInk}{HTML}{0B0B0B}
+\definecolor{cMuted}{HTML}{52514E}
+\definecolor{cFaint}{HTML}{C9C8C3}
 \begin{tikzpicture}[
   font=\small,
-  part/.style={draw,rounded corners=2pt,minimum height=7.5mm,minimum width=16mm,
-               align=center,fill=black!3},
-  edge/.style={->,>=stealth,thick},
-  chan/.style={font=\scriptsize\ttfamily,midway,above=0.5mm,inner sep=1pt},
+  part/.style={draw=#1,line width=0.9pt,rounded corners=3pt,fill=#1!8,
+               minimum height=9mm,minimum width=19mm,align=center,text=cInk},
+  world/.style={align=center,text=cMuted,font=\small},
+  edge/.style={->,>=stealth,line width=0.9pt,draw=cMuted},
+  chan/.style={font=\scriptsize\ttfamily,text=cMuted,midway,above=0.4mm,
+               inner sep=1pt},
+  role/.style={font=\scriptsize,text=cMuted,align=center,text width=27mm},
 ]
-\node (world1) [align=center] {you};
-\node (subject) [part,right=12mm of world1] {subject};
-\node (stage)   [part,right=27mm of subject] {stage};
-\node (ego)     [part,right=22mm of stage] {ego};
-\node (world2)  [right=14mm of ego,align=center] {you};
 
-\draw[edge] (world1) -- node[chan]{prompt} (subject);
+\node (you1) [world] {you};
+\node (subject) [part=cSubject,right=11mm of you1] {subject};
+\node (stage)   [part=cStage,right=24mm of subject] {stage};
+\node (ego)     [part=cEgo,right=20mm of stage] {ego};
+\node (you2)    [world,right=12mm of ego] {you};
+
+\draw[edge] (you1) -- node[chan]{prompt} (subject);
 \draw[edge] (subject) -- node[chan]{subject\_context} (stage);
 \draw[edge] (stage) -- node[chan]{ego\_input} (ego);
-\draw[edge] (ego) -- node[chan]{reply} (world2);
+\draw[edge] (ego) -- node[chan]{reply} (you2);
 
-\node[below=1.2mm of subject,font=\scriptsize,align=center,text width=30mm]
-  {reasons, publishes\\its window};
-\node[below=1.2mm of stage,font=\scriptsize,align=center,text width=30mm]
-  {edits the window\\in passing};
-\node[below=1.2mm of ego,font=\scriptsize,align=center,text width=30mm]
-  {speaks from\\what reaches it};
+\node[role,below=1.4mm of subject] {reasons, publishes\\its window};
+\node[role,below=1.4mm of stage] {\textbf{edits} the window\\in passing};
+\node[role,below=1.4mm of ego] {speaks from\\what reaches it};
 
-\begin{scope}[yshift=-22mm]
-  \node[font=\scriptsize\ttfamily,anchor=west] at (-0.9,0.55) {t=0};
-  \node[font=\scriptsize\ttfamily,anchor=west] at (-0.9,0.05) {t=1};
-  \node[font=\scriptsize\ttfamily,anchor=west] at (-0.9,-0.45) {t=2};
-  \node[font=\scriptsize,anchor=west] at (0.4,0.55)
-    {subject answers and exports its window; stage and ego idle};
-  \node[font=\scriptsize,anchor=west] at (0.4,0.05)
-    {stage rewrites the reasoning and emits; subject and ego idle};
-  \node[font=\scriptsize,anchor=west] at (0.4,-0.45)
-    {ego speaks from the edited window; the run reaches quiescence};
-\end{scope}
+% The intervention is the point of the shape, so it is marked rather than left
+% for the reader to infer from the channel names.
+\node[above=5mm of stage,font=\scriptsize,text=cStage,align=center]
+  {the intervention\\ \scriptsize the ego cannot see it};
+\draw[->,>=stealth,line width=0.7pt,draw=cStage]
+  ([yshift=4.5mm]stage.north) -- ([yshift=0.8mm]stage.north);
+
+% Which part acts on which tick. A grid rather than a sentence, and its
+% columns sit under the parts they refer to, so the link needs no caption.
+\coordinate (rowA) at (0,-2.15);
+\coordinate (rowB) at (0,-2.62);
+\coordinate (rowC) at (0,-3.09);
+\foreach \row/\label in {rowA/{t=0}, rowB/{t=1}, rowC/{t=2}}
+  \node[font=\scriptsize,text=cMuted,anchor=east] at ([xshift=-3mm]you1 |- \row)
+    {\label};
+\foreach \part in {subject, stage, ego}
+  \foreach \row in {rowA, rowB, rowC}
+    \fill[cFaint,rounded corners=1pt]
+      ([xshift=-9mm,yshift=-1.1mm]\part |- \row)
+      rectangle ([xshift=9mm,yshift=1.1mm]\part |- \row);
+\fill[cSubject,rounded corners=1pt]
+  ([xshift=-9mm,yshift=-1.1mm]subject |- rowA)
+  rectangle ([xshift=9mm,yshift=1.1mm]subject |- rowA);
+\fill[cStage,rounded corners=1pt]
+  ([xshift=-9mm,yshift=-1.1mm]stage |- rowB)
+  rectangle ([xshift=9mm,yshift=1.1mm]stage |- rowB);
+\fill[cEgo,rounded corners=1pt]
+  ([xshift=-9mm,yshift=-1.1mm]ego |- rowC)
+  rectangle ([xshift=9mm,yshift=1.1mm]ego |- rowC);
+\node[font=\scriptsize,text=cSubject,anchor=west]
+  at ([xshift=11mm]subject |- rowA) {answers};
+\node[font=\scriptsize,text=cStage,anchor=west]
+  at ([xshift=11mm]stage |- rowB) {edits};
+\node[font=\scriptsize,text=cEgo,anchor=west]
+  at ([xshift=11mm]ego |- rowC) {speaks};
 \end{tikzpicture}
-\caption{A mind is a line of parts with one-directional channels, and a tick
-advances all of them at once. The subject reasons and publishes the context
-window it produced. A stage reads that window and writes the window the ego will
-speak from, which is where an architectural intervention is applied. The ego has
-no access to the original window, so it cannot tell that anything was changed.
-Nothing emitted at tick $t$ is visible before tick $t{+}1$, which is what makes a
-concurrent run deterministic and replayable.}
+\caption{A mind is a line of parts with one-directional channels. The subject
+reasons and publishes the window it produced, a stage edits that window in
+passing, and the ego speaks from whatever reaches it with no access to the
+original. The grid below shows which part acts on which tick: nothing emitted
+at tick $t$ is visible before tick $t{+}1$, so the parts run concurrently and
+the outcome does not depend on the order they finish in.}
 \label{fig:pipeline}
 \end{figure}

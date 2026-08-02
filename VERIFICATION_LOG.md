@@ -1203,3 +1203,39 @@ instead of piling up after the section.
 | 271 | Tables sit with their sections | Viewed pages 5 to 7 with image tokens | VERIFIED (Table 1 with 4.1, Tables 2 and 3 with 4.3 and 4.4, Table 4 with 4.5) |
 | 272 | Build | Ran it | VERIFIED (11 pages, 0 errors, 0 undefined control sequences) |
 | 273 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
+
+## 2026-07-31 — figures, and a calibration that is now measured rather than recalled
+
+The paper had one diagram and four tables. It now has six figures, every one
+drawn from a result file by `make_paper_figures.py`, so a figure cannot
+disagree with a table. Ten rounds of looking at the rendered output, each one
+finding something the code could not.
+
+The probe table was dropped: its figure carried the same rates, and the counts
+and exact tests moved into the figure's caption. The remaining tables each hold
+something their figure does not.
+
+The power curve had been typed from a console log. It now reads
+`out/studies/calibration/summary.json`, written by a script that measures the
+false-positive rate and the power sweep.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 274 | The categorical palette | Ran the validator at four slots against the light surface | VERIFIED (lightness, chroma, CVD separation and normal-vision floor all PASS; the contrast WARN is met by direct labels on every mark) |
+| 275 | Calibration measured, not recalled | Ran `studies/calibrate.py` over 200 null trials and 60 per shift | VERIFIED (4.5% with a control, 7.0% without, power 5/10/23/47/83%) |
+| 276 | Every figure comes from a result file | Read the generator and deleted no fallbacks | VERIFIED (a missing study is skipped and reported, never drawn) |
+| 277 | Figure 1, the architecture | Viewed it four times across redesigns | VERIFIED (parts coloured to match the plots, the intervention marked, and the tick grid's columns anchored under the parts they refer to) |
+| 278 | Figures 2 to 6 | Viewed each as a raster, then again inside the built document | VERIFIED (no label collisions, no legend over data, no clipped labels) |
+| 279 | The paper builds | Ran it | VERIFIED (13 pages, 0 errors, 0 undefined control sequences) |
+| 280 | Caption voice | Scanned every caption for banned constructions | VERIFIED (clean) |
+| 281 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
+
+### Fixed while looking, not while writing
+
+Bars drawn in the wrong order once the axis was inverted, so the colours
+contradicted the legend. Legends sitting on top of data in three figures. A
+value label clipped at the axis edge. An annotation overlapping the line it
+annotated. The tick grid floating free of the parts it described. None of these
+were visible in the code.

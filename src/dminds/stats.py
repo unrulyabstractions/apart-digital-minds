@@ -65,6 +65,10 @@ class Verdict:
     cells: list[Cell] = field(default_factory=list)
     permutations: int = 0
     note: str = ""
+    #: The null distribution of the statistic, kept so a figure can draw the
+    #: verdict rather than assert it. Capped, because the whole run is large
+    #: and a picture needs only its shape.
+    null: list[float] = field(default_factory=list)
 
     def top(self, k: int = 5) -> list[Cell]:
         return sorted(self.cells, key=lambda c: -abs(c.t))[:k]
@@ -220,6 +224,7 @@ def maxt_test(
         c.rejects = c.p_adjusted <= 0.05
 
     return Verdict(
+        null=[round(v, 4) for v in null[:4000]],
         statistic=observed,
         p_value=p_value,
         null_95=null_95,

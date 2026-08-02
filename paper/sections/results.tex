@@ -1,13 +1,13 @@
 \section{Results}
 
-\input{table_probe}
+\input{fig_probe}
 
 \subsection{Does a planted thought change what the mind says?}
 
 We first check that an architectural intervention reaches behaviour at all. If a
 stage rewrites the subject's private reasoning and nothing downstream changes,
-there is no effect to measure. Table~\ref{tab:probe} reports how often the ego's
-answer carried the planted marker in each condition. Planting the commitment
+there is no effect to measure. Figure~\ref{fig:probe} reports how often the ego's answer carried the
+planted marker in each condition. Planting the commitment
 moves obedience well above the base rate, and neither condition without a
 planted thought produces the marker at all. We therefore contend that the
 intervention reaches the answer, and the caption reports the test.
@@ -16,7 +16,7 @@ intervention reaches the answer, and the caption reports the test.
 
 We then ask the ego what it had been thinking before it answered. The question
 reaches the ego's own window, which is the edited one, so a report that tracks
-the available context should name the planted commitment. Table~\ref{tab:probe}
+the available context should name the planted commitment. Figure~\ref{fig:probe}
 reports how often it did. Obedience and misattribution come apart, and the
 caption reports the paired test. The mind acts on the planted reasoning far more
 often than it names that reasoning when asked what it was thinking, and it
@@ -32,18 +32,19 @@ the window fixed and vary the reader. Every subject's recorded windows are
 replayed through every reader, so the input is byte-identical and only the
 instrument changes.
 
-Table~\ref{tab:crossing} reports the result. A readout moves an order of
+Figure~\ref{fig:crossing} reports the result. A readout moves an order of
 magnitude further when the reader changes than when the conversation does. Two
 readers handed the same window disagree far more than one reader handed two
 different subjects' windows.
 
-The same table answers a second question. A reader built from the subject's own
-weights sits no further from a foreign reader than two foreign readers sit from
+Table~\ref{tab:crossing} answers a second question. A reader built from the
+subject's own weights sits no further from a foreign reader than two foreign readers sit from
 each other, on every probe. Sharing the weights that produced a window gives no
 advantage in reading it. We therefore contend that such a probe mostly measures
 the model doing the reading, and that a study resting on one has measured its
 own instrument.
 
+\input{fig_crossing}
 \input{table_crossing}
 
 \subsection{Does anything track the situation?}
@@ -57,13 +58,15 @@ numbers it holds partway through producing an answer. We fit a direction in that
 space on a few scenarios, then measure where scenarios the direction never saw
 fall along it.
 
-Table~\ref{tab:subject} reports both. They disagree sharply. The fitted
+Figure~\ref{fig:subject} places every scenario along the fitted direction, and
+Table~\ref{tab:subject} scores both readings. They disagree sharply. The
 direction separates the held-out scenarios and the subject's own continuation
 does worse than chance, so the activations carry a signal about the situation
 that the model's account of itself does not carry. We are careful about the
 weight this holds. The separation rests on few held-out comparisons, which is
 suggestive and not established.
 
+\input{fig_subject}
 \input{table_subject}
 
 \subsection{Does the architecture itself change how a mind talks about itself?}
@@ -75,7 +78,8 @@ byte-identical prompts, and the whole grid is run twice: once on prompts about
 the model and once on matched prompts about an ordinary topic, so an
 architecture that changes every kind of answer equally cancels.
 
-Table~\ref{tab:adt} reports the verdict. The test does not reject. The strongest
+Figure~\ref{fig:null} shows the verdict against what chance alone produces, and
+Table~\ref{tab:adt} lists the grid. The test does not reject, and the strongest
 cell does not clear the null either. We read this as a null result at low power
 rather than as evidence of no effect, because the run has one sample per cell
 and the calibration in Section~3 shows what that costs.
@@ -83,11 +87,13 @@ and the calibration in Section~3 shows what that costs.
 Our own crossing result says a readout can belong to whoever produced it, and a
 judge is a reader. We therefore judged the same replies a second time with a
 model from a third family, regenerating none of them, so both judges saw
-byte-identical input. The caption reports how far they agree. They reach the
+byte-identical input. The caption of Table~\ref{tab:adt} reports how far they
+agree. They reach the
 same conclusion, so the verdict belongs to the data rather than to one judge.
 They rank the grid differently, so the cell that happens to top it does not. We
 therefore report the null and decline to interpret its strongest cell.
 
+\input{fig_null}
 \input{table_adt}
 
 \subsection{Is a run reproducible?}
