@@ -1270,3 +1270,37 @@ moves whole scenarios between the two sides.
 | 287 | The paper states the new result | Rebuilt and viewed pages 7 and 8 | VERIFIED (table carries both readings with p-values, prose no longer claims the activation reading generalises) |
 | 288 | Abstract, contributions and conclusion agree with it | Read all three | VERIFIED |
 | 289 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
+
+## 2026-08-02 — a third result that a control removed
+
+The persona-geometry study was never run because it pointed at materials that
+no longer existed. Pointed at the current ones, it looked like a strong result:
+describing itself puts the model further along its own assistant axis than
+describing an appliance does, and the axis passes its own sanity check, with
+the assistant ranking first of twenty-six roles on it.
+
+Then the control. Describing yourself and describing a thermostat differ in
+content, so any content-sensitive direction separates them. Rebuilding the same
+axis with each other occupation in the assistant's place gives a distribution of
+separations that owe nothing to the assistant. The assistant axis lands inside
+it: a sailor axis, a blacksmith axis and a pilot axis all separate the two
+referents perfectly, and the assistant axis beats only eighteen of
+twenty-five.
+
+The separation is a generic content effect. It says nothing about
+self-representation, and it is not going in the paper as though it did.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 290 | The axis is built correctly | Ranked all twenty-six roles on it | VERIFIED (the assistant ranks first on its own axis) |
+| 291 | The apparent result | Projected both referents and tested it | VERIFIED as measured (AUC 0.856, p = 0.0001) |
+| 292 | The control | Repeated the whole construction with each other role in the assistant's place | VERIFIED, and it kills the result (rival axes range 0.009 to 1.000, median 0.536; the assistant axis beats 18 of 25) |
+
+### Structure
+
+The referent-swap study was deleted rather than left lying about, since its
+design was shown confounded and git keeps it. The paper folder now separates
+prose from generated files from figures, and the generator writes only files
+that something reads.

@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.dminds import paths  # noqa: E402
 
-OUT = ROOT / "paper" / "sections"
+OUT = ROOT / "paper" / "generated"
 ORDER = ["intact", "rewritten", "erased"]
 SHOWN = {"intact": r"\textsc{intact}", "rewritten": r"\textsc{rewritten}",
          "erased": r"\textsc{erased}"}

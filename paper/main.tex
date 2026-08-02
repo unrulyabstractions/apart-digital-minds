@@ -10,8 +10,10 @@
 \documentclass[11pt]{article}
 
 \input{paperdefs-common}
-\input{sections/generated_numbers}
-\input{sections/caption_probe}
+%% Numbers, tables and captions, all written by
+%% studies/make_paper_numbers.py from the result files.
+\input{generated/generated_numbers}
+\input{generated/caption_probe}
 
 \begin{document}
 \thispagestyle{plain}
@@ -72,7 +74,7 @@ the check that says when it is needed.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \input{sections/introduction}
 \input{sections/related_work}
-\input{sections/figure_pipeline}
+\input{figures/figure_pipeline}
 \input{sections/methods}
 \input{sections/results}
 \input{sections/discussion}

@@ -17,7 +17,7 @@
 
 % --- Graphics, color, tables ---
 \usepackage{graphicx}
-\graphicspath{{images/}{figures/}{../figures/}}
+\graphicspath{{figures/}}
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{array}
@@ -54,7 +54,7 @@
 %% Sections read their own tables, so the input path has to include
 %% the sections directory.
 \makeatletter\providecommand*{\input@path}{}
-\g@addto@macro\input@path{{sections/}}\makeatother
+\g@addto@macro\input@path{{sections/}{generated/}{figures/}}\makeatother
 
 % --- Typography ---
 \usepackage{microtype}

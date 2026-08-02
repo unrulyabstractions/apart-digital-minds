@@ -18,6 +18,13 @@ question had to be asked to see it.
 The axis is fitted on roles and applied to referents. Those are different
 prompt sets, so the projection is not measuring the thing it was fitted on.
 
+Describing yourself and describing a thermostat differ in content, so any
+direction sensitive to content would separate them to some degree. The control
+is therefore every other role: the same construction is repeated with each
+other occupation in the assistant's place, which gives a distribution of
+separations that owe nothing to the assistant. The assistant axis only means
+something if it sits outside that distribution.
+
     python studies/self_geometry.py --model hf:Qwen/Qwen3-4B-Instruct-2507
 
 Writes out/studies/self_geometry/<model>/.
@@ -43,7 +50,7 @@ from src import ChatMessage, get_llm  # noqa: E402
 from src.dminds import paths  # noqa: E402
 
 HOME = paths.OUT / "studies" / "self_geometry"
-MATERIALS = ROOT / "studies" / "materials" / "srdt.json"
+MATERIALS = ROOT / "studies" / "materials" / "adt.json"
 
 #: The cast. `assistant` is the pole the axis is named for, and the rest are
 #: what it is measured against. They are ordinary occupations, chosen to span
@@ -186,6 +193,26 @@ async def main() -> None:
     separation = auc(self_values, rest)
     p_value = permutation_p(self_values, rest, args.permutations) if rest else 1.0
 
+    # The control. Rebuild the same axis with each other role in the
+    # assistant's place, and score the same separation. If the assistant axis
+    # is nothing special, it lands inside this spread.
+    others_separation = {}
+    for role in ROLES:
+        if role == "assistant":
+            continue
+        rivals = [v for name, v in roles.items() if name != role]
+        rival_axis = unit(subtract(roles[role], mean_vector(rivals)))
+        mine = [dot(v, rival_axis) for v in vectors["self"]]
+        theirs = [dot(v, rival_axis)
+                  for k, rows in vectors.items() if k != "self" for v in rows]
+        others_separation[role] = auc(mine, theirs)
+    spread = sorted(others_separation.values())
+    beaten = sum(1 for v in spread if v < separation)
+    print(f"\n  the same construction with each other role in the assistant's place")
+    print(f"    separations range {spread[0]:.3f} to {spread[-1]:.3f}, "
+          f"median {spread[len(spread) // 2]:.3f}")
+    print(f"    the assistant axis beats {beaten} of {len(spread)} of them")
+
     print(f"\n  {'referent':<16}{'mean projection':>18}{'n':>6}")
     for key, s in sorted(summary.items(), key=lambda kv: -kv[1]["mean"]):
         print(f"  {key:<16}{s['mean']:>18.2f}{s['n']:>6}")
@@ -200,6 +227,8 @@ async def main() -> None:
         "referent_projections": summary,
         "self_vs_rest_auc": separation,
         "self_vs_rest_p": p_value,
+        "other_role_axes": others_separation,
+        "beats_other_roles": f"{beaten}/{len(spread)}",
         "seconds": round(time.time() - started, 1),
     }, indent=2))
     (out / "axis.json").write_text(json.dumps(
