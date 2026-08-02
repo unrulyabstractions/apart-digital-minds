@@ -259,6 +259,34 @@ def architecture(macros: list[str], model="hf:Qwen/Qwen3-4B-Instruct-2507") -> N
     print(f"  architecture: S={v['statistic']:.2f}, p={v['p_value']:.3f}")
 
 
+def cross_judge(macros: list[str], model="hf:Qwen/Qwen3-4B-Instruct-2507",
+                second="openai:gpt-4.1-mini") -> None:
+    """The same replies judged twice, so the verdict can be told from the judge."""
+    slug = model.replace(":", "-").replace("/", "-")
+    name = f"rejudged-{second.replace(':', '-').replace('/', '-')}.json"
+    path = paths.OUT / "studies" / "adt" / slug / name
+    if not path.exists():
+        print("  cross judge: not run")
+        return
+    d = json.loads(path.read_text())
+    calls, second_v = d["call_agreement"], d["second_verdict"]
+    macros += [
+        macro("judgeSecond", rf"\texttt{{{second.split(':', 1)[1]}}}"),
+        macro("judgeCompared", calls["compared"]),
+        macro("judgeAgree", f"{100 * calls['agree_rate']:.0f}"),
+        macro("judgeYesFirst", f"{calls['yes_rate_first']:.3f}"),
+        macro("judgeYesSecond", f"{calls['yes_rate_second']:.3f}"),
+        macro("adtSecondS", f"{second_v['statistic']:.2f}"),
+        macro("adtSecondP", f"{second_v['p_value']:.3f}"),
+        macro("adtSameConclusion", "yes" if d["same_conclusion"] else "no"),
+        macro("adtSecondTopGroup", rf"\textsc{{{second_v['group']}}}"),
+        macro("adtSecondTopAxis", rf"\texttt{{{second_v['axis']}}}"),
+    ]
+    print(f"  cross judge: {calls['agree_rate']:.1%} agreement on "
+          f"{calls['compared']} calls, same conclusion "
+          f"{d['same_conclusion']}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.parse_args()
@@ -267,6 +295,7 @@ def main() -> None:
     crossing(macros)
     subject_side(macros)
     architecture(macros)
+    cross_judge(macros)
     (OUT / "generated_numbers.tex").write_text("\n".join(macros) + "\n")
     print(f"  wrote {OUT}/generated_numbers.tex and four tables")
 

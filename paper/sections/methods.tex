@@ -80,7 +80,8 @@ is what the architecture audit is read against.
 
 The probes run on open-weight models small enough to run every trial locally.
 The architecture audit is judged by a model from a different family than the one
-under audit, so nothing judges itself. Subject, stage and ego are separate
+under audit, so nothing judges itself, and then judged again by a second model
+so the verdict can be told apart from the judge. Subject, stage and ego are separate
 instances of one set of weights, held once and shared, so any difference between
 conditions comes from the window rather than from the model. Every model call in
 a run passes through one recording, which makes a run replayable without a

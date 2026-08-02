@@ -1145,3 +1145,31 @@ than printing a number nobody produced.
 | 255 | The build is clean | Read the log | VERIFIED (11 pages, 0 errors, 0 undefined control sequences, 1 overfull box) |
 | 256 | Voice | Scanned every section for em dashes, ornate connectives, clefts and `X, not Y` punch lines | VERIFIED (clean) |
 | 257 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
+
+## 2026-07-31 — the audit judged twice
+
+The crossing study says a readout can belong to whoever produced it, which
+applies to a judge as much as to a probe. The same saved replies were judged
+again by a hosted model, regenerating none, so both judges saw byte-identical
+input.
+
+The conclusion survives the swap and the ranking does not. Both judges fail to
+reject, so the null belongs to the data. Their strongest cells differ, so no
+cell of that table should be read as a finding. The paper now says both.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 258 | The replaced OpenAI key | Direct curl to `/v1/models` | VERIFIED (HTTP 200, 125 models) |
+| 259 | Two judges on identical input | Re-judged 192 saved replies, regenerating none | VERIFIED (2688 calls compared, 80.1% agreement, yes-rates 0.323 and 0.321) |
+| 260 | The verdict does not depend on the judge | Compared both verdicts | VERIFIED (gemma S=3.05 p=0.153, gpt-4.1-mini S=2.44 p=0.712, both fail to reject) |
+| 261 | The ranking does depend on the judge | Compared the strongest cells | VERIFIED (`direct/agency` against `direct/concrete`) |
+| 262 | The paper carries all of it | Regenerated the numbers, rebuilt, viewed page 6 | VERIFIED (11 pages, 0 undefined control sequences, the cross-judge paragraph renders with generated values) |
+| 263 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
+
+### BROKEN, and fixed
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 264 | The first agreement count | Read the printed output and questioned why it was exactly half the calls | BROKEN (the self and control halves share a verdict key, so keying them together compared 1344 of 2688 calls and reported that as the whole). The key now carries the condition, and the corrected figure is 80.1% over 2688. |

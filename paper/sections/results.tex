@@ -75,6 +75,17 @@ clear the null. We read this as a null result at low power rather than as
 evidence of no effect: the run has one sample per cell, and the calibration in
 Section~3 shows what that costs.
 
+Since our own crossing result says a readout can belong to whoever produced it,
+we judged the same replies a second time with \judgeSecond, regenerating none
+of them. The two judges see byte-identical input and differ only in who is
+judging. They agree on \judgeAgree\% of \judgeCompared\ calls and their
+overall rates of saying yes are \judgeYesFirst\ and \judgeYesSecond. The
+second judge reaches $S = \adtSecondS$ with $p = \adtSecondP$, and the same
+conclusion. The verdict therefore belongs to the data rather than to one judge.
+The ordering inside the grid does not: the second judge's strongest cell is
+\adtSecondTopGroup\ on \adtSecondTopAxis\ instead. We therefore report the
+null and decline to interpret the cell that happens to top it.
+
 \subsection{Is a run reproducible?}
 
 Every model call in a run passes through one recording, and replaying a
