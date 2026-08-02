@@ -233,6 +233,46 @@ def figure_null(model="hf:Qwen/Qwen3-4B-Instruct-2507") -> None:
 # -- the calibration ---------------------------------------------------------
 
 
+def figure_substitution() -> None:
+    """Own reply against a swapped one, with the control beside it."""
+    home = paths.OUT / "studies" / "substitution"
+    runs = []
+    for folder in sorted(home.iterdir()):
+        path = folder / "summary.json"
+        if path.exists():
+            runs.append(json.loads(path.read_text()))
+    if not runs:
+        raise FileNotFoundError(f"no substitution runs under {home}")
+
+    fig, ax = plt.subplots(figsize=(3.6, 2.2))
+    height, gap = 0.30, 0.03
+    for i, r in enumerate(runs):
+        for value, offset, colour in (
+                (r["authorship"]["mean_drop"], -height / 2 - gap, BLUE),
+                (r["control"]["mean_drop"], height / 2 + gap, FAINT)):
+            ax.barh(i + offset, value, height=height, color=colour, zorder=3)
+            ax.text(value + 0.006, i + offset, f"{value:+.3f}", va="center",
+                    fontsize=7.5, color=INK)
+    ax.axvline(0, color=MUTED, lw=1, zorder=4)
+    ax.set_yticks(range(len(runs)))
+    ax.set_yticklabels([r["model"].split("/")[-1].replace("-Instruct-2507", "")
+                        for r in runs])
+    ax.invert_yaxis()
+    ax.set_xlabel("fall in p(yes) when the reply is swapped")
+    # From the data, so a larger effect than expected cannot fall off the axis.
+    widest = max(max(r["authorship"]["mean_drop"], r["control"]["mean_drop"])
+                 for r in runs)
+    ax.set_xlim(-0.02, widest * 1.28)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=BLUE),
+               plt.Rectangle((0, 0), 1, 1, color=FAINT)]
+    ax.legend(handles, ["did you write the previous message?",
+                        "control question, same substitution"],
+              loc="upper center", bbox_to_anchor=(0.46, -0.34), ncol=1,
+              fontsize=7.5, labelcolor=INK, handlelength=1.2,
+              handleheight=0.9, borderpad=0, labelspacing=0.35)
+    save(fig, "substitution")
+
+
 def figure_power() -> None:
     """Power against planted effect. The job is change over a parameter."""
     data = json.loads(
@@ -271,6 +311,7 @@ def main() -> None:
     style()
     for name, fn in [("probe", figure_probe), ("crossing", figure_crossing),
                      ("subject", figure_subject), ("null", figure_null),
+                     ("substitution", figure_substitution),
                      ("power", figure_power)]:
         try:
             fn()

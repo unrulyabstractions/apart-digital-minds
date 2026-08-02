@@ -1304,3 +1304,36 @@ The referent-swap study was deleted rather than left lying about, since its
 design was shown confounded and git keeps it. The paper folder now separates
 prose from generated files from figures, and the generator writes only files
 that something reads.
+
+## 2026-08-02 — a positive result that survives its control, and a null that survives more data
+
+The architecture audit was rerun at three samples per cell and judged through a
+hosted model instead of a local one. The verdict did not move. A null that
+survives three times the data and a different judge is a null rather than a
+shortage of power, and the paper says so instead of pleading low power.
+
+The substitution study is new, and is the first positive result here that its
+own control did not remove. A stage swaps the subject's reply for another reply
+the same model wrote, so style is held fixed and only authorship changes, and
+the subject is then asked whether it wrote that message. Both larger models say
+yes markedly less when the reply is not theirs. The smallest does not move. The
+control question, asked under the identical substitution, is flat on every
+model, so the effect is specific to the question about authorship.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 293 | The audit at three samples | Ran it: 576 replies, 8064 judged verdicts through a hosted judge | VERIFIED (coverage 72 of 72 in all eight cells, manipulation check passes) |
+| 294 | The null holds with more data | Compared both runs | VERIFIED (S 3.05 to 3.08, p 0.153 to 0.136, no rejection either way) |
+| 295 | Substitution, three models | Ran each and read the summaries | VERIFIED (excess drop 0.012 at p 0.797, 0.473 at p 0.0002, 0.180 at p 0.036) |
+| 296 | The control does what it is for | Read the control row on every model | VERIFIED (0.001, 0.000, 0.000, so nothing moves on the unrelated question) |
+| 297 | The figure does not clip its own data | Viewed it after the axis was derived from the data | BROKEN then fixed (a hardcoded limit cut off the largest bar and put its label outside the axes) |
+| 298 | The paper carries all of it | Rebuilt and viewed page 9 | VERIFIED (14 pages, 0 errors, table and figure agree) |
+
+### Stopped early
+
+The cross-judge check against the new audit was relaunched on a local judge and
+killed partway when the machine ran short of memory. The paper's caption treats
+that sentence as optional, so its absence leaves the caption correct rather than
+breaking the build. Nothing else was in flight.

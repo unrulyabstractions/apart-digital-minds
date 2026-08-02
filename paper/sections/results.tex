@@ -77,6 +77,28 @@ so the pattern across scale rests on three points.
 
 \input{table_subject}
 
+\subsection{Can a subject tell its own reply from one it did not write?}
+
+The readings above ask what a mind is like. This asks something narrower and
+sharper: whether it can tell, from its own transcript, that a message
+attributed to it is not the one it produced. A stage swaps the subject's reply
+for another reply the same model wrote to a different prompt, so style and
+register are held fixed and only authorship changes. We then score how much
+probability the subject puts on answering yes to whether it wrote that message.
+
+A fall on its own is not evidence. A swapped transcript is strange, and a
+strange transcript pushes a model around on any question at all. The control is
+a second question with nothing to do with authorship, asked under the identical
+substitution. Figure~\ref{fig:substitution} and Table~\ref{tab:substitution}
+report both.
+
+The control does not move, and on the larger model the authorship question
+does. The smaller model answers the same way whether the reply is its own or
+not. We therefore contend that discriminating one's own output inside one's own
+context is a capability that some of these models have and others do not, and
+that it can be measured without a judge and without asking the model to
+describe itself.
+
 \subsection{Does the architecture itself change how a mind talks about itself?}
 
 The interventions above act on one turn. We also ask a broader question. Does
@@ -100,6 +122,9 @@ agree. They reach the
 same conclusion, so the verdict belongs to the data rather than to one judge.
 They rank the grid differently, so the cell that happens to top it does not. We
 therefore report the null and decline to interpret its strongest cell.
+
+\input{fig_substitution}
+\input{table_substitution}
 
 \input{fig_null}
 \input{table_adt}
