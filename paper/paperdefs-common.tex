@@ -51,6 +51,11 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta}
 
+%% Sections read their own tables, so the input path has to include
+%% the sections directory.
+\makeatletter\providecommand*{\input@path}{}
+\g@addto@macro\input@path{{sections/}}\makeatother
+
 % --- Typography ---
 \usepackage{microtype}
 

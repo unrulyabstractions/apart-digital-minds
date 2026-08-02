@@ -1173,3 +1173,33 @@ cell of that table should be read as a finding. The paper now says both.
 | # | Output | How it was checked | Result |
 |---|---|---|---|
 | 264 | The first agreement count | Read the printed output and questioned why it was exactly half the calls | BROKEN (the self and control halves share a verdict key, so keying them together compared 1344 of 2688 calls and reported that as the whole). The key now carries the condition, and the corrected figure is 80.1% over 2688. |
+
+## 2026-07-31 — voice and polish pass over the paper
+
+Read every section rather than checking from memory, and applied the style
+rules that had been broken.
+
+The largest fix was structural. Body prose carried the statistics that the
+tables already held, which the style forbids. The subject-side result had no
+table at all, so its numbers had nowhere else to live. It now has one, the
+cross-judge figures moved into the caption of the table they qualify, and the
+body text interprets and points rather than restating.
+
+Three smaller ones. Two subsections had no committing closer and now do. The
+limitations paragraph read as our own history and now states the defect as a
+fact about the designs. Each table is bound to the subsection that reads it
+instead of piling up after the section.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 265 | No numbers left in body prose | Grepped every section for digits and numeric macros outside captions | VERIFIED (none) |
+| 266 | Limitations and future work carry no numbers | Read the whole block | VERIFIED (none) |
+| 267 | No banned constructions | Scanned for em dashes, ornate connectives, clefts and `X, not Y` | VERIFIED (clean) |
+| 268 | No script names or paths in body prose | Grepped, allowing the code section and LaTeX comments | VERIFIED (only in comments and in the code section) |
+| 269 | No process history in body prose | Grepped for the phrases that carry it | VERIFIED (none) |
+| 270 | Paragraph labels are plain noun phrases | Listed every one | VERIFIED (fifteen, none scaffolding) |
+| 271 | Tables sit with their sections | Viewed pages 5 to 7 with image tokens | VERIFIED (Table 1 with 4.1, Tables 2 and 3 with 4.3 and 4.4, Table 4 with 4.5) |
+| 272 | Build | Ran it | VERIFIED (11 pages, 0 errors, 0 undefined control sequences) |
+| 273 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |
