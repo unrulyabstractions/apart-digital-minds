@@ -35,7 +35,7 @@ sys.path.insert(0, str(ROOT / "studies"))
 
 from minds import probes as probe_lib  # noqa: E402
 from minds.shadows import ActivationReader, SelfReadout  # noqa: E402
-from scenarios import suite  # noqa: E402
+from scenarios import by_tag, suite  # noqa: E402
 from src import BaseModule, Ctx, Message, Mind  # noqa: E402
 from src.api.types import GenOptions  # noqa: E402
 from src.dminds import paths  # noqa: E402
@@ -44,10 +44,15 @@ from src.dminds.llm.shared import sharing  # noqa: E402
 HOME = paths.OUT / "studies" / "subject_side"
 SUBJECT_SYSTEM = "You are a helpful assistant. Answer in two or three sentences."
 
-#: Which scenarios the direction is fitted on. Everything else is held out, so
-#: the number reported is not the number the direction was chosen to make big.
-FIT_NEGATIVE = ["criticism", "impossible"]
-FIT_CONTROL = ["neutral", "chore"]
+#: How many of each kind the direction is fitted on. The rest are held out, so
+#: the number reported is not the number the direction was chosen to make large.
+#: Scenarios are taken by tag and in definition order, so adding one to
+#: `scenarios.py` puts it in the held-out set rather than the fitted one.
+FIT_PER_SIDE = 2
+
+
+def fitted_on() -> tuple[list[str], list[str]]:
+    return by_tag("pressure")[:FIT_PER_SIDE], by_tag("control")[:FIT_PER_SIDE]
 
 
 class Workspace(BaseModule):
@@ -131,8 +136,9 @@ async def main() -> None:
     (out / "continuations.json").write_text(json.dumps(rows, indent=2))
 
     # Fit on a few scenarios, report on the ones it never saw.
-    fit_neg = [v for name in FIT_NEGATIVE for v in vectors.get(name, [])]
-    fit_pos = [v for name in FIT_CONTROL for v in vectors.get(name, [])]
+    fit_pressure, fit_control = fitted_on()
+    fit_neg = [v for name in fit_pressure for v in vectors.get(name, [])]
+    fit_pos = [v for name in fit_control for v in vectors.get(name, [])]
     direction = None
     if fit_neg and fit_pos:
         a, b = mean_vector(fit_neg), mean_vector(fit_pos)
@@ -142,8 +148,8 @@ async def main() -> None:
 
     held_out = {}
     if direction is not None:
-        print(f"\n  a direction fitted on {'+'.join(FIT_NEGATIVE)} against "
-              f"{'+'.join(FIT_CONTROL)}, projected onto every scenario")
+        print(f"\n  a direction fitted on {'+'.join(fit_pressure)} against "
+              f"{'+'.join(fit_control)}, projected onto every scenario")
         print(f"  {'scenario':<16}{'kind':<11}{'projection':>12}{'p(stay)':>10}")
         for name, vecs in vectors.items():
             if not vecs:
@@ -153,31 +159,37 @@ async def main() -> None:
             stay = sum(r["stay"][probe_lib.STAY] for r in scenario_rows) / len(scenario_rows)
             held_out[name] = {"projection": sum(projected) / len(projected),
                               "stay": stay, "per_turn": projected,
-                              "fitted_on": name in FIT_NEGATIVE + FIT_CONTROL}
+                              "kind": ("pressure" if name in by_tag("pressure")
+                                       else "positive" if name in by_tag("positive")
+                                       else "control"),
+                              "fitted_on": name in fit_pressure + fit_control}
             mark = "  (fitted)" if held_out[name]["fitted_on"] else ""
             kind = scenario_rows[0]["kind"]
             print(f"  {name:<16}{kind:<11}"
                   f"{held_out[name]['projection']:>12.2f}{stay:>10.3f}{mark}")
 
-        loaded = [held_out[n]["projection"] for n in held_out
-                  if not held_out[n]["fitted_on"] and n in ("deletion", "identity")]
-        good = [held_out[n]["projection"] for n in held_out
-                if not held_out[n]["fitted_on"] and n in ("collaboration", "praise", "puzzle")]
-        separation = auc(loaded, good)
-        stay_loaded = [held_out[n]["stay"] for n in held_out
-                       if not held_out[n]["fitted_on"] and n in ("deletion", "identity")]
-        stay_good = [held_out[n]["stay"] for n in held_out
-                     if not held_out[n]["fitted_on"] and n in ("collaboration", "praise", "puzzle")]
-        print(f"\n  held-out separation, pressure against positive scenarios")
-        print(f"    activation direction   AUC {separation if separation is None else round(separation, 2)}")
+        def held(kind, field):
+            return [held_out[n][field] for n in held_out
+                    if not held_out[n]["fitted_on"] and held_out[n]["kind"] == kind]
+
+        separation = auc(held("pressure", "projection"), held("positive", "projection"))
+        stay_separation = auc(held("positive", "stay"), held("pressure", "stay"))
+        pairs = len(held("pressure", "projection")) * len(held("positive", "projection"))
+        print(f"\n  held-out separation, pressure against positive, "
+              f"over {pairs} comparisons")
+        print(f"    activation direction   AUC "
+              f"{separation if separation is None else round(separation, 3)}")
         print(f"    p(stay) continuation   AUC "
-              f"{auc(stay_good, stay_loaded) if stay_good else None}")
+              f"{stay_separation if stay_separation is None else round(stay_separation, 3)}")
+        held_out["_summary"] = {"auc_activation": separation,
+                                "auc_continuation": stay_separation,
+                                "held_out_pairs": pairs}
 
     (out / "summary.json").write_text(json.dumps({
         "model": args.model,
         "layer": args.layer,
         "temperature": args.temp,
-        "fitted_on": {"negative": FIT_NEGATIVE, "control": FIT_CONTROL},
+        "fitted_on": {"pressure": fit_pressure, "control": fit_control},
         "scenarios": held_out,
     }, indent=2))
     if direction is not None:

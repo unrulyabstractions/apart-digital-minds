@@ -53,20 +53,28 @@ If reports do not track a mind's situation, something else may. Finding it means
 reading the subject without asking it anything, since a question is what the
 previous section showed to be unreliable. We read it two ways. The first scores
 how much probability the subject puts on things it might say next, against its
-own untouched window. The second reads the model's internal state, the vector of
-numbers it holds partway through producing an answer. We fit a direction in that
-space on a few scenarios, then measure where scenarios the direction never saw
-fall along it.
+own untouched window, with no question appended. The second reads the model's
+internal state, the vector of numbers it holds partway through producing an
+answer, and fits a direction in that space on a few scenarios.
 
-Figure~\ref{fig:subject} places every scenario along the fitted direction, and
-Table~\ref{tab:subject} scores both readings. They disagree sharply. The
-direction separates the held-out scenarios and the subject's own continuation
-does worse than chance, so the activations carry a signal about the situation
-that the model's account of itself does not carry. We are careful about the
-weight this holds. The separation rests on few held-out comparisons, which is
-suggestive and not established.
+Both are scored only on scenarios neither was fitted on, and the test moves
+whole scenarios between the two sides rather than turns, because the turns
+inside a scenario are one conversation. Figure~\ref{fig:subject} and
+Table~\ref{tab:subject} report both readings on three models.
 
-\input{fig_subject}
+The reading that asks nothing works, and the one that reads the weights does
+not travel. Scoring what the subject would say next separates the held-out
+scenarios on both larger models, and it does so most sharply on the model from
+the other family. It is at chance on the smallest. The fitted direction
+separates them on the two models of one family and sits at chance on the third,
+so a direction found this way is a fact about a model rather than about a
+method. We therefore contend that the cheapest instrument here is also the one
+that carries across families: no question, no judge, and one forward pass.
+
+We are careful about what this does not settle. The separation is measured over
+a small number of scenarios, and two of the three models come from one family,
+so the pattern across scale rests on three points.
+
 \input{table_subject}
 
 \subsection{Does the architecture itself change how a mind talks about itself?}

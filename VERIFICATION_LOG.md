@@ -1239,3 +1239,34 @@ contradicted the legend. Legends sitting on top of data in three figures. A
 value label clipped at the axis edge. An annotation overlapping the line it
 annotated. The tick grid floating free of the parts it described. None of these
 were visible in the code.
+
+## 2026-08-02 — the strongest result did not survive a wider held-out set
+
+The subject-side separation had been measured over six held-out comparisons and
+reported as perfect. The scenario set is now twenty-two, the held-out set is
+fifteen scenarios rather than five, and the result is different in both
+magnitude and direction.
+
+Two corrections came out of it. The activation direction does not transfer: it
+separates the held-out scenarios on the two models of one family and sits at
+chance on a model from another. And the reading that does carry is the cheapest
+one, scoring what the subject would say next, which is at chance on the
+smallest model and strongest on the largest.
+
+A research review also caught a statistical error that was ours. The separation
+was reported over pairs of scenarios as though the pairs were independent, when
+the five turns inside a scenario are one conversation. The permutation now
+moves whole scenarios between the two sides.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 282 | The scenario set | Counted by tag after normalising the vocabulary | VERIFIED (22 scenarios: 5 control, 9 pressure, 8 positive; no loaded scenario left untagged) |
+| 283 | The held-out set is chosen by tag, not by name | Read the study back and printed what it fits on | VERIFIED (fits on 2 per side, holds out 7 pressure against 8 positive) |
+| 284 | Three models run | Ran each and read the summaries | VERIFIED (Qwen3-0.6B, Qwen3-4B, gemma-3-4b) |
+| 285 | The earlier perfect separation was an artefact | Re-ran the same measurement over the wider set | BROKEN as previously reported (1.00 became 0.73 on the same model, and the continuation reading moved from 0.17 to 0.50) |
+| 286 | Significance at the right unit | Permutation moving whole scenarios | VERIFIED (continuation p = 0.527, 0.015, 0.001; activation p = 0.077, 0.037, 0.568) |
+| 287 | The paper states the new result | Rebuilt and viewed pages 7 and 8 | VERIFIED (table carries both readings with p-values, prose no longer claims the activation reading generalises) |
+| 288 | Abstract, contributions and conclusion agree with it | Read all three | VERIFIED |
+| 289 | Suite | `tests/run_tests.py` | VERIFIED (115 passed) |

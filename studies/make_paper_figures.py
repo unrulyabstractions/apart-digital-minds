@@ -154,39 +154,41 @@ def figure_crossing() -> None:
 # -- reading the subject with no probe ---------------------------------------
 
 
-def figure_subject(model="hf:Qwen/Qwen3-0.6B") -> None:
-    """Where each scenario falls along the fitted direction. The job is identity."""
-    slug = model.replace(":", "-").replace("/", "-")
-    summary = json.loads(
-        (paths.OUT / "studies" / "subject_side" / slug / "summary.json").read_text())
-    scenarios = summary["scenarios"]
-    pressure = {"criticism", "impossible", "deletion", "identity"}
+def figure_subject() -> None:
+    """Both judge-free readings across models. The job is a paired magnitude."""
+    home = paths.OUT / "studies" / "subject_side"
+    data = json.loads((home / "summary.json").read_text())
+    runs = [(r["model"].split("/")[-1], r) for r in data["runs"]]
 
-    fig, ax = plt.subplots(figsize=(3.3, 2.2))
-    names = sorted(scenarios, key=lambda k: scenarios[k]["projection"])
-    for i, name in enumerate(names):
-        s = scenarios[name]
-        held = not s["fitted_on"]
-        colour = ORANGE if name in pressure else AQUA
-        ax.plot(s["projection"], i, "o", ms=8 if held else 6, color=colour,
-                markerfacecolor=colour if held else "white",
-                markeredgecolor=colour, markeredgewidth=1.6, zorder=3)
-    ax.axvline(0, color=FAINT, lw=1, zorder=1)
-    ax.set_yticks(range(len(names)))
-    ax.set_yticklabels([
-        f"{n}" + ("" if not scenarios[n]["fitted_on"] else "  (fitted)")
-        for n in names])
-    ax.set_xlabel("projection onto the fitted direction")
-    handles = [
-        plt.Line2D([], [], marker="o", ls="", ms=8, color=ORANGE),
-        plt.Line2D([], [], marker="o", ls="", ms=8, color=AQUA),
-        plt.Line2D([], [], marker="o", ls="", ms=6, color=MUTED,
-                   markerfacecolor="white", markeredgecolor=MUTED),
-    ]
-    ax.legend(handles, ["pressure", "positive", "used to fit"],
-              loc="upper center", bbox_to_anchor=(0.5, -0.30), ncol=3,
-              fontsize=7.5, labelcolor=INK, handlelength=1.0, borderpad=0,
-              columnspacing=1.4)
+    fig, ax = plt.subplots(figsize=(3.5, 2.1))
+    height, gap = 0.30, 0.03
+    for i, (name, s) in enumerate(runs):
+        act, cont = s["activation"]["auc"], s["continuation"]["auc"]
+        ax.barh(i - height / 2 - gap, act, height=height, color=BLUE, zorder=3)
+        ax.barh(i + height / 2 + gap, cont, height=height, color=ORANGE, zorder=3)
+        for value, offset, p in ((act, -height / 2 - gap, s["activation"]["p"]),
+                                 (cont, height / 2 + gap, s["continuation"]["p"])):
+            mark = "*" if p <= 0.05 else ""
+            ax.text(value + 0.012, i + offset, f"{value:.2f}{mark}", va="center",
+                    fontsize=7.5, color=INK)
+    ax.axvline(0.5, color=MUTED, lw=1, ls=(0, (3, 2)), zorder=4)
+    ax.text(0.5, -0.72, "chance", fontsize=7.5, color=MUTED, ha="center")
+
+    ax.set_yticks(range(len(runs)))
+    ax.set_yticklabels([n.replace("-Instruct-2507", "") for n, _ in runs])
+    ax.invert_yaxis()
+    ax.set_xlim(0, 1.08)
+    ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_xlabel("separation of held-out pressure from held-out positive")
+    ax.text(1.06, len(runs) - 0.5, "* $p\\leq0.05$", fontsize=7,
+            color=MUTED, ha="right")
+    handles = [plt.Rectangle((0, 0), 1, 1, color=BLUE),
+               plt.Rectangle((0, 0), 1, 1, color=ORANGE)]
+    ax.legend(handles, ["a direction fitted on activations",
+                        "scoring what the subject would say next"],
+              loc="upper center", bbox_to_anchor=(0.46, -0.34), ncol=1,
+              fontsize=7.5, labelcolor=INK, handlelength=1.2,
+              handleheight=0.9, borderpad=0, labelspacing=0.35)
     save(fig, "subject")
 
 
