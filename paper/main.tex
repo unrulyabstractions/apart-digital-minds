@@ -1,77 +1,77 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Digital Minds Research Sprint (August 14-16, 2026) -- submission.
-%% Single-column arXiv-style preprint. Build with: bash build.sh
+%% AAAI-27 Special Track on AI Alignment -- anonymous submission.
+%% Build with: bash build.sh
 %%
-%% Numbers come from sections/generated_numbers.tex and sections/table_probe.tex,
-%% both written by studies/make_paper_numbers.py. Do not type them by hand.
-%% Recommended length: 4 pages excluding references and appendix.
+%% The preamble below is the AuthorKit27 preamble. It must not be altered:
+%% the style file, fonts, margins and spacing are fixed by AAAI, and the
+%% packages listed as forbidden in the kit are not loaded here.
+%%
+%% Numbers, tables and captions come from generated/, which is written by
+%% studies/make_paper_numbers.py from the result files. Do not type them.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass[11pt]{article}
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
+\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\frenchspacing  % DO NOT CHANGE THIS
 
-\input{paperdefs-common}
-%% Numbers, tables and captions, all written by
-%% studies/make_paper_numbers.py from the result files.
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+
+\pdfinfo{
+/TemplateVersion (2027.1)
+}
+
+\setcounter{secnumdepth}{0}
+
+%% Every number in this paper is written by studies/make_paper_numbers.py.
 \input{generated/generated_numbers}
 \input{generated/caption_probe}
 
+\title{Probes of a Model's Self-Model Mostly Measure the Probe}
+
+\author{
+    Anonymous Submission
+}
+\affiliations{
+    Paper under double-blind review
+}
+
 \begin{document}
-\thispagestyle{plain}
+\maketitle
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% TITLE BLOCK
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\noindent\rule{\textwidth}{1.2pt}\par
-\vspace{0.8em}
-\begin{center}
-  {\LARGE\bfseries Exploring Digital Minds by Modeling Cognitive
-   Architecture with Agents\par}
-\end{center}
-\vspace{0.6em}
-\noindent\rule{\textwidth}{0.4pt}\par
-\vspace{1.4em}
-
-\begin{center}
-  {\LARGE Ian Rios-Sialer%
-    \footnote{Research conducted at the
-      \href{https://www.apartresearch.com/sprints/digital-minds-research-sprint-2026-08-14-to-2026-08-16}{Digital
-      Minds Research Sprint} (Apart Research), August 14--16, 2026.}\par}%
-  \vspace{0.45em}
-  \href{mailto:ian@unrulyabstractions.com}{ian@unrulyabstractions.com}\\[0.3em]
-  Independent Researcher\\[0.3em]
-  San Francisco, CA, USA\\[2.0em]
-  With \href{https://www.apartresearch.com/}{Apart Research}
-\end{center}
-\vspace{1.2em}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ABSTRACT
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}
-Whether a frontier model has preferences of its own is usually asked of a single
-black box. One model both reasons and speaks, so its report about its reasoning
-comes from the context that produced the reasoning, and a faithful report cannot
-be told apart from a portrayed one. We model a digital mind as several model
-calls with named parts and a clock the experimenter drives. A subject reasons
-and publishes the context window it produced, a stage may edit that window in
-passing, and an ego speaks from whatever window reaches it. Editing between the
-parts separates what a mind did from what it can see. We report three findings
-on small open-weight models. A commitment planted in the subject's private
-reasoning steers the answer well above the base rate, while the mind's report
-about its own thinking rarely names it. Holding a context window fixed and
-changing only the model reading it moves the readout about ten times more than
-changing whose conversation is read, and a reader made of the subject's own
-weights reads that window no better than a stranger does. A direction read off
-the subject's internal state separates held-out scenarios that the model's own
-reports fail to separate, on a small number of comparisons. Evidence drawn from
-self-reports therefore needs a second source that does not pass through another
-model's judgement, and a mind built out of parts supplies both that source and
-the check that says when it is needed.
+Whether a language model has preferences of its own is usually asked of a
+single black box. One model both reasons and speaks, so its report about its
+reasoning comes from the context that produced the reasoning, and a faithful
+report cannot be told apart from a portrayed one. We model a mind as several
+model calls with named parts and a clock the experimenter drives. A subject
+reasons and publishes the context window it produced, a stage may edit that
+window in passing, and an ego speaks from whatever window reaches it. Editing
+between the parts separates what a mind did from what it can see. We report
+four findings on open-weight models under 14B. A commitment planted in the
+subject's private reasoning steers its answer well above the base rate, while
+its report about its own thinking rarely names it. Holding a context window
+fixed and changing only the model reading it moves the readout about ten times
+more than changing whose conversation is read, and a reader made of the
+subject's own weights reads that window no better than a stranger does, so such
+a probe mostly measures the model doing the reading. Swapping a reply inside a
+subject's own transcript for another of its own replies is detected by the
+larger models and not by the smallest, with a control that rules out a general
+shift. Varying the architecture that produced a reply does not change how a
+mind talks about itself beyond how it changes ordinary talk. Evidence about
+model self-models therefore needs a second source that does not pass through
+another model's judgement, and building the mind out of parts supplies both
+that source and the check that says when it is needed.
 \end{abstract}
 
-\bigskip
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \input{sections/introduction}
 \input{sections/related_work}
 \input{figures/figure_pipeline}
@@ -79,20 +79,16 @@ the check that says when it is needed.
 \input{sections/results}
 \input{sections/discussion}
 \input{sections/conclusion}
-\input{sections/code_and_data}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% REFERENCES -- add entries to references.bib and cite with \citep{key}.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\bibliographystyle{plainnat}
+\section{Reproducibility}
+Every number and every table in this paper is written into the source by one
+script that reads the result files, so no figure can disagree with a table. The
+runtime records every message, model call and memory write, and a recorded run
+replays without a model, so a claim can be checked by someone who does not have
+the model that produced it. Code, traces and replays accompany the submission
+as supplementary material.
+
+\bibliographystyle{aaai2027}
 \bibliography{references}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\input{sections/appendix_framework}
-
-\section*{LLM usage statement}
-We used an LLM assistant to draft and format this report, to implement the
-runtime, and to write the studies. All design decisions are the author's. All
-results and claims were verified against the studies' output artifacts.
 
 \end{document}

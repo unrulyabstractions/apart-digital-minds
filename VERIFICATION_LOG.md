@@ -1337,3 +1337,30 @@ The cross-judge check against the new audit was relaunched on a local judge and
 killed partway when the machine ran short of memory. The paper's caption treats
 that sentence as optional, so its absence leaves the caption correct rather than
 breaking the build. Nothing else was in flight.
+
+## 2026-08-03 — restructured for AAAI-27, AI Alignment special track
+
+The paper was a single-column sprint report. It is now an anonymous AAAI-27
+submission built on AuthorKit27: two columns, seven content pages and one of
+references.
+
+The call for the alignment track is not published yet, so the length target is
+AAAI's usual seven pages plus references, and the format follows the kit
+exactly.
+
+Six packages the kit forbids were in the old preamble and are gone: `geometry`,
+`hyperref`, `titlesec`, `float`, and the two `newtx` font packages, whose fonts
+the style file loads itself. The custom preamble was deleted rather than
+adapted.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 300 | The kit's own rules | Grepped the source for every forbidden package and command the template lists | VERIFIED (none present) |
+| 301 | Anonymity | Grepped for the author name, the affiliation, the email and the repository URL | VERIFIED (none present; the code section that carried the URL was removed and replaced by a reproducibility statement pointing at supplementary material) |
+| 302 | It builds under the AAAI style | Ran the build | VERIFIED (8 pages, 0 errors, 0 undefined references) |
+| 303 | Length | Read the built pages | VERIFIED (seven content pages, references on the eighth) |
+| 304 | Every page | Viewed pages 1 to 8 with image tokens | VERIFIED (figures sized to the column, the pipeline figure spanning both, wide tables spanning both) |
+| 305 | Two stale claims from the old version | Read the rendered text rather than trusting the edit | BROKEN then fixed (a caption still described the earlier dot plot, and two passages still said the audit ran at one sample per cell after it had been rerun at three) |
+| 306 | A missing figure include | Chased an undefined reference | BROKEN then fixed (the subject figure was referenced but never included) |
