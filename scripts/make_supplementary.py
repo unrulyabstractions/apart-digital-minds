@@ -42,6 +42,11 @@ STUDIES = Path("out/studies")
 RESULTS = {"summary.json", "meta.json", "crossing.json", "results.json",
            "verdict.json", "verdicts.json"}
 
+#: The supplementary document, built by paper/build.sh. It is the appendix the
+#: paper has no room for, and it ships as a PDF because a reviewer reads it
+#: rather than rebuilds it.
+DOCUMENT = (Path("paper/build/supplement.pdf"), "supplement.pdf")
+
 #: One recorded run and the memory it wrote, so the claim that a run replays
 #: without a model can be checked.
 REPLAY = (Path("out/tapes"), Path("out/runs/replay-study"), Path("out/memory"))
@@ -111,9 +116,14 @@ def leaks(root: Path, files: list[Path]) -> list[str]:
 NOTE = """\
 # Supplementary material
 
-The runtime, the studies, and the result files every number and figure in the
-paper is read from. The paper itself is not included.
+The supplementary document, the runtime, the studies, and the result files
+every number and figure is read from. The paper itself is not included.
 
+`supplement.pdf` carries every scenario, every probe, every model and the full
+result of each study. It is the material the paper reports on but has no room
+to show.
+
+    supplement.pdf   the appendix: scenarios, probes, models, full results
     src/       the runtime: `src/api` declares each part, `src/dminds` implements one
     minds/     one mind per file, each a composition the paper measures
     studies/   one script per experiment, and the scripts that write the paper's numbers
@@ -153,7 +163,12 @@ def main() -> int:
     args = parser.parse_args()
     root = args.root.resolve()
 
-    files = contents(root, args.with_raw)
+    document = root / DOCUMENT[0]
+    if not document.exists():
+        print(f"  {DOCUMENT[0]} is missing. Run `bash paper/build.sh` first.")
+        return 1
+
+    files = contents(root, args.with_raw) + [DOCUMENT[0]]
     total = sum((root / f).stat().st_size for f in files)
     print(f"  {len(files)} files, {total / 1e6:.1f} MB before compression")
 
@@ -171,7 +186,8 @@ def main() -> int:
     with zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("supplementary/SUPPLEMENTARY.md", NOTE)
         for rel in files:
-            archive.write(root / rel, f"supplementary/{rel}")
+            name = DOCUMENT[1] if rel == DOCUMENT[0] else rel
+            archive.write(root / rel, f"supplementary/{name}")
 
     # Read the archive back rather than trusting that it was written, and scan
     # again, so the check covers the bytes a reviewer will actually open.

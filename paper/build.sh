@@ -13,4 +13,10 @@ if [ "${1:-}" != "fast" ]; then
   pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" main.tex
   pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" main.tex
 fi
-echo "=== Done: $BUILD/main.pdf ==="
+# The supplementary material is a second document on its own deadline. It has
+# no bibliography, so one pass settles it and a second fixes its references.
+pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" supplement.tex
+if [ "${1:-}" != "fast" ]; then
+  pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" supplement.tex
+fi
+echo "=== Done: $BUILD/main.pdf and $BUILD/supplement.pdf ==="

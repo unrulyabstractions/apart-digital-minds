@@ -1432,3 +1432,37 @@ run, not the per-trial records, which are large. `--with-raw` adds them.
 | 323 | A regenerated figure is a real figure | Viewed `substitution.png` from the extracted copy with image tokens | VERIFIED (three models, bars and controls matching Table 3) |
 | 324 | The generator now writes the wide tables | Reran it in the repository and diffed against what was committed | VERIFIED (no diff, so the paper's claim about its own tables is now true) |
 | 325 | The paper is unchanged | Compared the generated inputs rather than rebuilding | VERIFIED (all seven byte-identical to the committed versions, so `main.pdf` cannot have moved) |
+
+## 2026-08-03 — the supplementary document
+
+The paper's ethics statement said we report every scenario in full. Nothing
+delivered that. The AAAI restructure had dropped the only appendix at the page
+limit, so the claim had been true of an earlier draft and false of the one
+being submitted. `paper/supplement.tex` now carries it: the runtime, the
+models, all 22 scenarios, all 9 probes with both seats quoted, the full result
+of each study, and the statistic's calibration.
+
+`studies/make_supplement.py` writes its tables and listings. The scenarios and
+probes are read out of the modules the experiments import rather than copied,
+so a change to a prompt reaches the document without anyone remembering to
+carry it across.
+
+The document ships in the archive as a built PDF, at the root where a reviewer
+finds it.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 326 | `supplement.pdf` builds | Ran `build.sh` and read the log | VERIFIED (7 pages, 0 errors, 0 undefined references, 0 overfull boxes) |
+| 327 | Every page of it | Viewed pages 1 to 7 with image tokens | VERIFIED after two fixes (see below) |
+| 328 | The model table | Viewed page 3 | BROKEN then fixed (every model appeared twice, because the dedup compared raw names against LaTeX-formatted ones; roles are now collected per model) |
+| 329 | The model table names the judge | Viewed it again after adding the judge, and rewrote the caption | BROKEN then fixed (the prose named a hosted judge the table omitted, and the caption then called every listed model open-weight) |
+| 330 | The probe table | Viewed page 5 | BROKEN then fixed (the answers column ran off the page; fixed-width wrapping columns, 0 overfull boxes after) |
+| 331 | The paper still fits | Rebuilt after pointing two passages at the supplement, and read where the references begin | VERIFIED (7 content pages, references on page 8) |
+| 332 | The paper's two changed passages | Viewed page 8 with image tokens | VERIFIED (both render, and the ethics claim now points at something that exists) |
+| 333 | Voice of the new prose | Ran the `writing-voice` checklist over the supplement and rewrote three passages | VERIFIED (a cleft in the statistic section, and two stacked sentences) |
+| 334 | The archive still clean with the PDF in it | Unzipped and grepped with independent patterns, and scanned the PDF's own bytes for embedded build paths | VERIFIED (0 hits; pdflatex embedded no absolute path) |
+| 335 | The shipped PDF is the document | Opened the copy inside the extracted archive with image tokens | VERIFIED (title page renders, anonymous) |
+| 336 | The supplement's generator runs from the archive | Ran `make_supplement.py` in the extracted copy and diffed all 15 generated files against the repository | VERIFIED (byte-identical) |
+| 337 | Nothing else regressed | Ran the test suite and `make_paper_numbers.py` in the extracted copy | VERIFIED (115 passed; generated files identical) |
