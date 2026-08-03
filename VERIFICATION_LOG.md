@@ -1364,3 +1364,30 @@ adapted.
 | 304 | Every page | Viewed pages 1 to 8 with image tokens | VERIFIED (figures sized to the column, the pipeline figure spanning both, wide tables spanning both) |
 | 305 | Two stale claims from the old version | Read the rendered text rather than trusting the edit | BROKEN then fixed (a caption still described the earlier dot plot, and two passages still said the audit ran at one sample per cell after it had been rerun at three) |
 | 306 | A missing figure include | Chased an undefined reference | BROKEN then fixed (the subject figure was referenced but never included) |
+
+## 2026-08-03 — the four things the AAAI call requires
+
+The submission was missing three statements the call requires inside the seven
+content pages, and it still pointed at code the paper is not allowed to point
+at. The reproducibility checklist was also blank.
+
+The repository is being anonymized and submitted separately, so the paper no
+longer refers to it. The conclusion's release sentence and the reproducibility
+section's supplementary-material sentence are both gone.
+
+Checklist answer 4.8 claims the paper specifies its computing infrastructure.
+That claim was false when the answer was written, so the reproducibility
+section now names the hardware, the memory, the backend and the judge.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 307 | `ReproducibilityChecklist.tex` | Counted `\question{` blocks against filled placeholders | VERIFIED (31 of 31; the 3 placeholders inside the template's own instructions were left alone) |
+| 308 | The checklist renders its answers | Built it and viewed both pages with image tokens | VERIFIED (2 pages, every answer visible in blue, none missing) |
+| 309 | Ethical statement, generative-AI disclosure, computing infrastructure | Viewed page 8 with image tokens | VERIFIED (all three present and inside the content pages) |
+| 310 | No code or repository reference remains | Grepped the sections, the figures and the main file for release, supplementary, repository, GitHub and the framework's name | VERIFIED (one hit in the conclusion, removed; re-grepped clean) |
+| 311 | The conclusion after the edit | Viewed page 7 with image tokens | VERIFIED (one paragraph, ends on the runtime rather than on a release) |
+| 312 | Length after the additions | Read the rendered text for where the references begin | VERIFIED (7 content pages, references on page 8) |
+| 313 | Fonts | Ran `pdffonts` over the built PDF | VERIFIED (0 Type 3; every font embedded and subset) |
+| 314 | Voice of the new prose | Ran the `writing-voice` checklist over the three new sections and rewrote them | VERIFIED (no em dashes, no ornate connectives, sentences split to one idea, active voice with "we") |

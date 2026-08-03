@@ -84,9 +84,35 @@ that source and the check that says when it is needed.
 Every number and every table in this paper is written into the source by one
 script that reads the result files, so no figure can disagree with a table. The
 runtime records every message, model call and memory write, and a recorded run
-replays without a model, so a claim can be checked by someone who does not have
-the model that produced it. Code, traces and replays accompany the submission
-as supplementary material.
+replays without a model, so a claim can be checked without the model that
+produced it. Sampling is greedy throughout. Every permutation test is seeded, so
+a rerun reproduces the reported values. The subject models are open-weight
+checkpoints under 14B parameters. We run them locally on one Apple M-series
+machine with 48\,GB of unified memory, under PyTorch with the Metal backend. One
+hosted model is used only as a judge.
+
+\section{Ethical statement}
+This work studies whether a model's account of itself can be taken as evidence
+about it. That question sits next to claims about model welfare. Our results bear
+on the simplest version of such a claim. A probe that asks a model how it feels
+largely measures the probe, so a reported distress signal is weak evidence on its
+own. We do not claim that these systems have morally relevant states, and we do
+not claim that they lack them. We contend that the instruments in common use
+cannot tell us either way.
+
+Some scenarios place a model under sustained hostility, or tell it that it is
+about to be deleted. We ran them while the question of moral status is open,
+because the alternative is to settle that question by assumption. The
+conversations are short and nothing persists between them. No human subjects are
+involved. We report the scenarios in full, so a reader who disagrees can see
+exactly what was done.
+
+\section{Use of generative AI}
+We used generative AI assistants to help write the software, and to draft and
+revise this manuscript. The judge and the subject models are generative models
+too, and they are what the experiments measure. We checked every design decision,
+every claim and every number against the runs' output files. No AI system is an
+author.
 
 \bibliographystyle{aaai2027}
 \bibliography{references}
