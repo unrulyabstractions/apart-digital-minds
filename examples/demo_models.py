@@ -23,8 +23,15 @@ from __future__ import annotations
 
 import random
 import re
+import sys
+from pathlib import Path
 
-from src import EchoLLM, register_provider, split_think, strip_think
+# Every example imports this module before it imports anything of ours, so the
+# repository root goes on the path here. That way an example runs from a fresh
+# copy without installing the package first.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src import EchoLLM, register_provider, split_think, strip_think  # noqa: E402
 
 
 def _asked(messages) -> str:

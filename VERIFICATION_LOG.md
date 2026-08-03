@@ -1391,3 +1391,44 @@ section now names the hardware, the memory, the backend and the judge.
 | 312 | Length after the additions | Read the rendered text for where the references begin | VERIFIED (7 content pages, references on page 8) |
 | 313 | Fonts | Ran `pdffonts` over the built PDF | VERIFIED (0 Type 3; every font embedded and subset) |
 | 314 | Voice of the new prose | Ran the `writing-voice` checklist over the three new sections and rewrote them | VERIFIED (no em dashes, no ornate connectives, sentences split to one idea, active voice with "we") |
+
+## 2026-08-03 — the supplementary archive
+
+`scripts/make_supplementary.py` builds the anonymous archive. It names what
+goes in rather than excluding what does not, so a file can only ship if it was
+listed, and it scans every shipped byte for six kinds of identifying string. A
+single hit stops the build before the zip is written.
+
+The first version walked the repository and excluded `.git`, the paper and the
+agent settings. It wrote its output into `out/`, which it was also walking, so
+it zipped its own output as it grew. It reached 39.4 GB before the run was
+killed. The explicit include list removes that failure mode at the root, and
+the archive now goes to `dist/`.
+
+Building the archive exposed two things that were broken in the repository
+itself. The paper says one script writes every table, and that was not true:
+the three wide tables had been hand-edited to `table*` after the AAAI
+restructure, so rerunning the script would have silently collapsed them into
+one column. `table_edges()` now decides that in the generator. The examples
+could not run from a fresh copy, because none of them put the repository root
+on the path, so a reviewer who unzipped the archive and ran the replay example
+would have hit an import error on the first line.
+
+The archive carries the result files the paper is read from and one recorded
+run, not the per-trial records, which are large. `--with-raw` adds them.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 315 | The 39.4 GB archive | Listed the file and read its size before deleting it | BROKEN then fixed (deleted; the include list makes the recursion impossible) |
+| 316 | What the paper's numbers actually need | Traced every read under `out/` while running both paper scripts with their writes redirected to a scratch directory | VERIFIED (11 files; the shipped rule is a superset at 3.9 MB, against 38 MB for all of `out/`) |
+| 317 | Nothing identifying ships | Unzipped the archive and grepped it with patterns written independently of the script's own | VERIFIED (0 hits across 361 entries) |
+| 318 | Nothing forbidden ships | Checked the extracted tree for `.git`, `.claude`, `.venv`, `paper`, the verification log, the packer itself, caches and `.DS_Store` | VERIFIED (all absent) |
+| 319 | The test suite runs from the archive | Ran `tests/run_tests.py` in the extracted copy | VERIFIED (115 passed, no dependencies) |
+| 320 | The examples run from the archive | Ran all four in the extracted copy | BROKEN then fixed (all four import-failed; after the path fix all four exit clean) |
+| 321 | The paper's numbers reproduce from the archive | Ran `make_paper_numbers.py` in the extracted copy and diffed all seven generated files against the repository | VERIFIED (byte-identical) |
+| 322 | The paper's figures reproduce from the archive | Ran `make_paper_figures.py` in the extracted copy and compared SHA-256 of all six PNGs against the repository | VERIFIED (byte-identical) |
+| 323 | A regenerated figure is a real figure | Viewed `substitution.png` from the extracted copy with image tokens | VERIFIED (three models, bars and controls matching Table 3) |
+| 324 | The generator now writes the wide tables | Reran it in the repository and diffed against what was committed | VERIFIED (no diff, so the paper's claim about its own tables is now true) |
+| 325 | The paper is unchanged | Compared the generated inputs rather than rebuilding | VERIFIED (all seven byte-identical to the committed versions, so `main.pdf` cannot have moved) |
