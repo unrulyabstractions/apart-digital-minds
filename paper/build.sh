@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the AAAI-27 submission -> build/main.pdf
+# Build the sprint report and its appendix.
 #   bash build.sh        full build with bibliography
 #   bash build.sh fast   single pass
 set -euo pipefail
@@ -13,8 +13,8 @@ if [ "${1:-}" != "fast" ]; then
   pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" main.tex
   pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" main.tex
 fi
-# The supplementary material is a second document on its own deadline. It has
-# no bibliography, so one pass settles it and a second fixes its references.
+# The appendix is a second document. It has no bibliography, so one pass
+# settles it and a second fixes its references.
 pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" supplement.tex
 if [ "${1:-}" != "fast" ]; then
   pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$BUILD" supplement.tex

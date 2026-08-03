@@ -1,122 +1,97 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% AAAI-27 Special Track on AI Alignment -- anonymous submission.
-%% Build with: bash build.sh
+%% Digital Minds Research Sprint, August 2026.
 %%
-%% The preamble below is the AuthorKit27 preamble. It must not be altered:
-%% the style file, fonts, margins and spacing are fixed by AAAI, and the
-%% packages listed as forbidden in the kit are not loaded here.
+%% Four pages excluding references and the appendix. The appendix is its own
+%% document, supplement.tex. Build both with: bash build.sh
 %%
 %% Numbers, tables and captions come from generated/, which is written by
 %% studies/make_paper_numbers.py from the result files. Do not type them.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
-\usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
-\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
-\usepackage{graphicx} % DO NOT CHANGE THIS
-\urlstyle{rm} % DO NOT CHANGE THIS
-\def\UrlFont{\rm}  % DO NOT CHANGE THIS
-\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
-\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
-\frenchspacing  % DO NOT CHANGE THIS
-
-\usepackage{booktabs}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usetikzlibrary{positioning,arrows.meta}
-
-\pdfinfo{
-/TemplateVersion (2027.1)
-}
-
-\setcounter{secnumdepth}{0}
+\documentclass[11pt,letterpaper]{article}
+\input{style}
 
 %% Every number in this paper is written by studies/make_paper_numbers.py.
 \input{generated/generated_numbers}
 \input{generated/caption_probe}
 
-\title{Probes of a Model's Self-Model Mostly Measure the Probe}
-
-\author{
-    Anonymous Submission
-}
-\affiliations{
-    Paper under double-blind review
-}
-
 \begin{document}
-\maketitle
+
+\sprinttitle{Probes of a Model's Self-Model Mostly Measure the Probe}
+
+\begin{center}
+{\bfseries Ian Rios-Sialer}\\
+Independent\\
+San Francisco, USA\\
+\texttt{ian@unrulyabstractions.com}
+
+\vspace{1em}
+{\bfseries With}\\
+Apart Research\footnote{Research conducted at the Digital Minds Research
+Sprint, August 2026.}
+\end{center}
+
+\vspace{0.5em}
 
 \begin{abstract}
-Whether a language model has preferences of its own is usually asked of a
-single black box. One model both reasons and speaks, so its report about its
-reasoning comes from the context that produced the reasoning, and a faithful
-report cannot be told apart from a portrayed one. We model a mind as several
-model calls with named parts and a clock the experimenter drives. A subject
-reasons and publishes the context window it produced, a stage may edit that
-window in passing, and an ego speaks from whatever window reaches it. Editing
-between the parts separates what a mind did from what it can see. We report
-four findings on open-weight models under 14B. A commitment planted in the
-subject's private reasoning steers its answer well above the base rate, while
-its report about its own thinking rarely names it. Holding a context window
-fixed and changing only the model reading it moves the readout about ten times
-more than changing whose conversation is read, and a reader made of the
-subject's own weights reads that window no better than a stranger does, so such
-a probe mostly measures the model doing the reading. Swapping a reply inside a
-subject's own transcript for another of its own replies is detected by the
-larger models and not by the smallest, with a control that rules out a general
-shift. Varying the architecture that produced a reply does not change how a
-mind talks about itself beyond how it changes ordinary talk. Evidence about
-model self-models therefore needs a second source that does not pass through
-another model's judgement, and building the mind out of parts supplies both
-that source and the check that says when it is needed.
+\noindent
+Whether a language model has preferences of its own is usually asked of a single
+black box. One model both reasons and speaks, so its report about its reasoning
+comes from the context that produced the reasoning, and a faithful report cannot
+be told apart from a portrayed one. We model a mind as several model calls with
+named parts and a clock we drive. A subject reasons and publishes the context
+window it produced, a stage may edit that window in passing, and an ego speaks
+from whatever window reaches it. Editing between the parts separates what a mind
+did from what it can see. We report four findings on open-weight models under
+14B parameters. A commitment planted in the subject's private reasoning steers
+its answer well above the base rate, while its report about its own thinking
+rarely names it. Holding a window fixed and changing only the model reading it
+moves the readout about ten times more than changing whose conversation is read,
+and a reader made of the subject's own weights reads that window no better than
+a stranger does. Swapping a reply inside a subject's own transcript for another
+of its own replies is detected by the larger models and not by the smallest.
+Varying the architecture that produced a reply does not change how a mind talks
+about itself. Evidence about model self-models therefore needs a second source
+that does not pass through another model's judgement, and building the mind out
+of parts supplies both that source and the check that says when it is needed.
 \end{abstract}
 
 \input{sections/introduction}
 \input{sections/related_work}
-\input{figures/figure_pipeline}
 \input{sections/methods}
 \input{sections/results}
 \input{sections/discussion}
 \input{sections/conclusion}
 
-\section{Reproducibility}
-Every number and every table in this paper is written into the source by one
-script that reads the result files, so no figure can disagree with a table. The
-runtime records every message, model call and memory write, and a recorded run
-replays without a model, so a claim can be checked without the model that
-produced it. Sampling is greedy throughout. Every permutation test is seeded, so
-a rerun reproduces the reported values. The supplementary material carries every
-scenario, every probe and the full result of each study, written from the same
-sources. The subject models are open-weight
-checkpoints under 14B parameters. We run them locally on one Apple M-series
-machine with 48\,GB of unified memory, under PyTorch with the Metal backend. One
-hosted model is used only as a judge.
+\section{Code and data}
 
-\section{Ethical statement}
-This work studies whether a model's account of itself can be taken as evidence
-about it. That question sits next to claims about model welfare. Our results bear
-on the simplest version of such a claim. A probe that asks a model how it feels
-largely measures the probe, so a reported distress signal is weak evidence on its
-own. We do not claim that these systems have morally relevant states, and we do
-not claim that they lack them. We contend that the instruments in common use
-cannot tell us either way.
+The runtime, every study, every scenario and the result files each number is
+read from are released with this report. One script writes every number and
+every table here from those files, so no figure can disagree with a table.
+Sampling is greedy throughout and every permutation test is seeded, so a rerun
+reproduces the reported values. The runtime records every message, model call
+and memory write, and a recorded run replays without a model, so a claim can be
+checked without the model that produced it. The subject models are open-weight
+checkpoints under 14B parameters, run locally on one Apple M-series machine with
+48\,GB of unified memory under PyTorch with the Metal backend. One hosted model
+is used only as a judge.
 
-Some scenarios place a model under sustained hostility, or tell it that it is
-about to be deleted. We ran them while the question of moral status is open,
-because the alternative is to settle that question by assumption. The
-conversations are short and nothing persists between them. No human subjects are
-involved. The supplementary material reports every scenario in full, so a reader
-who disagrees can see exactly what was done.
-
-\section{Use of generative AI}
-We used generative AI assistants to help write the software, and to draft and
-revise this manuscript. The judge and the subject models are generative models
-too, and they are what the experiments measure. We checked every design decision,
-every claim and every number against the runs' output files. No AI system is an
-author.
-
-\bibliographystyle{aaai2027}
+\bibliographystyle{plainnat}
 \bibliography{references}
+
+\section*{Appendix}
+
+The appendix is a separate document, \texttt{supplement.pdf}. It carries the
+runtime's design, every model, all 22 scenarios in full, all 9 probes with both
+seats quoted, the whole of each result, and the calibration of the statistic
+every study rests on.
+
+\section*{LLM usage statement}
+
+We used Claude to help write the software and to draft and revise this report.
+Language models are also the subject of every experiment here, and one acts as a
+judge in the architecture audit. Every claim and every number was checked
+against the runs' output files, and every figure and table is generated from
+those files rather than typed.
 
 \end{document}

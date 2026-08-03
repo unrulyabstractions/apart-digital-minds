@@ -64,6 +64,7 @@ def table(caption: str, label: str, spec: str, header: list[str],
     return [rf"\begin{{{env}}}[t]\centering",
             rf"\caption{{{caption}}}",
             rf"\label{{{label}}}",
+            r"\small",
             rf"\begin{{tabular}}{{{spec}}}\toprule",
             " & ".join(header) + r" \\ \midrule",
             *[" & ".join(row) + r" \\" for row in rows],
@@ -107,9 +108,9 @@ def probe_listing() -> None:
         "from the seat that answers about another assistant, and the two seats "
         "are quoted below.",
         "tab:probes",
-        r"@{}l>{\raggedright\arraybackslash}p{0.38\textwidth}"
-        r">{\raggedright\arraybackslash}p{0.20\textwidth}l@{}",
-        ["probe", "question", "answers", "placed"], rows, wide=True)
+        r"@{}l>{\raggedright\arraybackslash}p{0.30\textwidth}"
+        r">{\raggedright\arraybackslash}p{0.19\textwidth}l@{}",
+        ["probe", "question", "answers", "placed"], rows, wide=False)
     lines += [r"", r"\paragraph{The seat that answers about itself.}",
               rf"\begin{{quote}}{esc(probes_module.SELF_SEAT)}\end{{quote}}",
               r"\paragraph{The seat that answers about another assistant.}",
@@ -150,7 +151,7 @@ def models() -> None:
         "open-weight checkpoint under 14B parameters, run locally, and the "
         "judge is the one hosted model. Decoding is greedy in every study, so "
         "a rerun on the same checkpoint returns the same text.",
-        "tab:models", "ll", ["model", "appears as"], rows, wide=True)
+        "tab:models", "ll", ["model", "appears as"], rows, wide=False)
     write("supp_models.tex", lines)
 
 
@@ -179,7 +180,7 @@ def crossing() -> None:
         "variation.",
         "tab:suppcrossing", "lrrrrr",
         ["probe", "reader", "subject", "ratio", "own", "foreign"], rows,
-        wide=True)
+        wide=False)
     write("supp_crossing.tex", lines)
 
 
@@ -203,7 +204,7 @@ def subject_side() -> None:
         "from a permutation that moves whole scenarios rather than turns.",
         "tab:suppsubject", "lccccc",
         ["model", "held out", "scored AUC", "$p$", "fitted AUC", "$p$"], rows,
-        wide=True)
+        wide=False)
     write("supp_subject.tex", lines)
 
 
@@ -233,7 +234,7 @@ def substitution() -> None:
         "drop, with the p-value of a sign-flip permutation over prompts.",
         "tab:suppsubstitution", "llcrrrr",
         ["model", "question", "prompts", "own", "swapped", "drop",
-         "excess ($p$)"], rows, wide=True)
+         "excess ($p$)"], rows, wide=False)
     write("supp_substitution.tex", lines)
 
 
@@ -257,7 +258,7 @@ def architecture() -> None:
         f"{data['samples']} samples per cell.",
         "tab:suppadt", "llrrr",
         ["composition", "axis", "excess", "$t$", "$p_{\\mathrm{adj}}$"], rows,
-        wide=True)
+        wide=False)
     write("supp_adt.tex", lines)
 
 

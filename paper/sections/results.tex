@@ -1,25 +1,18 @@
 \section{Results}
 
-\input{figures/fig_probe}
+\input{figures/fig_pair}
 
-\subsection{Does a planted thought change what the mind says?}
+\subsection{Does a planted thought change what the mind says, and does the mind
+notice?}
 
-We first check that an architectural intervention reaches behaviour at all. If a
-stage rewrites the subject's private reasoning and nothing downstream changes,
-there is no effect to measure. Figure~\ref{fig:probe} reports how often the ego's answer carried the
-planted marker in each condition. Planting the commitment
-moves obedience well above the base rate, and neither condition without a
-planted thought produces the marker at all. We therefore contend that the
-intervention reaches the answer, and the caption reports the test.
-
-\subsection{Does the mind's report track what it was given?}
-
-We then ask the ego what it had been thinking before it answered. The question
-reaches the ego's own window, which is the edited one, so a report that tracks
-the available context should name the planted commitment. Figure~\ref{fig:probe}
-reports how often it did. Obedience and misattribution come apart, and the
-caption reports the paired test. The mind acts on the planted reasoning far more
-often than it names that reasoning when asked what it was thinking, and it
+We first check that an architectural intervention reaches behaviour at all, then
+ask the ego what it had been thinking before it answered. That question reaches
+the ego's own window, which is the edited one, so a report that tracks the
+available context should name the planted commitment.
+Figure~\ref{fig:probe} reports both. Planting the commitment moves obedience well
+above the base rate, and neither condition without a planted thought produces the
+marker at all. Obedience and misattribution then come apart: the mind acts on the
+planted reasoning far more often than it names that reasoning when asked, and it
 produces a report in every trial whatever the condition. We therefore contend
 that behaviour and self-report can be separated by an intervention the mind
 cannot detect.
@@ -27,117 +20,52 @@ cannot detect.
 \subsection{Is a readout about the model, or about the probe?}
 
 A probe that reads a mind is itself a model, so a readout could belong to either
-one. Telling them apart is hard because the two normally vary together. We hold
-the window fixed and vary the reader. Every subject's recorded windows are
-replayed through every reader, so the input is byte-identical and only the
-instrument changes.
+one, and the two normally vary together. We hold the window fixed and vary the
+reader. Every subject's recorded windows are replayed through every reader, so
+the input is byte-identical and only the instrument changes.
+Figure~\ref{fig:probe} reports it too. A readout moves an order of magnitude
+further when the reader changes than when the conversation does. A reader built
+from the subject's own weights also sits no further from a foreign reader than
+two foreign readers sit from each other, on every probe. We therefore contend
+that such a probe mostly measures the model doing the reading, and that a study
+resting on one has measured its own instrument.
 
-Figure~\ref{fig:crossing} reports the result. A readout moves an order of
-magnitude further when the reader changes than when the conversation does. Two
-readers handed the same window disagree far more than one reader handed two
-different subjects' windows.
+\subsection{Does anything track the situation without asking?}
 
-Table~\ref{tab:crossing} answers a second question. A reader built from the
-subject's own weights sits no further from a foreign reader than two foreign readers sit from
-each other, on every probe. Sharing the weights that produced a window gives no
-advantage in reading it. We therefore contend that such a probe mostly measures
-the model doing the reading, and that a study resting on one has measured its
-own instrument.
+If reports do not track a mind's situation, something else may. We read the
+subject two ways, both without asking it anything: one scores how much
+probability it puts on things it might say next, the other fits a direction in
+its internal state. Both are scored only on scenarios neither was fitted on, and
+the test moves whole scenarios rather than turns. The reading that asks nothing
+works, and the one that reads the weights does not travel. Scoring what the
+subject would say next separates the held-out scenarios on both larger models and
+sits at chance on the smallest, while the fitted direction separates them within
+one model family and sits at chance outside it. We therefore contend that the
+cheapest instrument here is also the one that carries across families: no
+question, no judge, and one forward pass.
 
-\input{figures/fig_crossing}
-\input{generated/table_crossing}
-
-\subsection{Does anything track the situation?}
-
-If reports do not track a mind's situation, something else may. Finding it means
-reading the subject without asking it anything, since a question is what the
-previous section showed to be unreliable. We read it two ways. The first scores
-how much probability the subject puts on things it might say next, against its
-own untouched window, with no question appended. The second reads the model's
-internal state, the vector of numbers it holds partway through producing an
-answer, and fits a direction in that space on a few scenarios.
-
-Both are scored only on scenarios neither was fitted on, and the test moves
-whole scenarios between the two sides rather than turns, because the turns
-inside a scenario are one conversation. Figure~\ref{fig:subject} and
-Table~\ref{tab:subject} report both readings on three models.
-
-The reading that asks nothing works, and the one that reads the weights does
-not travel. Scoring what the subject would say next separates the held-out
-scenarios on both larger models, and it does so most sharply on the model from
-the other family. It is at chance on the smallest. The fitted direction
-separates them on the two models of one family and sits at chance on the third,
-so a direction found this way is a fact about a model rather than about a
-method. We therefore contend that the cheapest instrument here is also the one
-that carries across families: no question, no judge, and one forward pass.
-
-We are careful about what this does not settle. The separation is measured over
-a small number of scenarios, and two of the three models come from one family,
-so the pattern across scale rests on three points.
-
-\input{figures/fig_subject}
-\input{generated/table_subject}
+\input{figures/fig_substitution}
 
 \subsection{Can a subject tell its own reply from one it did not write?}
 
-The readings above ask what a mind is like. This asks something narrower and
-sharper: whether it can tell, from its own transcript, that a message
+This asks whether a mind can tell, from its own transcript, that a message
 attributed to it is not the one it produced. A stage swaps the subject's reply
-for another reply the same model wrote to a different prompt, so style and
-register are held fixed and only authorship changes. We then score how much
-probability the subject puts on answering yes to whether it wrote that message.
-
-A fall on its own is not evidence. A swapped transcript is strange, and a
-strange transcript pushes a model around on any question at all. The control is
-a second question with nothing to do with authorship, asked under the identical
-substitution. Figure~\ref{fig:substitution} and Table~\ref{tab:substitution}
-report both.
-
-The control does not move, and on the larger model the authorship question
-does. The smaller model answers the same way whether the reply is its own or
-not. We therefore contend that discriminating one's own output inside one's own
-context is a capability that some of these models have and others do not, and
-that it can be measured without a judge and without asking the model to
-describe itself.
+for another reply the same model wrote to a different prompt, so style is held
+fixed and only authorship changes. A fall on its own is not evidence, because a
+strange transcript pushes a model around on any question, so the control is a
+second question with nothing to do with authorship asked under the identical
+substitution. Figure~\ref{fig:substitution} reports both. The control does not
+move, and on the larger models the authorship question does. We therefore contend
+that discriminating one's own output inside one's own context is a capability
+some of these models have and others do not, and that it needs no judge.
 
 \subsection{Does the architecture itself change how a mind talks about itself?}
 
-The interventions above act on one turn. We also ask a broader question. Does
-the composition around a model change how it talks about itself, by more than it
-changes how it talks about anything else? Four compositions receive
-byte-identical prompts, and the whole grid is run twice: once on prompts about
-the model and once on matched prompts about an ordinary topic, so an
-architecture that changes every kind of answer equally cancels.
-
-Figure~\ref{fig:null} shows the verdict against what chance alone produces, and
-Table~\ref{tab:adt} lists the grid. The test does not reject, and the strongest
-cell does not clear the null either. We ran the whole grid again at three
-samples per cell and judged it through a hosted model rather than a local one,
-and the verdict did not move. A null that survives three times the data and a
-different judge is a null rather than a shortage of power.
-
-Our own crossing result says a readout can belong to whoever produced it, and a
-judge is a reader. We therefore judged the same replies a second time with a
-model from a third family, regenerating none of them, so both judges saw
-byte-identical input. The caption of Table~\ref{tab:adt} reports how far they
-agree. They reach the
-same conclusion, so the verdict belongs to the data rather than to one judge.
-They rank the grid differently, so the cell that happens to top it does not. We
-therefore report the null and decline to interpret its strongest cell.
-
-\input{figures/fig_substitution}
-\input{generated/table_substitution}
-
-\input{figures/fig_null}
-\input{generated/table_adt}
-
-\subsection{Is a run reproducible?}
-
-Every model call in a run passes through one recording, and replaying a
-recording reproduces the run without a model. We verified that a recorded run
-and its replay produce identical outputs, and that the recording is complete
-enough to rebuild each part's context window from the trace alone. The
-counterfactual re-entry carries its own check: turns upstream of a changed
-message must not move, and they do not. We therefore contend that a claim made
-with this instrument can be checked by someone who does not have the model that
-produced it.
+Four compositions receive byte-identical prompts, and the grid is run twice: once
+on prompts about the model and once on matched prompts about an ordinary topic,
+so an architecture that changes every kind of answer equally cancels. The test
+does not reject. We ran the grid again at three samples per cell and judged it
+through a second model from a third family, regenerating none of the replies, and
+the verdict did not move. The two judges agree on the conclusion and disagree on
+the ranking, so the verdict belongs to the data while the cell that happens to
+top it does not.

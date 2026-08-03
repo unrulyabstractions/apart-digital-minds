@@ -14,9 +14,11 @@ you ask for that provider.
 src/api/       the contracts
 src/dminds/    the implementations
 minds/         one mind per file: what to run
+studies/       one script per experiment, and the scripts that write the paper
+paper/         the sprint report and its appendix, built by paper/build.sh
 examples/      scripts that load a mind and show what it did
 ui/            talk to a mind in a browser and watch it think
-tests/         106 tests, no dependencies
+tests/         115 tests, no dependencies
 out/           everything a run produces (gitignored)
 ```
 

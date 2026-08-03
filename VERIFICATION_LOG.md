@@ -1466,3 +1466,36 @@ finds it.
 | 335 | The shipped PDF is the document | Opened the copy inside the extracted archive with image tokens | VERIFIED (title page renders, anonymous) |
 | 336 | The supplement's generator runs from the archive | Ran `make_supplement.py` in the extracted copy and diffed all 15 generated files against the repository | VERIFIED (byte-identical) |
 | 337 | Nothing else regressed | Ran the test suite and `make_paper_numbers.py` in the extracted copy | VERIFIED (115 passed; generated files identical) |
+
+## 2026-08-03 — restructured for the sprint template
+
+The paper was an anonymous two-column AAAI submission. It is now the Digital
+Minds Research Sprint report: one column, named authors, the template's section
+order through the LLM usage statement, and the appendix as its own document.
+The AAAI variant is replaced rather than kept alongside, and stays recoverable
+in git history.
+
+The template recommends four pages excluding references and appendix. The
+report is six. Four figures and five findings do not compress further without
+dropping one of each, and the appendix already carries everything the report
+points at.
+
+Removing the paper's tables was the largest change. The appendix already
+carried a fuller version of each, so `make_paper_numbers.py` now writes only
+the macros and the probe caption, and `make_supplement.py` owns every table.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 338 | The template | Read all four pages of the sprint template PDF with image tokens | VERIFIED (section order, byline shape, 4-page guidance, LLM statement) |
+| 339 | The macros survived the surgery | Snapshotted `generated_numbers.tex` and `caption_probe.tex`, removed 5 table writers, reran, diffed | VERIFIED (byte-identical; a first attempt crashed on a constant I removed too eagerly, and the diff was meaningless until the run succeeded) |
+| 340 | The pipeline figure | Viewed page 3 with image tokens | BROKEN then fixed (`scale=0.85,transform shape` collided every node label; reverted and re-viewed) |
+| 341 | The paired figure | Viewed page 4 with image tokens | VERIFIED (both panels legible at half width, axis text readable) |
+| 342 | The substitution figure | Viewed page 5 with image tokens | VERIFIED |
+| 343 | The title block | Viewed page 1 with image tokens | VERIFIED (rule, title, rule, byline, With Apart Research, sprint footnote) |
+| 344 | Both documents build | Read both logs | VERIFIED (main 8 pages, supplement 11, 0 overfull, 0 undefined refs in each) |
+| 345 | The appendix probe table | Viewed supplement page 7 with image tokens | BROKEN then fixed (ran off the page as a one-column table; narrower wrapping columns and small type) |
+| 346 | The appendix no longer describes tables the paper dropped | Read the rendered text and fixed three passages | BROKEN then fixed |
+| 347 | Nothing orphaned by the cleanup | Grepped every figure file for a referencing document | VERIFIED (two superseded figures deleted, three rehomed into the appendix, none unreferenced) |
+| 348 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |

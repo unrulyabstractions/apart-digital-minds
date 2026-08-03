@@ -1,44 +1,18 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Supplementary material, submitted on its own deadline.
+%% Appendix to the sprint report, submitted as its own document.
 %%
-%% Built on the same AAAI-27 preamble as the paper, so the two look alike.
 %% Everything in it is written by studies/make_supplement.py from the sources
 %% it describes. Do not type a prompt or a number in here.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
-\usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
-\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
-\usepackage{graphicx} % DO NOT CHANGE THIS
-\urlstyle{rm} % DO NOT CHANGE THIS
-\def\UrlFont{\rm}  % DO NOT CHANGE THIS
-\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
-\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
-\frenchspacing  % DO NOT CHANGE THIS
+\documentclass[11pt,letterpaper]{article}
+\input{style}
 
-\usepackage{booktabs}
-\usepackage{amsmath}
-\usepackage{array}
-
-\pdfinfo{
-/TemplateVersion (2027.1)
-}
-
-%% Sections are lettered here, so the paper can point at one of them.
+%% Sections are lettered, so the report can point at one of them.
 \setcounter{secnumdepth}{2}
 
-\title{Supplementary material\\
-Probes of a Model's Self-Model Mostly Measure the Probe}
-
-\author{
-    Anonymous Submission
-}
-\affiliations{
-    Paper under double-blind review
-}
-
 \begin{document}
-\maketitle
+\sprinttitle{Appendix\\Probes of a Model's Self-Model Mostly Measure the Probe}
 
 \noindent
 This document carries the material the paper reports on but has no room to
@@ -157,12 +131,11 @@ that moves with the conversation instead of a word that mostly does not.
 \section{Full results}
 \label{app:results}
 
-The paper reports each study at the grain that fits a column. This section
-reports the rest.
+The report gives each finding as a figure. This section gives the numbers
+behind them.
 
 \subsection{Reader crossing}
 
-The paper shows the crossing on the probes it discusses.
 Table~\ref{tab:suppcrossing} shows every probe, and both halves of the result:
 how far a readout moves when the reader changes rather than the window, and
 whether a reader made of the subject's own weights reads that window any better
@@ -177,6 +150,7 @@ the number of held-out scenarios each was scored on. Neither reading was fitted
 on the scenarios it was scored on, and the permutation moves whole scenarios,
 because the turns inside a scenario are one conversation.
 
+\input{figures/fig_subject}
 \input{generated/supp_subject}
 
 \subsection{Substitution}
@@ -188,8 +162,8 @@ on every model, at the grain of the whole run.
 
 \subsection{The architecture audit}
 
-The paper prints the six cells furthest from zero.
-Table~\ref{tab:suppadt} prints the grid.
+The report gives the verdict. Table~\ref{tab:suppadt} prints the grid it was
+taken over.
 
 \input{generated/supp_adt}
 
@@ -207,6 +181,8 @@ is planted, and separates rejecting from naming the right cell.
 Table~\ref{tab:suppfpr} reports what it does when nothing was planted, with and
 without the control that every study here carries.
 
+\input{figures/fig_power}
+\input{figures/fig_null}
 \input{generated/supp_calibration}
 
 \end{document}

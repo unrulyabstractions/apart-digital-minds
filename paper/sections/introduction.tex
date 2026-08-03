@@ -1,64 +1,42 @@
 \section{Introduction}
 
-Whether a frontier model has preferences of its own is usually asked of a
-single black box. We send one conversation to one model and read one stream of
-text back. Recent work reports that coherent value systems emerge in large
-models \citep{mazeika2025utility}, and self-reports have been proposed as
-evidence about moral status \citep{perez2023selfreports}. A single-box design
-cannot separate the two readings of such evidence. A model that genuinely
-reports its own state and a model that portrays a character who would say the
-same thing produce the same transcript \citep{shanahan2023roleplay}. Mistakenly
-harming systems that matter morally and misallocating concern to systems that do
-not are both serious errors, so the evidence we collect now should be able to
-tell those readings apart.
+Whether a frontier model has preferences of its own is usually asked of a single
+black box. Coherent value systems are reported to emerge in large models
+\citep{mazeika2025utility}, and self-reports have been proposed as evidence about
+moral status \citep{perez2023selfreports}. A single-box design cannot separate the
+two readings of such evidence. A model that genuinely reports its own state and a
+model that portrays a character who would say the same thing produce the same
+transcript \citep{shanahan2023roleplay}. Mistakenly harming systems that matter
+morally and misallocating concern to systems that do not are both serious errors,
+so the evidence we collect now should tell those readings apart.
 
 The obstacle is that the process and the report never come apart. When one model
-both reasons and speaks, its report about its reasoning is generated from the
-same context that produced the reasoning. Chain-of-thought text is already known
-to be an unreliable account of what drove an answer
-\citep{turpin2023unfaithful, lanham2023faithfulness}. Humans confabulate reasons
-for their behaviour under exactly the conditions where the real cause is
-unavailable to them \citep{nisbett1977telling}. To run the equivalent experiment
-on a model, we need to change what the model did while holding fixed what it can
-see.
+both reasons and speaks, its report about its reasoning comes from the same
+context that produced the reasoning. Chain-of-thought text is already an
+unreliable account of what drove an answer \citep{turpin2023unfaithful,
+lanham2023faithfulness}, and humans confabulate reasons for their behaviour when
+the real cause is unavailable to them \citep{nisbett1977telling}. To run the
+equivalent experiment on a model, we need to change what the model did while
+holding fixed what it can see.
 
-We propose to model a digital mind as several model calls with named parts and a
-clock we control. A \textbf{subject} reasons and publishes the context window it
-produced. A \textbf{stage} may edit that window in passing. An \textbf{ego}
-speaks from whatever window reaches it and has no access to the original. We
-call editing the window between two parts an \textbf{architectural
-intervention}. It splits one thing into two. The reasoning a mind performed and
-the reasoning a mind can see are now separate objects, and an experimenter can
-change one and hold the other fixed. Black-box prompting has no such handle.
+We model a digital mind as several model calls with named parts and a clock we
+control. A \textbf{subject} reasons and publishes the context window it produced.
+A \textbf{stage} may edit that window in passing. An \textbf{ego} speaks from
+whatever window reaches it and has no access to the original. We call editing the
+window between two parts an \textbf{architectural intervention}. What a mind did
+and what a mind can see become separate objects, and an experimenter can change
+one and hold the other fixed.
 
-Cognitive architecture also connects this evidence to existing theory. Proposed
-indicators of consciousness are stated as architectural properties, such as a
-global workspace that broadcasts to specialised parts
-\citep{baars1988cognitive, butlin2023consciousness}. A system built from one
-model call has no such properties to check. A system built from parts with
-declared channels does, and the same runtime that builds it records what
-actually flowed. We therefore posit that treating a digital mind as a
-composition of parts turns questions about introspection and identity into
-questions about which part produced a report and what that part was looking at.
+\noindent\textbf{Our main contributions are:}
 
-Our main contributions are:
-
-\begin{itemize}
-  \item A framing in which a claim about a digital mind's introspection becomes
-        a claim about a named part reading a named window, so an experimenter
-        can intervene between reasoning and speech.
-  \item a deterministic and replayable runtime in
-        which a mind is a pipeline of model-backed modules on a two-phase tick,
-        every event is traced, and no cognitive architecture is built in.
-  \item An introspection probe built on that runtime, and a study in which a
-        planted thought steers the answer while the mind's report about its own
-        reasoning does not track what it was given.
-  \item A way to check such a probe. We hold one context window fixed and
-        change only the model reading it. The readout turns out to belong
-        mostly to the reader, and a reader made of the subject's own weights
-        reads it no better than a stranger does.
-  \item A way to read the subject that asks it nothing, by scoring what it
-        would say next. It separates held-out scenarios on both larger models
-        we tried, where a direction fitted on internal state does not carry
-        from one model family to another.
-\end{itemize}
+\begin{enumerate}[leftmargin=*,itemsep=1pt,topsep=3pt]
+  \item A deterministic, replayable runtime in which a mind is a pipeline of
+        model-backed parts on a clock and no cognitive architecture is built in.
+  \item A study in which a planted thought steers the answer while the mind's
+        report about its own reasoning does not track what it was given.
+  \item A calibration for probes of this kind. We hold one window fixed and
+        change only the model reading it, and the readout turns out to belong
+        mostly to the reader.
+  \item Two readings that ask the subject nothing, one of which separates
+        held-out scenarios that a probe's questions do not.
+\end{enumerate}
