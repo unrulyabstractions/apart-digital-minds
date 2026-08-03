@@ -36,6 +36,11 @@ INK, MUTED, FAINT = "#0b0b0b", "#52514e", "#c9c8c3"
 def style() -> None:
     """Recessive chrome, thin marks, text in ink rather than in series colour."""
     plt.rcParams.update({
+        # TrueType rather than the default Type 3. AAAI requires Type 1 or
+        # TrueType and rejects Type 3 outright, and matplotlib emits Type 3
+        # unless told otherwise.
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
         "figure.dpi": 200,
         "savefig.dpi": 200,
         "font.family": "serif",
