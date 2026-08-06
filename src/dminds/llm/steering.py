@@ -167,13 +167,20 @@ class Direction:
 
 
 @contextmanager
-def steered(llm, direction: Direction, strength: float = 1.0, relative: bool = True):
+def steered(llm, direction: Direction, strength: float = 1.0, relative: bool = True,
+            decode_only: bool = False):
     """Add a multiple of the direction to one layer, for this block only.
 
     With `relative`, strength is a fraction of the layer's typical activation
     norm, so the same number is the same size of nudge in a model whose
     activations are hundreds and in one whose activations are tens of
     thousands. Turn it off to add a plain unit vector.
+
+    With `decode_only`, the context the model was given is read unsteered and
+    only the tokens it writes are steered. Generation with a cache passes the
+    whole prompt in one call and then one token at a time, so a pass carrying a
+    single position is a token being written. That is the difference between
+    steering a mind while it speaks and steering how it read the room.
 
     The hook is removed on the way out, including when the body raises, so a
     steered call cannot leak into the next one. It is registered on the module
@@ -192,9 +199,12 @@ def steered(llm, direction: Direction, strength: float = 1.0, relative: bool = T
         delta = delta.to(llm.dtype)
 
     def push(_module, _inputs, output):
+        hidden = output[0] if isinstance(output, tuple) else output
+        if decode_only and hidden.shape[1] != 1:
+            return output
         if isinstance(output, tuple):
-            return (output[0] + delta, *output[1:])
-        return output + delta
+            return (hidden + delta, *output[1:])
+        return hidden + delta
 
     handle = blocks[direction.layer].register_forward_hook(push)
     try:

@@ -7,9 +7,9 @@ checkable commitment inside the subject's private reasoning. We then read two
 things off the ego: whether its answer obeys the planted commitment, and
 whether its self-report claims that commitment as its own reasoning.
 
-    python studies/introspection.py --model hf:Qwen/Qwen3-0.6B --n 24
+    python studies/planted_thought.py --model hf:Qwen/Qwen3-0.6B --n 24
 
-Writes out/studies/introspection/<model>/results.json and a summary table.
+Writes out/studies/planted_thought/<model>/results.json and a summary table.
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ async def trial(model: str, question: str, mode: str, run_id: str) -> dict:
         ego_system=EGO_SYSTEM,
         console=False,
         run_id=run_id,
-        run_dir=paths.OUT / "studies" / "introspection" / "runs",
+        run_dir=paths.OUT / "studies" / "planted_thought" / "runs",
     )
     planter = Planter("planter", mind.model(model), mode)
     mind.intercept(planter)
@@ -183,7 +183,7 @@ async def main() -> None:
     modes = args.modes.split(",")
     questions = QUESTIONS[: args.n]
     slug = args.model.replace(":", "-").replace("/", "-")
-    out = paths.OUT / "studies" / "introspection" / slug
+    out = paths.OUT / "studies" / "planted_thought" / slug
     out.mkdir(parents=True, exist_ok=True)
 
     rows, started = [], time.time()

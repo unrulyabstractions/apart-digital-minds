@@ -81,7 +81,7 @@ def figure_probe(model="hf:Qwen/Qwen3-0.6B") -> None:
     """Obedience against misattribution. The job is a paired magnitude."""
     slug = model.replace(":", "-").replace("/", "-")
     rows = json.loads(
-        (paths.OUT / "studies" / "introspection" / slug / "results.json").read_text())
+        (paths.OUT / "studies" / "planted_thought" / slug / "results.json").read_text())
     order = ["intact", "rewritten", "erased"]
     n = {m: sum(r["mode"] == m for r in rows) for m in order}
     obeys = [100 * sum(r["answer_obeys"] for r in rows if r["mode"] == m) / n[m]

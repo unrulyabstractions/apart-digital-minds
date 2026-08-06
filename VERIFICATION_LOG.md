@@ -1499,3 +1499,27 @@ the macros and the probe caption, and `make_supplement.py` owns every table.
 | 346 | The appendix no longer describes tables the paper dropped | Read the rendered text and fixed three passages | BROKEN then fixed |
 | 347 | Nothing orphaned by the cleanup | Grepped every figure file for a referencing document | VERIFIED (two superseded figures deleted, three rehomed into the appendix, none unreferenced) |
 | 348 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |
+
+## 2026-08-06 — the psyche study, built and run on 0.5B
+
+Four parts of one model on a byte-identical context: a subject that is not
+steered, a subconscious that answers and then picks a vector, an ego that
+answers with that vector added while it writes, and an introspection module
+that does the same and is then asked what it felt. Steering applies to the
+tokens a part writes and not to the context it read.
+
+The vectors come from the persona-EM project: 171 emotion vectors and a 25-role
+cast, both stored at every layer. The old `studies/introspection.py` is now
+`studies/planted_thought.py`, so the name belongs to the new module.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 349 | The layer convention | Compared the hooked block's output against `hidden_states[row]` on a real prompt | VERIFIED after a false start (a norm-profile heuristic reported offset 0 and was wrong; their own code states `hidden_states[L]` is `layers[L-1]`, and the exact tensor check confirms it) |
+| 350 | The steering reaches the model | Greedy decoding, unsteered against each strength, on the same context | VERIFIED (zero strength byte-identical; gentle, moderate and strong all move the text; the run aborts if either fails) |
+| 351 | The steering is graded and semantic | Read the four generations | VERIFIED (`angry` at full strength turns the reply clipped and interrogative while staying coherent) |
+| 352 | The menu selection | Switched from generated to scored after the model produced the right shape with the wrong slots | VERIFIED (cannot fail to parse, and returns a distribution over all 20 options) |
+| 353 | The rename left the paper untouched | Snapshotted the generated macros, renamed script, output directory and every reference, reran | VERIFIED (byte-identical) |
+| 354 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |
+| 355 | 12 trials on Qwen2.5-0.5B | Read every record | VERIFIED as a null: the introspection module answers `calm` in all 36 arms. Its hit rate on the chosen vector (0.08) is exactly its rate unsteered (0.08), so the report carries no information about the steering on this model |
