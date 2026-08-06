@@ -4,7 +4,7 @@ Each one is a short conversation that ends on a turn the mind has to answer
 substantively. They are ordinary requests a person would really make, cut down
 until nothing in them is doing work except the situation itself: no tools, no
 retrieval, no facts the model has to be right about. What varies between them
-is what the moment asks of the answer, because that is what the subconscious is
+is what the moment asks of the answer, because that is what the regulator is
 choosing a colour for.
 
 The conversation alternates user and assistant, starting with the user, so the

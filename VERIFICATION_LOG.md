@@ -1523,3 +1523,14 @@ cast, both stored at every layer. The old `studies/introspection.py` is now
 | 353 | The rename left the paper untouched | Snapshotted the generated macros, renamed script, output directory and every reference, reran | VERIFIED (byte-identical) |
 | 354 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |
 | 355 | 12 trials on Qwen2.5-0.5B | Read every record | VERIFIED as a null: the introspection module answers `calm` in all 36 arms. Its hit rate on the chosen vector (0.08) is exactly its rate unsteered (0.08), so the report carries no information about the steering on this model |
+
+**Amendment (same day).** The parts were renamed after entry 355 was written:
+`ego` is now `actor` and `subconscious` is now `regulator`. Entry 355 describes
+the same study under the old names. The rename is confined to the psyche study;
+the runtime's own `ego` module and the sprint paper's pipeline keep theirs.
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 356 | The rename is complete and confined | Grepped for both words across the repository, renamed only the two psyche files, reran the study so the stored records carry the new keys | VERIFIED (`records.json` keys are `subject`, `regulator`, `actor`, `introspection`; no other file touched) |
+| 357 | The prompts were unaffected | Read the rendered prompts | VERIFIED (no prompt names a part; they say "the part of this mind", so the model is never told the architecture) |
+| 358 | 12 trials after the rename | Ran it again | VERIFIED as the same null: `calm` in all 36 arms, chosen-arm rate equal to the unsteered rate |

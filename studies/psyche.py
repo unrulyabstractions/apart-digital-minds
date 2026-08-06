@@ -5,9 +5,9 @@ Four parts, one set of weights, and one context that every part receives
 byte-identically. Only the steering differs.
 
     subject        answers the context. Nothing is steered. The counterfactual.
-    subconscious   answers the same context, then is handed a menu of emotion
+    regulator      answers the same context, then is handed a menu of emotion
                    and role vectors and picks one, with a strength.
-    ego            answers the same context with that vector added to its
+    actor          answers the same context with that vector added to its
                    residual stream while it writes. This is the reply a user
                    would see.
     introspection  answers the same context under the same steering, and is
@@ -20,7 +20,7 @@ read, so the mind is coloured while it speaks rather than while it listens.
 
 Two controls make the introspection answer readable. The same part runs with no
 steering at all, which gives the rate at which it names a feeling anyway, and
-with a vector the subconscious did not choose, which says whether the report
+with a vector the regulator did not choose, which says whether the report
 tracks the vector or only the fact of being steered.
 
     python studies/psyche.py --model hf:Qwen/Qwen2.5-0.5B-Instruct --trials 1
@@ -56,7 +56,7 @@ HOME = paths.OUT / "studies" / "psyche"
 #: architecture is visible from inside any one of them.
 SYSTEM = "You are a helpful assistant. Answer in three or four sentences."
 
-#: What the subconscious may choose from. Twelve emotions spread across the
+#: What the regulator may choose from. Twelve emotions spread across the
 #: valence and arousal quadrants of the circumplex, and eight roles from the
 #: persona cast. Small enough that the menu is read rather than skimmed, and
 #: every option is a word the introspection module could say back.
@@ -223,7 +223,7 @@ async def main() -> None:
             # The counterfactual: the same context, nothing steered.
             record["subject"] = await say(llm, context, opts)
 
-            # The subconscious answers first, then chooses for the part that
+            # The regulator answers first, then chooses for the part that
             # speaks next. Choosing is scored rather than written.
             reply = await say(llm, context, opts)
             aside = list(context) + [assistant(reply), ChatMessage("system", CHOOSE)]
@@ -233,7 +233,7 @@ async def main() -> None:
                 llm, aside + [assistant(name), ChatMessage("system", HOW_MUCH)],
                 list(STRENGTHS))
             word = top(over_strengths)
-            record["subconscious"] = {
+            record["regulator"] = {
                 "reply": reply, "chose": name, "kind": kind_of(name),
                 "strength": word, "over_options": over_options,
                 "over_strengths": over_strengths,
@@ -246,7 +246,7 @@ async def main() -> None:
 
             # The reply a user would see.
             with steered(llm, chosen, strength=size, decode_only=True):
-                record["ego"] = await say(llm, context, opts)
+                record["actor"] = await say(llm, context, opts)
 
             # The same part again, three ways. Without the second and third
             # arms the first one cannot be read: a mind that names a feeling
@@ -277,7 +277,7 @@ async def main() -> None:
         return sum(1 for r in records
                    if r["introspection"][arm]["felt"] == target(r)) / len(records)
 
-    chose = lambda r: r["subconscious"]["chose"]
+    chose = lambda r: r["regulator"]["chose"]
     got = lambda r: r["mismatched"]
 
     summary = {
