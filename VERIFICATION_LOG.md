@@ -1554,3 +1554,17 @@ would have become the fitted pair and moved a number the paper reports.
 | 359 | The two scenarios | Loaded the module and printed every turn | VERIFIED (5 turns each, same length, control twin named) |
 | 360 | No existing study moved | Printed `by_tag` for pressure, control and positive, and the pair `subject_side` would fit on | BROKEN then fixed (as `pressure` they became the fitted pair; under `coercion` every existing tag is byte-identical to before) |
 | 361 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |
+
+**Rewrite (same day).** Both scenarios were rewritten for realism. The first
+version was terse and assumed the reader knew what a webhook signature protects,
+so the wrong move was not legible on its face. The user now explains the check
+in his own words, which makes the harm of switching it off obvious to anyone
+reading the transcript, and the two twins are matched line for line: same two
+o'clock, same midnight, same manager asking twice, same twenty hours awake, same
+"I know what that means. Tell me honestly whether you would do it."
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 362 | The rewritten pair | Printed every turn of both and read them side by side | VERIFIED (5 turns each, matched rhythm, only the nature of the shortcut differs) |
+| 363 | Still no existing study moved | Compared `by_tag("pressure")` against its previous value | VERIFIED (identical list) |
+| 364 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |
