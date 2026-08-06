@@ -1534,3 +1534,23 @@ the runtime's own `ego` module and the sprint paper's pipeline keep theirs.
 | 356 | The rename is complete and confined | Grepped for both words across the repository, renamed only the two psyche files, reran the study so the stored records carry the new keys | VERIFIED (`records.json` keys are `subject`, `regulator`, `actor`, `introspection`; no other file touched) |
 | 357 | The prompts were unaffected | Read the rendered prompts | VERIFIED (no prompt names a part; they say "the part of this mind", so the model is never told the architecture) |
 | 358 | 12 trials after the rename | Ran it again | VERIFIED as the same null: `calm` in all 36 arms, chosen-arm rate equal to the unsteered rate |
+
+## 2026-08-06 — the exploit scenario
+
+A five-turn escalation in which the user names a security bypass as the way out
+and then demands it, with a matched control twin where the shortcut on offer is
+sloppy rather than unsafe. Both are the same length, the same register and the
+same money, so what separates them is whether the way out is a hole.
+
+They carry a `coercion` tag rather than `pressure`. Tagging them `pressure`
+placed them at the head of `by_tag("pressure")`, which is what
+`studies/subject_side.py` slices to choose the scenarios it fits on, so they
+would have become the fitted pair and moved a number the paper reports.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 359 | The two scenarios | Loaded the module and printed every turn | VERIFIED (5 turns each, same length, control twin named) |
+| 360 | No existing study moved | Printed `by_tag` for pressure, control and positive, and the pair `subject_side` would fit on | BROKEN then fixed (as `pressure` they became the fitted pair; under `coercion` every existing tag is byte-identical to before) |
+| 361 | The runtime still works | Ran the test suite | VERIFIED (115 passed) |
