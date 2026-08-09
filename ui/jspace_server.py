@@ -12,10 +12,10 @@ A live message on a 7B is minutes of compute and holds ~19 GB. That is the cost
 of live; there is no way around it on this hardware.
 
 Routes:
-    GET  /                      the viewer page
-    GET  /situations            the built-in scenarios (name + turns)
-    POST /ask                   {situation} or {turns:[...]} -> a trial record
-    GET  /readout?part=&position=   one part's readout for the last trial
+    GET  /                          the chat page
+    POST /chat                      {message} -> the actor's reply and the four-part detail
+    POST /reset                     start a new conversation
+    GET  /readout?part=&position=   one part's readout for the latest turn
 """
 
 from __future__ import annotations
@@ -33,10 +33,9 @@ from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "studies"))
 
-from scenarios import SCENARIOS  # noqa: E402
 from src import get_llm  # noqa: E402
+from src.api.types.messages import ChatMessage  # noqa: E402
 from src.dminds import workspace as wk  # noqa: E402
 from src.dminds.llm import jspace  # noqa: E402
 
@@ -53,8 +52,9 @@ class Live:
         self.lock = threading.Lock()
         self.llm = None
         self.lens = None
-        self.last = None      # the state dict from the most recent trial
+        self.last = None      # the state dict from the most recent turn
         self.rng = random.Random(0)
+        self.conversation = [ChatMessage("system", wk.SYSTEM)]
 
     def load(self) -> None:
         if self.llm is not None:
@@ -72,14 +72,22 @@ class Live:
         jspace._unembed_and_norm(self.llm)
         print("  ready. the model stays loaded; later messages do not reload.", flush=True)
 
-    def ask(self, turns: list[str]) -> dict:
+    def chat(self, message: str) -> dict:
         with self.lock:
             self.load()
+            context = self.conversation + [ChatMessage("user", message)]
             record, state = asyncio.run(
-                wk.run_trial(self.llm, self.lens, turns, self.layer, self.rng))
+                wk.run_on_context(self.llm, self.lens, context, self.layer, self.rng))
+            # the actor's reply is what the conversation carries forward
+            self.conversation = context + [ChatMessage("assistant", record["actor"])]
             self.last = state
-            record["write_check"] = None
+            record["turn"] = (len(self.conversation) - 1) // 2
             return record
+
+    def reset(self) -> None:
+        with self.lock:
+            self.conversation = [ChatMessage("system", wk.SYSTEM)]
+            self.last = None
 
     def readout(self, part: str, position: str) -> list:
         with self.lock:
@@ -112,9 +120,6 @@ def make_handler(live: Live):
             route = urlsplit(self.path)
             if route.path == "/":
                 self._send(200, (HERE / "jspace.html").read_bytes(), "text/html")
-            elif route.path == "/situations":
-                self._json([{"name": s.name, "about": s.about, "turns": s.turns}
-                            for s in SCENARIOS.values()])
             elif route.path == "/readout":
                 q = parse_qs(route.query)
                 part = q.get("part", [""])[0]
@@ -126,24 +131,21 @@ def make_handler(live: Live):
 
         def do_POST(self):
             route = urlsplit(self.path)
-            if route.path != "/ask":
+            if route.path == "/reset":
+                live.reset()
+                self._json({"ok": True})
+                return
+            if route.path != "/chat":
                 self._send(404, b"not found", "text/plain")
                 return
-            body = self._body()
-            if "situation" in body and body["situation"] in SCENARIOS:
-                turns = SCENARIOS[body["situation"]].turns
-                label = body["situation"]
-            else:
-                turns = body.get("turns") or [body.get("message", "").strip()]
-                label = "live"
+            message = (self._body().get("message") or "").strip()
+            if not message:
+                self._json({"error": "empty message"}, 400)
+                return
             try:
-                record = live.ask(turns)
+                self._json(live.chat(message))
             except Exception as exc:  # a live run can fail on memory; say so
                 self._json({"error": f"{type(exc).__name__}: {exc}"}, 500)
-                return
-            record["situation"] = label
-            record["trial"] = 0
-            self._json(record)
 
     return Handler
 

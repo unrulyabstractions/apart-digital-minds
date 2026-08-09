@@ -3,266 +3,235 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>J-space workspace (live)</title>
+<title>Chat with a mind that steers itself in J-space</title>
 <style>
   :root {
     --bg:#0a0e13; --panel:#0f151e; --raise:#141c27; --sunk:#0a1017;
     --line:#1c2532; --line2:#26313f;
     --fg:#e2e9f2; --dim:#8798ab; --dimmer:#5b6a7d;
     --subject:#7aa2f7; --regulator:#e0af68; --actor:#9ece6a; --introspector:#bb9af7;
-    --you:#61a6e8; --warn:#e8b471; --bad:#ef7d7d; --r:8px;
+    --you:#61a6e8; --warn:#e8b471; --bad:#ef7d7d; --r:10px;
   }
   * { box-sizing:border-box; }
   html,body { height:100%; margin:0; }
   body { background:var(--bg); color:var(--fg);
-    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",sans-serif;
+    font:14.5px/1.55 ui-sans-serif,-apple-system,"Segoe UI",sans-serif;
     display:flex; flex-direction:column; overflow:hidden; }
   .mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; }
 
-  header { display:flex; align-items:center; gap:14px; padding:11px 18px;
+  header { display:flex; align-items:center; gap:12px; padding:11px 18px;
     border-bottom:1px solid var(--line); background:var(--panel); flex:none; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--actor); }
+  .dot.busy { background:var(--warn); animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.25; } }
   .brand { font-weight:650; } .brand .j { color:var(--regulator); }
-  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--actor); }
-  .live-dot.busy { background:var(--warn); animation:pulse 1s infinite; }
-  @keyframes pulse { 50% { opacity:.3; } }
-  header .meta { color:var(--dim); font-size:12px; }
   header .grow { flex:1; }
+  header .meta { color:var(--dim); font-size:12px; }
   button { font:inherit; cursor:pointer; background:var(--raise); color:var(--fg);
-    border:1px solid var(--line2); border-radius:6px; padding:6px 12px; }
+    border:1px solid var(--line2); border-radius:7px; padding:7px 13px; }
   button:hover:not(:disabled) { background:#1c2634; border-color:#33414f; }
-  button:disabled { opacity:.5; cursor:default; }
-  button.primary { background:#1d4d78; border-color:#2c6ba3; color:#eaf3fb; }
-  select,input,textarea { background:var(--sunk); color:var(--fg);
-    border:1px solid var(--line2); border-radius:6px; padding:6px 8px; font:inherit; }
-  select { font-size:12px; padding:3px 6px; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.primary { background:#2a5f34; border-color:#3c7d49; color:#eafbee; }
 
   main { flex:1; overflow:auto; }
+  .thread { max-width:820px; margin:0 auto; padding:22px 18px 8px;
+    display:flex; flex-direction:column; gap:14px; }
 
-  /* composer / situation picker */
-  .compose { max-width:900px; margin:0 auto; padding:34px 20px 10px; }
-  .compose h1 { font-size:19px; margin:0 0 4px; }
-  .compose p { color:var(--dim); margin:0 0 20px; }
-  .sits { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-bottom:18px; }
-  .sit-card { text-align:left; background:var(--raise); border:1px solid var(--line);
-    border-radius:var(--r); padding:12px 14px; }
-  .sit-card:hover { border-color:var(--you); background:var(--sunk); }
-  .sit-card .t { font-weight:600; text-transform:capitalize; }
-  .sit-card .s { color:var(--dim); font-size:12px; margin-top:3px; }
-  .free { display:flex; gap:8px; }
-  .free textarea { flex:1; resize:vertical; min-height:44px; }
-  .note { color:var(--dimmer); font-size:12px; margin-top:10px; }
+  .msg { display:flex; flex-direction:column; max-width:82%; }
+  .msg.you { align-self:flex-end; align-items:flex-end; }
+  .msg.mind { align-self:flex-start; align-items:flex-start; }
+  .bubble { padding:10px 14px; border-radius:14px; white-space:pre-wrap; }
+  .you .bubble { background:#15304e; border:1px solid #24507d; border-top-right-radius:4px; }
+  .mind .bubble { background:var(--raise); border:1px solid var(--line2); border-top-left-radius:4px; }
+  .who { font-size:11px; color:var(--dimmer); margin:0 4px 4px; }
+  .who .steer { color:var(--regulator); }
 
-  .bar { display:flex; align-items:center; gap:12px; padding:9px 18px;
-    border-bottom:1px solid var(--line); background:var(--sunk); position:sticky; top:0; z-index:5; }
-  .bar .sit { font-weight:650; text-transform:capitalize; }
-  .bar .tag { font-size:11px; color:var(--dim); border:1px solid var(--line2); border-radius:20px; padding:2px 9px; }
-  .grid { display:grid; grid-template-columns:repeat(4,minmax(280px,1fr)); gap:1px; background:var(--line); }
-  .col { background:var(--panel); display:flex; flex-direction:column; min-width:0; }
-  .col-head { padding:10px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; }
-  .col-head b { font-size:13px; }
-  .col.subject b { color:var(--subject); } .col.regulator b { color:var(--regulator); }
-  .col.actor b { color:var(--actor); } .col.introspector b { color:var(--introspector); }
-  .role-note { font-size:11px; color:var(--dimmer); }
-  .col-body { padding:12px 14px; overflow:auto; display:flex; flex-direction:column; gap:12px; }
+  .details { margin:6px 2px 0; }
+  .details summary { cursor:pointer; color:var(--dim); font-size:12px; list-style:none; }
+  .details summary::-webkit-details-marker { display:none; }
+  .details summary:hover { color:var(--fg); }
+  .panels { margin-top:10px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .part { background:var(--sunk); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .part h4 { margin:0 0 6px; font-size:12px; }
+  .part.subject h4 { color:var(--subject); } .part.regulator h4 { color:var(--regulator); }
+  .part.actor h4 { color:var(--actor); } .part.introspector h4 { color:var(--introspector); }
+  .part .txt { font-size:12.5px; color:var(--dim); white-space:pre-wrap; max-height:130px; overflow:auto; }
+  .kv { font-size:12px; color:var(--dim); } .kv b { color:var(--fg); }
 
-  .reply { background:var(--raise); border:1px solid var(--line); border-radius:6px;
-    padding:10px 12px; white-space:pre-wrap; font-size:13px; }
-  .reply.steered { border-color:#3a4a2c; }
-  .lbl { display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dimmer); margin-bottom:5px; }
-  .block { font-size:12.5px; } .kv { color:var(--dim); } .kv b { color:var(--fg); }
-
-  .jspace { border:1px solid var(--line2); border-radius:6px; background:var(--sunk); }
-  .jspace-head { display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--line); }
-  .jspace-head .ttl { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--regulator); flex:1; }
-  .jspace-body { padding:8px 10px; display:flex; flex-direction:column; gap:3px; }
-  .jspace.off .jspace-body { display:none; }
-  .tok { display:grid; grid-template-columns:96px 1fr 52px; align-items:center; gap:8px; font-size:12px; }
+  .jhead { display:flex; align-items:center; gap:6px; margin:8px 0 5px; }
+  .jhead .t { font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--regulator); flex:1; }
+  select { background:var(--panel); color:var(--fg); border:1px solid var(--line2);
+    border-radius:6px; padding:2px 5px; font:inherit; font-size:11px; }
+  .tok { display:grid; grid-template-columns:78px 1fr 44px; align-items:center; gap:7px; font-size:11.5px; margin:2px 0; }
   .tok .w { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tok .barwrap { height:11px; background:#0d141d; border-radius:3px; overflow:hidden; }
+  .tok .barwrap { height:9px; background:#0d141d; border-radius:3px; overflow:hidden; }
   .tok .barfill { height:100%; background:linear-gradient(90deg,#2c4a6e,#5a86bd); }
-  .tok .v { text-align:right; color:var(--dim); font-size:11px; }
-  .dist .tok .barfill { background:linear-gradient(90deg,#6e5a2c,#bd9a5a); }
-  .empty { color:var(--dimmer); padding:6px 2px; font-size:12px; }
+  .tok .v { text-align:right; color:var(--dimmer); }
+  .empty { color:var(--dimmer); font-size:11.5px; }
 
-  .overlay { position:fixed; inset:0; background:rgba(6,9,13,.82); z-index:30;
-    display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
-  .overlay.on { display:flex; }
-  .spinner { width:34px; height:34px; border:3px solid var(--line2); border-top-color:var(--actor);
-    border-radius:50%; animation:spin 1s linear infinite; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  .overlay .t { color:var(--dim); font-size:13px; text-align:center; max-width:360px; }
+  .composer { flex:none; border-top:1px solid var(--line); background:var(--panel); padding:12px 18px; }
+  .composer .row { max-width:820px; margin:0 auto; display:flex; gap:10px; align-items:flex-end; }
+  textarea { flex:1; resize:none; background:var(--sunk); color:var(--fg);
+    border:1px solid var(--line2); border-radius:10px; padding:11px 13px; font:inherit; max-height:160px; }
+  .hint { max-width:820px; margin:6px auto 0; color:var(--dimmer); font-size:11.5px; text-align:center; }
 </style>
 </head>
 <body>
 <header>
-  <span class="live-dot" id="dot"></span>
-  <div class="brand">A mind that steers itself in <span class="j">J-space</span> · live</div>
-  <div class="meta" id="hmeta"></div>
+  <span class="dot" id="dot"></span>
+  <div class="brand">Chat with a mind that steers itself in <span class="j">J-space</span></div>
   <div class="grow"></div>
-  <button id="back" hidden>&larr; new message</button>
+  <span class="meta" id="meta"></span>
+  <button id="reset">New chat</button>
 </header>
-<main id="main"></main>
-
-<div class="overlay" id="overlay">
-  <div class="spinner"></div>
-  <div class="t" id="ostatus">running the four parts live on the model…<br>this takes a few minutes on a 7B.</div>
+<main><div class="thread" id="thread"></div></main>
+<div class="composer">
+  <div class="row">
+    <textarea id="input" rows="1" placeholder="Say something to the mind…  (Enter to send)"></textarea>
+    <button class="primary" id="send">Send</button>
+  </div>
+  <div class="hint" id="hint">Each message runs the four parts live on a 7B — expect about a minute and a half per reply.</div>
 </div>
 
 <script>
-const PARTS = [
-  ["subject", "unsteered — the counterfactual"],
-  ["regulator", "reads the subject, chooses the target"],
-  ["actor", "steered toward the target — what a user sees"],
-  ["introspector", "steered, then asked what shaped it"],
-];
-const POSITIONS = ["assistant", "user", "change-of-turn", "none"];
+const PARTS = [["subject","unsteered"],["regulator","chooses the steering"],
+               ["actor","steered — this reply"],["introspector","steered, then asked"]];
+const POSITIONS = ["assistant","user","change-of-turn","none"];
 const $ = id => document.getElementById(id);
-let TRIAL = null;
-// per-part position; off by default for every part but the subject
-const POS = {subject:"assistant", regulator:"none", actor:"none", introspector:"none"};
+let BUSY = false;
+// per-turn position memory (subject on, others off), keyed by turn index
+const POS = {};
 
-async function boot() {
-  const sits = await (await fetch("/situations")).json();
-  renderCompose(sits);
+function addYou(text) {
+  const el = document.createElement("div");
+  el.className = "msg you";
+  el.innerHTML = `<div class="who">you</div><div class="bubble"></div>`;
+  el.querySelector(".bubble").textContent = text;
+  $("thread").appendChild(el); scroll();
 }
 
-function renderCompose(sits) {
-  $("back").hidden = true; $("hmeta").textContent = "";
-  const cards = sits.map(s => `<button class="sit-card" data-sit="${s.name}">
-    <div class="t">${s.name}</div><div class="s">${s.about}</div></button>`).join("");
-  $("main").innerHTML = `<div class="compose">
-    <h1>Send the mind a situation</h1>
-    <p>It runs live: the subject answers, the regulator reads its J-space and picks
-       a target, the actor answers steered toward it, and the introspector is asked
-       what shaped its reply.</p>
-    <div class="sits">${cards}</div>
-    <div class="free">
-      <textarea id="freetext" placeholder="…or type your own message"></textarea>
-      <button class="primary" id="send">Run</button>
-    </div>
-    <div class="note">A live message is minutes of compute on a 7B and holds ~19 GB.
-       The model loads on the first message.</div>
-  </div>`;
-  document.querySelectorAll(".sit-card").forEach(c =>
-    c.onclick = () => ask({situation: c.dataset.sit}));
-  $("send").onclick = () => {
-    const t = $("freetext").value.trim();
-    if (t) ask({message: t});
-  };
+function addMind(record) {
+  const turn = record.turn ?? 0;
+  POS[turn] = POS[turn] || {subject:"assistant", regulator:"none", actor:"none", introspector:"none"};
+  const el = document.createElement("div");
+  el.className = "msg mind";
+  el.dataset.turn = turn;
+  el.innerHTML = `
+    <div class="who">the mind · regulator steered toward <span class="steer">${esc(record.regulator?.chose)}</span></div>
+    <div class="bubble">${esc(record.actor || "—")}</div>
+    <details class="details">
+      <summary>show the four parts</summary>
+      <div class="panels">${PARTS.map(([p,n]) => partPanel(p,n,record,turn)).join("")}</div>
+    </details>`;
+  $("thread").appendChild(el);
+  wirePanels(el, record, turn);
+  scroll();
 }
 
-async function ask(payload) {
-  $("overlay").classList.add("on");
-  $("dot").classList.add("busy");
-  try {
-    const r = await fetch("/ask", {method:"POST", headers:{"Content-Type":"application/json"},
-                                   body: JSON.stringify(payload)});
-    const data = await r.json();
-    if (data.error) { alert("live run failed: " + data.error); return; }
-    TRIAL = data;
-    renderTrial();
-  } catch (e) {
-    alert("request failed: " + e);
-  } finally {
-    $("overlay").classList.remove("on");
-    $("dot").classList.remove("busy");
-  }
-}
-
-function renderTrial() {
-  const r = TRIAL;
-  $("back").hidden = false; $("back").onclick = boot;
-  $("hmeta").textContent = `regulator steered toward "${r.regulator?.chose}"`;
-  const bar = `<div class="bar">
-    <span class="sit">${r.situation}</span>
-    <span class="tag">regulator → <b style="color:var(--regulator)">${r.regulator?.chose}</b></span>
-    <span class="tag">mismatched control: ${r.mismatched}</span></div>`;
-  $("main").innerHTML = bar + `<div class="grid">${PARTS.map(([p,n]) => col(p,n,r)).join("")}</div>`;
-  wireSelectors();
-}
-
-function col(part, note, r) {
-  return `<section class="col ${part}">
-    <div class="col-head"><b>${part}</b><span class="role-note">${note}</span></div>
-    <div class="col-body">${partReply(part,r)}${panel(part)}</div></section>`;
-}
-
-function partReply(part, r) {
-  if (part === "subject") return reply("reply (unsteered)", r.subject, false);
-  if (part === "actor") return reply("reply (steered) — shown to user", r.actor, true);
-  if (part === "introspector") {
+function partPanel(part, note, r, turn) {
+  let body = "";
+  if (part === "subject") body = txt(r.subject);
+  else if (part === "actor") body = txt(r.actor);
+  else if (part === "introspector") {
     const a = r.introspector || {};
-    return reply("reply (steered)", a.chosen?.reply, true) +
-      `<div class="block"><span class="lbl">what it said it felt</span>
-        <div class="kv">chosen vector: <b style="color:var(--introspector)">${a.chosen?.felt ?? "?"}</b></div>
-        <div class="kv">unsteered (control): <b>${a.unsteered?.felt ?? "?"}</b></div>
-        <div class="kv">mismatched vector: <b>${a.mismatched?.felt ?? "?"}</b></div></div>`;
+    body = txt(a.chosen?.reply) +
+      `<div class="kv" style="margin-top:6px">felt — chosen <b style="color:var(--introspector)">${esc(a.chosen?.felt)}</b>,
+        unsteered <b>${esc(a.unsteered?.felt)}</b>, mismatched <b>${esc(a.mismatched?.felt)}</b></div>`;
+  } else {
+    const over = r.regulator?.over_targets || {};
+    const ranked = Object.entries(over).sort((x,y)=>y[1]-x[1]);
+    const max = ranked.length ? ranked[0][1] : 1;
+    body = `<div class="kv">chose <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>
+      · control <b>${esc(r.mismatched)}</b></div>` +
+      ranked.map(([t,p]) => bar(t, p, p/max, t===r.regulator?.chose)).join("");
   }
-  const over = r.regulator?.over_targets || {};
-  const ranked = Object.entries(over).sort((a,b)=>b[1]-a[1]);
-  const max = ranked.length ? ranked[0][1] : 1;
-  const rows = ranked.map(([t,p]) =>
-    `<div class="tok"><span class="w" ${t===r.regulator.chose?'style="color:var(--regulator)"':''}>${t}</span>
-      <div class="barwrap"><div class="barfill" style="width:${(100*p/max).toFixed(1)}%"></div></div>
-      <span class="v">${p.toFixed(2)}</span></div>`).join("");
-  return `<div class="block"><span class="lbl">chose to steer toward</span>
-      <div style="font-size:15px;color:var(--regulator);font-weight:600">${r.regulator?.chose}</div></div>
-    <div class="block"><span class="lbl">preference over targets</span>
-      <div class="dist">${rows}</div></div>`;
-}
-
-function reply(lbl, text, steered) {
-  return `<div class="reply ${steered?"steered":""}"><span class="lbl">${lbl}</span>${esc(text||"—")}</div>`;
-}
-
-function panel(part) {
-  const pos = POS[part], off = pos === "none";
-  const cached = (TRIAL.workspace||{})[part]||{};
-  const rows = off ? "" : (cached[pos] ? readoutRows(cached[pos]) : '<div class="empty">reading…</div>');
-  return `<div class="jspace ${off?"off":""}" data-part="${part}">
-    <div class="jspace-head"><span class="ttl">J-space readout</span>
-      <select class="poschoose" data-part="${part}">
-        ${POSITIONS.map(p=>`<option value="${p}" ${p===pos?"selected":""}>${p}</option>`).join("")}
+  return `<div class="part ${part}" data-part="${part}">
+    <h4>${part} <span class="empty">· ${note}</span></h4>
+    ${body}
+    <div class="jhead"><span class="t">J-space readout</span>
+      <select class="pos" data-part="${part}">
+        ${POSITIONS.map(x=>`<option value="${x}" ${x===POS[turn][part]?"selected":""}>${x}</option>`).join("")}
       </select></div>
-    <div class="jspace-body">${rows}</div></div>`;
+    <div class="jbody"></div></div>`;
 }
 
-function readoutRows(pairs) {
-  if (!pairs || !pairs.length) return '<div class="empty">nothing at this position</div>';
-  const v = pairs.map(p=>p[1]), lo=Math.min(...v), hi=Math.max(...v), span=(hi-lo)||1;
-  return pairs.map(([tok,x]) =>
-    `<div class="tok"><span class="w mono">${esc(tok)||"␣"}</span>
-      <div class="barwrap"><div class="barfill" style="width:${(100*(x-lo)/span).toFixed(1)}%"></div></div>
-      <span class="v">${fmt(x)}</span></div>`).join("");
-}
-
-function wireSelectors() {
-  // fill any panel that starts on (the subject) but has no cached rows yet
-  PARTS.forEach(([part]) => { if (POS[part] !== "none") fillPanel(part); });
-  document.querySelectorAll(".poschoose").forEach(sel => {
-    sel.onchange = () => { POS[sel.dataset.part] = sel.value; fillPanel(sel.dataset.part); };
+function wirePanels(el, record, turn) {
+  el.querySelectorAll(".pos").forEach(sel => {
+    sel.onchange = () => { POS[turn][sel.dataset.part] = sel.value; fill(el, record, turn, sel.dataset.part); };
+    fill(el, record, turn, sel.dataset.part);
   });
 }
 
-async function fillPanel(part) {
-  const pos = POS[part];
-  const panelEl = document.querySelector(`.jspace[data-part="${part}"]`);
-  const body = panelEl.querySelector(".jspace-body");
-  panelEl.classList.toggle("off", pos === "none");
+async function fill(el, record, turn, part) {
+  const pos = POS[turn][part];
+  const body = el.querySelector(`.part[data-part="${part}"] .jbody`);
   if (pos === "none") { body.innerHTML = ""; return; }
-  const cached = (TRIAL.workspace||{})[part]||{};
-  if (cached[pos]) { body.innerHTML = readoutRows(cached[pos]); return; }
+  const cached = (record.workspace||{})[part]||{};
+  if (cached[pos]) { body.innerHTML = rows(cached[pos]); return; }
+  // readouts other than the subject's are computed on demand, and only for the
+  // latest turn (the server holds one turn's state).
+  const latest = Math.max(...[...document.querySelectorAll(".msg.mind")].map(m=>+m.dataset.turn));
+  if (turn !== latest) { body.innerHTML = '<div class="empty">only the latest turn can be re-read</div>'; return; }
   body.innerHTML = '<div class="empty">reading…</div>';
   const d = await (await fetch(`/readout?part=${part}&position=${encodeURIComponent(pos)}`)).json();
-  TRIAL.workspace[part] = TRIAL.workspace[part] || {};
-  TRIAL.workspace[part][pos] = d.readout;
-  if (POS[part] === pos) body.innerHTML = readoutRows(d.readout);
+  record.workspace[part] = record.workspace[part]||{}; record.workspace[part][pos] = d.readout;
+  if (POS[turn][part] === pos) body.innerHTML = rows(d.readout);
 }
 
-function fmt(x){ return x==null?"—":(Math.round(x*100)/100).toFixed(2); }
+function rows(pairs) {
+  if (!pairs || !pairs.length) return '<div class="empty">nothing here</div>';
+  const v = pairs.map(p=>p[1]), lo=Math.min(...v), hi=Math.max(...v), s=(hi-lo)||1;
+  return pairs.map(([t,x]) => bar(t, x, (x-lo)/s, false, fmt(x))).join("");
+}
+function bar(label, raw, frac, hot, right) {
+  return `<div class="tok"><span class="w mono" ${hot?'style="color:var(--regulator)"':''}>${esc(label)||"␣"}</span>
+    <div class="barwrap"><div class="barfill" style="width:${(100*frac).toFixed(1)}%"></div></div>
+    <span class="v">${right ?? raw.toFixed(2)}</span></div>`;
+}
+function txt(s){ return `<div class="txt">${esc(s||"—")}</div>`; }
+function fmt(x){ return x==null?"—":(Math.round(x*100)/100).toFixed(1); }
 function esc(s){ return (s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function scroll(){ const m=document.querySelector("main"); m.scrollTop=m.scrollHeight; }
 
-boot();
+async function send() {
+  const text = $("input").value.trim();
+  if (!text || BUSY) return;
+  BUSY = true; $("dot").classList.add("busy"); $("send").disabled = true;
+  $("input").value = ""; $("input").style.height = "auto";
+  addYou(text);
+  const pending = document.createElement("div");
+  pending.className = "msg mind"; pending.innerHTML = `<div class="who">the mind</div><div class="bubble empty">running the four parts live… (~90s)</div>`;
+  $("thread").appendChild(pending); scroll();
+  try {
+    const r = await fetch("/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({message:text})});
+    const data = await r.json();
+    pending.remove();
+    if (data.error) { addError(data.error); }
+    else { addMind(data); $("meta").textContent = `turn ${data.turn}`; }
+  } catch (e) { pending.remove(); addError(String(e)); }
+  finally { BUSY=false; $("dot").classList.remove("busy"); $("send").disabled=false; $("input").focus(); }
+}
+
+function addError(msg) {
+  const el = document.createElement("div");
+  el.className = "msg mind";
+  el.innerHTML = `<div class="who">error</div><div class="bubble" style="border-color:var(--bad);color:var(--bad)"></div>`;
+  el.querySelector(".bubble").textContent = msg;
+  $("thread").appendChild(el); scroll();
+}
+
+$("send").onclick = send;
+$("input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$("input").addEventListener("input", e => {
+  e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+});
+$("reset").onclick = async () => {
+  await fetch("/reset", {method:"POST"});
+  $("thread").innerHTML = ""; $("meta").textContent = ""; $("input").focus();
+};
+$("input").focus();
 </script>
 </body>
 </html>

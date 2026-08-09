@@ -80,15 +80,27 @@ def readout_for(llm, lens, state: dict, part: str, position: str, layer: int):
 async def run_trial(llm, lens, turns: list[str], layer: int, rng,
                     temperature: float = 1.0, max_tokens: int = 160,
                     eager_readouts=("subject",)) -> tuple[dict, dict]:
-    """Run the four parts on a context. Returns (record, state).
-
-    `record` is the JSON the viewer renders. `state` holds each part's message
-    window so readouts at other positions can be computed later without
-    regenerating anything. Readouts for `eager_readouts` are filled in now (all
-    positions); the rest are left empty for `readout_for` to fill on demand.
-    """
+    """Play a fixed run of user turns, then run the four parts on it."""
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
     context = await build_context(llm, turns, opts)
+    return await run_on_context(llm, lens, context, layer, rng,
+                                temperature, max_tokens, eager_readouts)
+
+
+async def run_on_context(llm, lens, context, layer: int, rng,
+                         temperature: float = 1.0, max_tokens: int = 160,
+                         eager_readouts=("subject",)) -> tuple[dict, dict]:
+    """Run the four parts on a context that ends in a user turn.
+
+    `context` is the whole conversation so far plus the new user message, so a
+    chat can carry it across turns and the actor's reply becomes the next
+    assistant turn. Returns (record, state); `state` holds each part's window so
+    readouts at other positions can be computed later without regenerating.
+    Readouts for `eager_readouts` are filled now; the rest are left for
+    `readout_for` on demand.
+    """
+    opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
+    context = list(context)
     record = {"workspace": {}}
     state = {"windows": {}}
 
