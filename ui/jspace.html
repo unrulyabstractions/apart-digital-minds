@@ -152,6 +152,9 @@ function addMind(record) {
     </details>`;
   $("thread").appendChild(el);
   wirePanels(el, record, turn);
+  // the context window is the whole conversation; show its newest end first so
+  // the latest turn is what you see, not an old one.
+  el.querySelectorAll(".window").forEach(w => { w.scrollTop = w.scrollHeight; });
   scroll();
 }
 
