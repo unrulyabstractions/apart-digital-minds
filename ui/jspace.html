@@ -86,6 +86,13 @@
     border-radius:6px; font-size:12px; color:var(--dim); }
   .trace ol { margin:0; padding-left:18px; } .trace li { margin:2px 0; }
   .dist { display:flex; flex-direction:column; }
+  .jbody { margin-bottom:6px; }
+  .fulllabel, .statline { font-size:10px; color:var(--dimmer); margin:5px 0 3px; }
+  .chips { display:flex; flex-wrap:wrap; gap:3px; max-height:110px; overflow:auto; }
+  .chip { font-family:ui-monospace,Menlo,monospace; font-size:10.5px; padding:1px 5px;
+    background:var(--panel); border:1px solid var(--line2); border-radius:4px; color:var(--regulator); }
+  .statline .stat { margin-right:8px; color:var(--dim); }
+  .statline .stat b { color:var(--fg); font-family:ui-monospace,Menlo,monospace; }
   .composer { flex:none; border-top:1px solid var(--line); background:var(--panel); padding:12px 18px; }
   .composer .row { max-width:820px; margin:0 auto; display:flex; gap:10px; align-items:flex-end; }
   textarea { flex:1; resize:none; background:var(--sunk); color:var(--fg);
@@ -175,11 +182,12 @@ function partPanel(part, note, r, turn) {
     ${extra}
     <div class="wlabel">context window (${win.length} messages)</div>
     ${window}
-    <div class="jhead"><span class="t">J-space readout</span>
+    <div class="jhead"><span class="t">J-space · mean-pooled per position</span>
       <select class="pos" data-part="${part}">
         ${POSITIONS.map(x=>`<option value="${x}" ${x===POS[turn][part]?"selected":""}>${x}</option>`).join("")}
       </select></div>
-    <div class="jbody"></div></div>`;
+    <div class="jbody"></div>
+    <div class="jfull"></div></div>`;
 }
 
 function messageRow(m) {
@@ -203,20 +211,38 @@ function wirePanels(el, record, turn) {
   });
 }
 
+function hasAnalysis(a) { return a && (a.positions || a.per_token); }
+
 async function fill(el, record, turn, part) {
   const pos = POS[turn][part];
-  const body = el.querySelector(`.part[data-part="${part}"] .jbody`);
-  if (pos === "none") { body.innerHTML = ""; return; }
-  const cached = (record.workspace||{})[part]||{};
-  if (cached[pos]) { body.innerHTML = rows(cached[pos]); return; }
-  // readouts other than the subject's are computed on demand, and only for the
-  // latest turn (the server holds one turn's state).
-  const latest = Math.max(...[...document.querySelectorAll(".msg.mind")].map(m=>+m.dataset.turn));
-  if (turn !== latest) { body.innerHTML = '<div class="empty">only the latest turn can be re-read</div>'; return; }
-  body.innerHTML = '<div class="empty">reading…</div>';
-  const d = await (await fetch(`/readout?part=${part}&position=${encodeURIComponent(pos)}`)).json();
-  record.workspace[part] = record.workspace[part]||{}; record.workspace[part][pos] = d.readout;
-  if (POS[turn][part] === pos) body.innerHTML = rows(d.readout);
+  const panel = el.querySelector(`.part[data-part="${part}"]`);
+  const body = panel.querySelector(".jbody"), full = panel.querySelector(".jfull");
+  if (pos === "none") { body.innerHTML = ""; full.innerHTML = ""; return; }
+
+  let a = (record.workspace||{})[part];
+  if (!hasAnalysis(a)) {
+    // only the latest turn's parts can be analysed on demand (server holds one turn)
+    const latest = Math.max(...[...document.querySelectorAll(".msg.mind")].map(m=>+m.dataset.turn));
+    if (turn !== latest) { body.innerHTML = '<div class="empty">only the latest turn can be re-read</div>'; return; }
+    body.innerHTML = '<div class="empty">reading every token in one pass…</div>';
+    const d = await (await fetch(`/analyze?part=${part}`)).json();
+    a = d.analysis; record.workspace[part] = a;
+    if (POS[turn][part] !== pos) return;   // selector moved while we waited
+  }
+  body.innerHTML = rows((a.positions || {})[pos]);
+  full.innerHTML = fullView(a);
+}
+
+function fullView(a) {
+  const pt = a.per_token || [], st = a.stats || {};
+  if (!pt.length) return "";
+  const chips = pt.map(x =>
+    `<span class="chip" title="${esc(x.token)} → ${esc(x.jspace)} (${x.logit})">${esc(x.jspace)||"␣"}</span>`).join("");
+  const top = (st.top_tokens||[]).slice(0,6).map(([t,c]) =>
+    `<span class="stat"><b>${esc(t)||"␣"}</b> ${c}</span>`).join("");
+  return `<div class="fulllabel">full view — top J-space token at each of the ${st.n_tokens||pt.length} reply tokens</div>
+    <div class="chips">${chips}</div>
+    <div class="statline">most frequent: ${top} · mean top logit ${st.mean_top_logit ?? "—"}</div>`;
 }
 
 function rows(pairs) {

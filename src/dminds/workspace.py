@@ -11,7 +11,7 @@ recorded per part.
     introspector   answers steered, then is asked what shaped its reply.
 
 The batch study and the live server both call `run_trial`. The live server keeps
-the returned `state` and calls `readout_for` on demand, so a message pays for the
+the returned `state` and calls `analyze_part` on demand, so a message pays for the
 subject's readout up front and the other parts' readouts only when asked.
 """
 
@@ -65,16 +65,15 @@ async def build_context(llm, turns: list[str], opts) -> list[ChatMessage]:
     return messages
 
 
-def readout_for(llm, lens, state: dict, part: str, position: str, layer: int):
-    """One part's J-space readout at one position, from a finished trial's state.
+def analyze_part(llm, lens, state: dict, part: str, layer: int) -> dict:
+    """One part's full J-space turn (positions, per token, stats), one pass.
 
-    The live server calls this when a viewer turns a part's panel on, so the
-    other three parts' readouts are never computed unless they are looked at.
+    The live server calls this when a viewer opens a part's panel, so the other
+    parts are never analysed unless they are looked at.
     """
-    if position == "none" or part not in state["windows"]:
-        return []
-    return jspace.read_workspace(llm, lens, state["windows"][part], layer,
-                                 position=position)
+    if part not in state["windows"]:
+        return {"positions": {}, "per_token": [], "stats": {}}
+    return jspace.read_turn(llm, lens, state["windows"][part], layer)
 
 
 async def run_trial(llm, lens, turns: list[str], layer: int, rng,
@@ -107,9 +106,8 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     def window(reply):
         return list(context) + [ChatMessage("assistant", reply)]
 
-    def all_positions(messages):
-        return {p: jspace.read_workspace(llm, lens, messages, layer, position=p)
-                for p in POSITIONS}
+    def analyze(messages):
+        return jspace.read_turn(llm, lens, messages, layer)
 
     # subject: unsteered counterfactual
     record["subject"] = await say(llm, context, opts)
@@ -149,7 +147,7 @@ async def run_on_context(llm, lens, context, layer: int, rng,
             state["windows"]["introspector"] = window(reply)
 
     for part in state["windows"]:
-        record["workspace"][part] = all_positions(state["windows"][part]) \
+        record["workspace"][part] = analyze(state["windows"][part]) \
             if part in eager_readouts else {}
 
     # full per-module instrumentation: the whole context each part read and the

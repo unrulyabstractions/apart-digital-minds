@@ -15,7 +15,7 @@ Routes:
     GET  /                          the chat page
     POST /chat                      {message} -> the actor's reply and the four-part detail
     POST /reset                     start a new conversation
-    GET  /readout?part=&position=   one part's readout for the latest turn
+    GET  /analyze?part=            one part's full J-space turn (positions, per token, stats)
 """
 
 from __future__ import annotations
@@ -89,12 +89,11 @@ class Live:
             self.conversation = [ChatMessage("system", wk.SYSTEM)]
             self.last = None
 
-    def readout(self, part: str, position: str) -> list:
+    def analyze(self, part: str) -> dict:
         with self.lock:
             if self.last is None:
-                return []
-            return wk.readout_for(self.llm, self.lens, self.last, part,
-                                  position, self.layer)
+                return {"positions": {}, "per_token": [], "stats": {}}
+            return wk.analyze_part(self.llm, self.lens, self.last, part, self.layer)
 
 
 def make_handler(live: Live):
@@ -120,12 +119,9 @@ def make_handler(live: Live):
             route = urlsplit(self.path)
             if route.path == "/":
                 self._send(200, (HERE / "jspace.html").read_bytes(), "text/html")
-            elif route.path == "/readout":
-                q = parse_qs(route.query)
-                part = q.get("part", [""])[0]
-                position = q.get("position", ["assistant"])[0]
-                self._json({"part": part, "position": position,
-                            "readout": live.readout(part, position)})
+            elif route.path == "/analyze":
+                part = parse_qs(route.query).get("part", [""])[0]
+                self._json({"part": part, "analysis": live.analyze(part)})
             else:
                 self._send(404, b"not found", "text/plain")
 

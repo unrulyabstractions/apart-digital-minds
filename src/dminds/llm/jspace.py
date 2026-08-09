@@ -184,6 +184,117 @@ def _residual_at(llm, messages, block: int, position: str = "last"):
     return caught[0][0]
 
 
+def _spans(ids: list[int], im_start: int, im_end: int) -> dict:
+    """Token spans per role, and the change-of-turn marker, in a ChatML sequence.
+
+    Returns {'user': (begin, end), 'assistant': (begin, end),
+    'change-of-turn': index}, using the last turn of each role. Spans cover the
+    content tokens only, so a mean over a span is a mean over what was said.
+    """
+    starts = [i for i, t in enumerate(ids) if t == im_start]
+    turns = list(zip(starts, starts[1:] + [len(ids)])) if starts else []
+    out = {}
+    for begin, end in turns:
+        role = _role_of(ids, begin)
+        if role not in ("user", "assistant"):
+            continue
+        content = begin + 2  # past the marker and the role token
+        ends = [i for i in range(begin, end) if ids[i] == im_end]
+        out[role] = (content, ends[-1] if ends else end)
+        if role == "assistant":
+            out["change-of-turn"] = begin
+    return out
+
+
+def read_turn(llm, lens: Lens, messages, layer: int, top_k: int = 12) -> dict:
+    """The whole turn's J-space in one forward pass: positions, per token, stats.
+
+    Reads the residual at every token once, then:
+      - positions: the readout mean-pooled over each role's tokens (and read at
+        the change-of-turn marker), which is the emotion-paper convention and
+        far less noisy than a single token,
+      - per_token: the top J-space token at each token of the assistant's reply,
+      - stats: how often each token tops the reply, and the mean top logit.
+    """
+    import torch
+    from collections import Counter
+
+    llm.load()
+    prompt = llm.tokenizer.apply_chat_template(
+        [{"role": m.role, "content": m.content} for m in messages],
+        tokenize=False, add_generation_prompt=False)
+    inputs = llm.tokenizer(prompt, return_tensors="pt").to(llm.device)
+    ids = inputs["input_ids"][0].tolist()
+
+    caught = []
+
+    def grab(_m, _i, output):
+        h = output[0] if isinstance(output, tuple) else output
+        caught.append(h[0].detach().float().cpu())   # every position, [seq, d]
+
+    handle = _blocks(llm.model_obj)[block_for(layer)].register_forward_hook(grab)
+    try:
+        with torch.no_grad():
+            llm.model_obj(**inputs)
+    finally:
+        handle.remove()
+    residual = caught[0]                              # [seq, d]
+
+    J = lens.jacobians[layer]
+    W_U, norm = _unembed_and_norm(llm)
+
+    def decode_top(vec):
+        with torch.no_grad():
+            t = J @ vec
+            if norm is not None:
+                t = norm(t.to(llm.device)).float().cpu()
+            logits = W_U @ t
+        top = torch.topk(logits, top_k)
+        return [(llm.tokenizer.decode([int(i)]).strip(), float(v))
+                for v, i in zip(top.values, top.indices)]
+
+    im_start = llm.tokenizer.convert_tokens_to_ids("<|im_start|>")
+    im_end = llm.tokenizer.convert_tokens_to_ids("<|im_end|>")
+    if not _ROLE_CACHE:
+        for r in ("user", "assistant", "system"):
+            _ROLE_CACHE[llm.tokenizer(r, add_special_tokens=False)["input_ids"][0]] = r
+    spans = _spans(ids, im_start, im_end)
+
+    positions = {}
+    for name in POSITIONS:
+        if name == "change-of-turn":
+            idx = spans.get("change-of-turn")
+            if idx is not None:
+                positions[name] = decode_top(residual[idx])
+        else:
+            span = spans.get(name)
+            if span and span[1] > span[0]:
+                positions[name] = decode_top(residual[span[0]:span[1]].mean(0))
+
+    # per-token, over the assistant's reply: the top J-space token at each token
+    per_token, stats = [], {}
+    span = spans.get("assistant")
+    if span and span[1] > span[0]:
+        block = residual[span[0]:span[1]]                # [n, d]
+        with torch.no_grad():
+            trans = block @ J.T                          # [n, d]
+            if norm is not None:
+                trans = norm(trans.to(llm.device)).float().cpu()
+            logits = trans @ W_U.T                        # [n, vocab]
+            top = logits.max(dim=-1)
+        for i, (val, tid) in enumerate(zip(top.values.tolist(), top.indices.tolist())):
+            per_token.append({
+                "token": llm.tokenizer.decode([ids[span[0] + i]]),
+                "jspace": llm.tokenizer.decode([tid]).strip(),
+                "logit": round(val, 2)})
+        counts = Counter(p["jspace"] for p in per_token)
+        stats = {"n_tokens": len(per_token),
+                 "top_tokens": counts.most_common(top_k),
+                 "mean_top_logit": round(float(top.values.mean()), 2)}
+
+    return {"positions": positions, "per_token": per_token, "stats": stats}
+
+
 def read_workspace(llm, lens: Lens, messages, layer: int, top_k: int = 12,
                    position: str = "last"):
     """What this window is poised to make the model say: the J-space readout.
