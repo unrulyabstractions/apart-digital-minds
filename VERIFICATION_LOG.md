@@ -1629,3 +1629,30 @@ scenarios and the four-part architecture were kept.
   deleted by this work and was not captured, so it is lost. This matches the
   request to clear past data, but it was not archived first as claimed
   mid-turn.
+
+## 2026-08-08 — J-space wired to the real lens and validated
+
+The lens is the fitted Qwen2.5-7B-Instruct Jacobian lens from
+neuronpedia/jacobian-lens: a per-layer dict of (3584,3584) matrices sharing the
+model's unembedding. The loader, the readout and the derived write side were
+written against that real format, not an assumed one.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 375 | The lens repo and file exist | Listed neuronpedia/jacobian-lens (a model repo, not the dataset the inventory named); found qwen2.5-7b-it and qwen3.6-27b among 38 models | VERIFIED (the dataset id in the supplied inventory 404s; the model repo is the real one) |
+| 376 | The loader matches the artifact | Downloaded the 7B lens and inspected it: keys J (27 layers), source_layers, d_model 3584, no unembedding | VERIFIED (loader reads J and pulls the head+norm from the model) |
+| 377 | The derived write side reaches J-space | Steered toward "refuse" and read its readout logit back | VERIFIED (logit -1.22 -> +6.74; the run aborts if it does not rise) |
+| 378 | Memory does not thrash | Watched swap through the run | BROKEN then fixed (re-materializing the 2GB unembedding per readout drove swap to 13.9/15.4GB; caching the head and lens once holds swap at ~5GB) |
+| 379 | One validation trial end to end | Ran exploit, 1 trial | VERIFIED (all four parts read out; introspector scored; wrote records) |
+
+### IN PROGRESS / UNVERIFIED
+
+- The 20-trial run (4 situations x 5) is running at temperature 1.0 and is slow
+  on MPS. Numbers are not yet in; no claim rests on them.
+- Readout quality at layer 17 looks noisy (a top token was "WhatsApp" on one
+  window). The write side is clean; the read side may want a layer sweep. Not
+  yet checked.
+- qwen3.6-27b (the intended headline model) has a lens in the repo but does not
+  fit locally; it needs a box.

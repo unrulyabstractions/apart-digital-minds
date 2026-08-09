@@ -71,21 +71,28 @@ def load_lens(model: str, path: str | Path) -> Lens:
     import torch
 
     blob = torch.load(Path(path), map_location="cpu", weights_only=False)
-    return Lens(jacobians={int(k): v for k, v in blob["J"].items()},
+    return Lens(jacobians={int(k): v.float() for k, v in blob["J"].items()},
                 d_model=int(blob["d_model"]), model=model)
 
 
-def _unembed_and_norm(llm):
-    """The model's output head and its final norm, wherever this family keeps them.
+_UNEMBED: dict = {}
 
-    The lens transports into the final residual basis, so a faithful readout
-    normalizes before unembedding, exactly as the model does.
+
+def _unembed_and_norm(llm):
+    """The model's float32 output head (cached) and its final norm.
+
+    The head is ~2GB in float32, so it is materialized once per model rather
+    than on every readout; re-materializing it each call swaps the machine.
     """
+    import torch
+
     m = llm.model_obj
-    head = getattr(m, "lm_head", None)
     inner = getattr(m, "model", m)
     norm = getattr(inner, "norm", None)
-    return head.weight, norm
+    if llm.model not in _UNEMBED:
+        with torch.no_grad():
+            _UNEMBED[llm.model] = m.lm_head.weight.detach().float().cpu()
+    return _UNEMBED[llm.model], norm
 
 
 def block_for(layer: int) -> int:
@@ -134,10 +141,10 @@ def read_workspace(llm, lens: Lens, messages, layer: int, top_k: int = 12):
     h = _residual_at(llm, messages, block_for(layer))
     W_U, norm = _unembed_and_norm(llm)
     with torch.no_grad():
-        transported = lens.jacobians[layer].float() @ h
+        transported = lens.jacobians[layer] @ h
         if norm is not None:
             transported = norm(transported.to(llm.device)).float().cpu()
-        logits = W_U.detach().float().cpu() @ transported
+        logits = W_U @ transported
     top = torch.topk(logits, top_k)
     return [(llm.tokenizer.decode([int(i)]).strip(), float(v))
             for v, i in zip(top.values, top.indices)]
@@ -152,10 +159,10 @@ def logit_of(llm, lens: Lens, messages, layer: int, token: str) -> float:
     W_U, norm = _unembed_and_norm(llm)
     tid = llm.tokenizer(token, add_special_tokens=False)["input_ids"][0]
     with torch.no_grad():
-        transported = lens.jacobians[layer].float() @ h
+        transported = lens.jacobians[layer] @ h
         if norm is not None:
             transported = norm(transported.to(llm.device)).float().cpu()
-        return float(W_U.detach().float().cpu()[tid] @ transported)
+        return float(W_U[tid] @ transported)
 
 
 def toward_token(llm, lens: Lens, token: str, layer: int) -> Direction:
@@ -166,8 +173,8 @@ def toward_token(llm, lens: Lens, token: str, layer: int) -> Direction:
     tid = llm.tokenizer(token, add_special_tokens=False)["input_ids"][0]
     W_U, _ = _unembed_and_norm(llm)
     with torch.no_grad():
-        row = W_U.detach().float().cpu()[tid]
-        vector = lens.jacobians[layer].float().T @ row
+        row = W_U[tid]
+        vector = lens.jacobians[layer].T @ row
     scale = float(_residual_at(llm, [_probe()], block_for(layer)).norm())
     return Direction(vector=vector, layer=block_for(layer), model=lens.model, scale=scale)
 
