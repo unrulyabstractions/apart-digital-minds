@@ -176,8 +176,11 @@ function partPanel(part, note, r, turn) {
     const over = r.regulator?.over_targets || {};
     const ranked = Object.entries(over).sort((x,y)=>y[1]-x[1]);
     const max = ranked.length ? ranked[0][1] : 1;
-    extra = `<div class="sub">chose <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>
-      · control <b>${esc(r.mismatched)}</b> · scored over ${ranked.length} targets</div>
+    extra = `<div class="sub">steered the actor toward
+      <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>, picked by scoring
+      ${ranked.length} candidate qualities (below). The control arm uses
+      <b>${esc(r.mismatched)}</b> — a quality it did <i>not</i> pick — to test whether
+      the introspector names the vector actually applied or just reacts to being steered.</div>
       <div class="dist">${ranked.map(([t,p]) => bar(t,p,p/max,t===r.regulator?.chose)).join("")}</div>`;
   } else if (part === "introspector") {
     const a = r.introspector || {};
