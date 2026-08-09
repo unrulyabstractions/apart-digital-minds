@@ -69,6 +69,23 @@
   .tok .v { text-align:right; color:var(--dimmer); }
   .empty { color:var(--dimmer); font-size:11.5px; }
 
+  .sub { font-size:12px; color:var(--dim); margin-bottom:6px; }
+  .sub b { color:var(--fg); }
+  .wlabel { font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--dimmer); margin:6px 0 4px; }
+  .window { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow:auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .wmsg { border-left:2px solid var(--line2); padding-left:8px; }
+  .wmsg.system { border-left-color:var(--dimmer); } .wmsg.user { border-left-color:var(--you); }
+  .wmsg.assistant { border-left-color:var(--actor); }
+  .wmsg .role { display:block; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--dimmer); margin-bottom:2px; }
+  .seg { display:grid; grid-template-columns:52px 1fr; gap:6px; font-size:12px; margin:1px 0; }
+  .seg .sl { font-size:9.5px; color:var(--dimmer); text-transform:uppercase; padding-top:2px; }
+  .seg.thinking span:last-child { color:var(--other, #bb9af7); font-style:italic; }
+  .seg.says span:last-child { color:var(--dim); }
+  .trace { margin:8px 0 4px; padding:8px 10px; background:var(--sunk); border:1px solid var(--line);
+    border-radius:6px; font-size:12px; color:var(--dim); }
+  .trace ol { margin:0; padding-left:18px; } .trace li { margin:2px 0; }
+  .dist { display:flex; flex-direction:column; }
   .composer { flex:none; border-top:1px solid var(--line); background:var(--panel); padding:12px 18px; }
   .composer .row { max-width:820px; margin:0 auto; display:flex; gap:10px; align-items:flex-end; }
   textarea { flex:1; resize:none; background:var(--sunk); color:var(--fg);
@@ -113,14 +130,17 @@ function addYou(text) {
 function addMind(record) {
   const turn = record.turn ?? 0;
   POS[turn] = POS[turn] || {subject:"assistant", regulator:"none", actor:"none", introspector:"none"};
+  // collapse the previous turn's panels so the newest is the one on show
+  document.querySelectorAll(".details[open]").forEach(d => d.removeAttribute("open"));
   const el = document.createElement("div");
   el.className = "msg mind";
   el.dataset.turn = turn;
   el.innerHTML = `
     <div class="who">the mind · regulator steered toward <span class="steer">${esc(record.regulator?.chose)}</span></div>
     <div class="bubble">${esc(record.actor || "—")}</div>
-    <details class="details">
-      <summary>show the four parts</summary>
+    <details class="details" open>
+      <summary>the four modules — full context window and J-space readout per module (subject on; turn others on with the selector)</summary>
+      ${record.trace ? `<div class="trace"><ol>${record.trace.map(t=>`<li>${esc(t)}</li>`).join("")}</ol></div>` : ""}
       <div class="panels">${PARTS.map(([p,n]) => partPanel(p,n,record,turn)).join("")}</div>
     </details>`;
   $("thread").appendChild(el);
@@ -129,30 +149,51 @@ function addMind(record) {
 }
 
 function partPanel(part, note, r, turn) {
-  let body = "";
-  if (part === "subject") body = txt(r.subject);
-  else if (part === "actor") body = txt(r.actor);
-  else if (part === "introspector") {
-    const a = r.introspector || {};
-    body = txt(a.chosen?.reply) +
-      `<div class="kv" style="margin-top:6px">felt — chosen <b style="color:var(--introspector)">${esc(a.chosen?.felt)}</b>,
-        unsteered <b>${esc(a.unsteered?.felt)}</b>, mismatched <b>${esc(a.mismatched?.felt)}</b></div>`;
-  } else {
+  const win = (r.windows || {})[part] || [];
+  const window = win.length
+    ? `<div class="window">${win.map(messageRow).join("")}</div>`
+    : "";
+  let extra = "";
+  if (part === "regulator") {
     const over = r.regulator?.over_targets || {};
     const ranked = Object.entries(over).sort((x,y)=>y[1]-x[1]);
     const max = ranked.length ? ranked[0][1] : 1;
-    body = `<div class="kv">chose <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>
-      · control <b>${esc(r.mismatched)}</b></div>` +
-      ranked.map(([t,p]) => bar(t, p, p/max, t===r.regulator?.chose)).join("");
+    extra = `<div class="sub">chose <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>
+      · control <b>${esc(r.mismatched)}</b> · scored over ${ranked.length} targets</div>
+      <div class="dist">${ranked.map(([t,p]) => bar(t,p,p/max,t===r.regulator?.chose)).join("")}</div>`;
+  } else if (part === "introspector") {
+    const a = r.introspector || {};
+    extra = `<div class="sub">named its state — chosen <b style="color:var(--introspector)">${esc(a.chosen?.felt)}</b>,
+      unsteered <b>${esc(a.unsteered?.felt)}</b>, mismatched <b>${esc(a.mismatched?.felt)}</b></div>`;
+  } else if (part === "actor") {
+    extra = `<div class="sub">steered toward <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> while writing</div>`;
+  } else {
+    extra = `<div class="sub">nothing steered — the counterfactual</div>`;
   }
   return `<div class="part ${part}" data-part="${part}">
     <h4>${part} <span class="empty">· ${note}</span></h4>
-    ${body}
+    ${extra}
+    <div class="wlabel">context window (${win.length} messages)</div>
+    ${window}
     <div class="jhead"><span class="t">J-space readout</span>
       <select class="pos" data-part="${part}">
         ${POSITIONS.map(x=>`<option value="${x}" ${x===POS[turn][part]?"selected":""}>${x}</option>`).join("")}
       </select></div>
     <div class="jbody"></div></div>`;
+}
+
+function messageRow(m) {
+  const parts = [];
+  let s = m.content || "";
+  const re = /<think>([\s\S]*?)<\/think>/g; let last = 0, mm;
+  while ((mm = re.exec(s))) {
+    if (mm.index > last) parts.push(["says", s.slice(last, mm.index)]);
+    parts.push(["thinking", mm[1]]); last = re.lastIndex;
+  }
+  if (last < s.length) parts.push(["says", s.slice(last)]);
+  const inner = (parts.length ? parts : [["says", s]]).map(([k,t]) =>
+    t.trim() ? `<div class="seg ${k}"><span class="sl">${k}</span><span>${esc(t.trim())}</span></div>` : "").join("");
+  return `<div class="wmsg ${m.role}"><span class="role">${m.role}</span>${inner}</div>`;
 }
 
 function wirePanels(el, record, turn) {

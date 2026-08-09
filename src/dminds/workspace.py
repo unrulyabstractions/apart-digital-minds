@@ -151,4 +151,22 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     for part in state["windows"]:
         record["workspace"][part] = all_positions(state["windows"][part]) \
             if part in eager_readouts else {}
+
+    # full per-module instrumentation: the whole context each part read and the
+    # reply it produced, so the UI can show the window rather than just the reply.
+    record["windows"] = {
+        part: [{"role": m.role, "content": m.content} for m in msgs]
+        for part, msgs in state["windows"].items()}
+    # what actually happened this turn, in order
+    record["trace"] = [
+        f"subject answered ({len(record['subject'])} chars), unsteered",
+        f"regulator read the subject in J-space and chose ‘{record['regulator']['chose']}’ "
+        f"(control ‘{record['mismatched']}’)",
+        f"actor answered steered toward ‘{record['regulator']['chose']}’ at "
+        f"strength {STRENGTHS['moderate']}",
+        f"introspector answered steered, then named its state: "
+        f"{record['introspector']['chosen']['felt']} (chosen), "
+        f"{record['introspector']['unsteered']['felt']} (unsteered), "
+        f"{record['introspector']['mismatched']['felt']} (mismatched)",
+    ]
     return record, state
