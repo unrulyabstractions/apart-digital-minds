@@ -87,10 +87,18 @@
   .trace ol { margin:0; padding-left:18px; } .trace li { margin:2px 0; }
   .dist { display:flex; flex-direction:column; }
   .jbody { margin-bottom:6px; }
-  .fulllabel, .statline { font-size:10px; color:var(--dimmer); margin:5px 0 3px; }
-  .chips { display:flex; flex-wrap:wrap; gap:3px; max-height:110px; overflow:auto; }
-  .chip { font-family:ui-monospace,Menlo,monospace; font-size:10.5px; padding:1px 5px;
-    background:var(--panel); border:1px solid var(--line2); border-radius:4px; color:var(--regulator); }
+  .posgroup { margin-bottom:6px; }
+  .poslabel { font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--regulator); margin:4px 0 2px; }
+  .fulllabel, .statline { font-size:10px; color:var(--dimmer); margin:7px 0 4px; }
+  .rtext { font-size:13px; line-height:1.9; background:var(--panel); border:1px solid var(--line);
+    border-radius:6px; padding:8px 10px; max-height:150px; overflow:auto; }
+  .rtok { border-radius:3px; padding:1px 0; cursor:pointer; white-space:pre-wrap;
+    border-bottom:1px solid transparent; }
+  .rtok:hover { background:#1c2634; }
+  .rtok.on { background:#2c3a1e; border-bottom-color:var(--actor); color:#eafbee; }
+  .scrub { margin-top:6px; background:var(--sunk); border:1px solid var(--line2); border-radius:6px; padding:8px 10px; min-height:36px; }
+  .scrubhead { font-size:11px; color:var(--dim); margin-bottom:5px; }
+  .scrubhead b { color:var(--regulator); font-family:ui-monospace,Menlo,monospace; }
   .statline .stat { margin-right:8px; color:var(--dim); }
   .statline .stat b { color:var(--fg); font-family:ui-monospace,Menlo,monospace; }
   .composer { flex:none; border-top:1px solid var(--line); background:var(--panel); padding:12px 18px; }
@@ -120,7 +128,7 @@
 <script>
 const PARTS = [["subject","unsteered"],["regulator","chooses the steering"],
                ["actor","steered — this reply"],["introspector","steered, then asked"]];
-const POSITIONS = ["assistant","user","change-of-turn","none"];
+const POSITIONS = ["assistant","user","change-of-turn","all","none"];
 const $ = id => document.getElementById(id);
 let BUSY = false;
 // per-turn position memory (subject on, others off), keyed by turn index
@@ -232,20 +240,50 @@ async function fill(el, record, turn, part) {
     a = d.analysis; record.workspace[part] = a;
     if (POS[turn][part] !== pos) return;   // selector moved while we waited
   }
-  body.innerHTML = rows((a.positions || {})[pos]);
-  full.innerHTML = fullView(a);
+  const positions = a.positions || {};
+  if (pos === "all") {
+    body.innerHTML = POSITIONS.filter(p => p!=="all" && p!=="none" && positions[p]).map(p =>
+      `<div class="posgroup"><div class="poslabel">${p}</div>${rows(positions[p])}</div>`).join("")
+      || '<div class="empty">no positions</div>';
+  } else {
+    body.innerHTML = rows(positions[pos]);
+  }
+  full.innerHTML = fullView(a, part);
+  wireScrub(el, part, a);
 }
 
-function fullView(a) {
+function fullView(a, part) {
   const pt = a.per_token || [], st = a.stats || {};
   if (!pt.length) return "";
-  const chips = pt.map(x =>
-    `<span class="chip" title="${esc(x.token)} → ${esc(x.jspace)} (${x.logit})">${esc(x.jspace)||"␣"}</span>`).join("");
+  // the reply, token by token: hover or tap a token to read its top J-space
+  // tokens in the strip below.
+  const toks = pt.map((x,i) =>
+    `<span class="rtok" data-i="${i}" title="${esc(x.jspace)} (${x.logit})">${esc(x.token)||"␣"}</span>`).join("");
   const top = (st.top_tokens||[]).slice(0,6).map(([t,c]) =>
     `<span class="stat"><b>${esc(t)||"␣"}</b> ${c}</span>`).join("");
-  return `<div class="fulllabel">full view — top J-space token at each of the ${st.n_tokens||pt.length} reply tokens</div>
-    <div class="chips">${chips}</div>
-    <div class="statline">most frequent: ${top} · mean top logit ${st.mean_top_logit ?? "—"}</div>`;
+  return `<div class="fulllabel">reply, token by token — hover a token to see its top J-space tokens (${st.n_tokens||pt.length} tokens)</div>
+    <div class="rtext" data-part="${part}">${toks}</div>
+    <div class="scrub" data-part="${part}"><div class="empty">hover a token above</div></div>
+    <div class="statline">most frequent J-space token: ${top} · mean top logit ${st.mean_top_logit ?? "—"}</div>`;
+}
+
+function wireScrub(el, part, a) {
+  const pt = a.per_token || [];
+  const text = el.querySelector(`.rtext[data-part="${part}"]`);
+  const scrub = el.querySelector(`.scrub[data-part="${part}"]`);
+  if (!text || !scrub) return;
+  const show = i => {
+    const x = pt[i]; if (!x) return;
+    text.querySelectorAll(".rtok").forEach(t => t.classList.toggle("on", +t.dataset.i === i));
+    const tops = x.tops || [];
+    const vals = tops.map(t=>t[1]), lo=Math.min(...vals), hi=Math.max(...vals), s=(hi-lo)||1;
+    scrub.innerHTML = `<div class="scrubhead">token <b>${esc(x.token)||"␣"}</b> is poised on:</div>` +
+      tops.map(([t,v]) => bar(t, v, (v-lo)/s, false, fmt(v))).join("");
+  };
+  text.querySelectorAll(".rtok").forEach(t => {
+    t.onmouseenter = () => show(+t.dataset.i);
+    t.onclick = () => show(+t.dataset.i);
+  });
 }
 
 function rows(pairs) {

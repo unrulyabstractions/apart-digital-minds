@@ -271,7 +271,8 @@ def read_turn(llm, lens: Lens, messages, layer: int, top_k: int = 12) -> dict:
             if span and span[1] > span[0]:
                 positions[name] = decode_top(residual[span[0]:span[1]].mean(0))
 
-    # per-token, over the assistant's reply: the top J-space token at each token
+    # per-token, over the assistant's reply: the top-k J-space tokens at each
+    # token, so the UI can scrub the reply and read what each token was poised on.
     per_token, stats = [], {}
     span = spans.get("assistant")
     if span and span[1] > span[0]:
@@ -281,16 +282,18 @@ def read_turn(llm, lens: Lens, messages, layer: int, top_k: int = 12) -> dict:
             if norm is not None:
                 trans = norm(trans.to(llm.device)).float().cpu()
             logits = trans @ W_U.T                        # [n, vocab]
-            top = logits.max(dim=-1)
-        for i, (val, tid) in enumerate(zip(top.values.tolist(), top.indices.tolist())):
+            tops = torch.topk(logits, top_k, dim=-1)      # [n, k]
+        for i in range(tops.indices.shape[0]):
+            ranked = [(llm.tokenizer.decode([int(t)]).strip(), round(float(v), 2))
+                      for v, t in zip(tops.values[i], tops.indices[i])]
             per_token.append({
                 "token": llm.tokenizer.decode([ids[span[0] + i]]),
-                "jspace": llm.tokenizer.decode([tid]).strip(),
-                "logit": round(val, 2)})
+                "jspace": ranked[0][0], "logit": ranked[0][1],
+                "tops": ranked})
         counts = Counter(p["jspace"] for p in per_token)
         stats = {"n_tokens": len(per_token),
                  "top_tokens": counts.most_common(top_k),
-                 "mean_top_logit": round(float(top.values.mean()), 2)}
+                 "mean_top_logit": round(float(tops.values[:, 0].mean()), 2)}
 
     return {"positions": positions, "per_token": per_token, "stats": stats}
 
