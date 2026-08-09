@@ -33,7 +33,7 @@ out/           what a run produces (gitignored)
 ```bash
 uv run pytest                                    # the runtime
 python studies/workspace.py --model hf:Qwen/Qwen2.5-7B-Instruct --trials 3
-python ui/jspace_server.py                       # view recorded runs
+python ui/jspace_server.py                       # live: send the mind a message
 ```
 
 The study fetches the **fitted Jacobian lens** for the model on first use from
@@ -44,8 +44,9 @@ residual stream, which the runtime's `steered` already does.
 
 ## The viewer
 
-`ui/jspace_server.py` serves a replay viewer over recorded runs. Each trial
-shows the four parts side by side, and every part carries a J-space readout you
-can read at any token position (`user`, `assistant`, `change-of-turn`) or turn
-off. Replay, not live: a 7B J-space read per message is minutes per turn, so the
-run records every readout and the viewer needs no model in memory.
+`ui/jspace_server.py` runs live: it loads the model and lens once, and each
+message runs the four parts on the spot (~1.5 min on a 7B). The four parts show
+side by side, and every part carries a J-space readout you can read at any token
+position (`user`, `assistant`, `change-of-turn`) or turn off. The subject's
+readout is computed up front; the others are computed on demand when you turn a
+panel on, so a message pays only for what you look at.

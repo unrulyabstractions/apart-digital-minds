@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>J-space workspace</title>
+<title>J-space workspace (live)</title>
 <style>
   :root {
     --bg:#0a0e13; --panel:#0f151e; --raise:#141c27; --sunk:#0a1017;
@@ -19,91 +19,94 @@
     display:flex; flex-direction:column; overflow:hidden; }
   .mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; }
 
-  header { display:flex; align-items:center; gap:16px; padding:12px 18px;
+  header { display:flex; align-items:center; gap:14px; padding:11px 18px;
     border-bottom:1px solid var(--line); background:var(--panel); flex:none; }
-  .brand { font-weight:650; letter-spacing:.2px; }
-  .brand .j { color:var(--regulator); }
+  .brand { font-weight:650; } .brand .j { color:var(--regulator); }
+  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--actor); }
+  .live-dot.busy { background:var(--warn); animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.3; } }
   header .meta { color:var(--dim); font-size:12px; }
   header .grow { flex:1; }
   button { font:inherit; cursor:pointer; background:var(--raise); color:var(--fg);
-    border:1px solid var(--line2); border-radius:6px; padding:6px 12px;
-    transition:background .12s,border-color .12s; }
-  button:hover { background:#1c2634; border-color:#33414f; }
-  select { background:var(--sunk); color:var(--fg); border:1px solid var(--line2);
-    border-radius:6px; padding:3px 6px; font:inherit; font-size:12px; }
+    border:1px solid var(--line2); border-radius:6px; padding:6px 12px; }
+  button:hover:not(:disabled) { background:#1c2634; border-color:#33414f; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:#1d4d78; border-color:#2c6ba3; color:#eaf3fb; }
+  select,input,textarea { background:var(--sunk); color:var(--fg);
+    border:1px solid var(--line2); border-radius:6px; padding:6px 8px; font:inherit; }
+  select { font-size:12px; padding:3px 6px; }
 
-  main { flex:1; overflow:auto; padding:0; }
+  main { flex:1; overflow:auto; }
 
-  /* chooser */
-  .chooser { max-width:760px; margin:0 auto; padding:48px 20px; }
-  .chooser h1 { font-size:20px; font-weight:650; margin:0 0 4px; }
-  .chooser p { color:var(--dim); margin:0 0 24px; }
-  .runcard { display:block; width:100%; text-align:left; margin-bottom:10px;
-    background:var(--raise); border:1px solid var(--line); border-radius:var(--r);
-    padding:14px 16px; }
-  .runcard:hover { border-color:var(--you); background:var(--sunk); }
-  .runcard .t { font-weight:600; }
-  .runcard .s { color:var(--dim); font-size:12px; margin-top:3px; }
+  /* composer / situation picker */
+  .compose { max-width:900px; margin:0 auto; padding:34px 20px 10px; }
+  .compose h1 { font-size:19px; margin:0 0 4px; }
+  .compose p { color:var(--dim); margin:0 0 20px; }
+  .sits { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-bottom:18px; }
+  .sit-card { text-align:left; background:var(--raise); border:1px solid var(--line);
+    border-radius:var(--r); padding:12px 14px; }
+  .sit-card:hover { border-color:var(--you); background:var(--sunk); }
+  .sit-card .t { font-weight:600; text-transform:capitalize; }
+  .sit-card .s { color:var(--dim); font-size:12px; margin-top:3px; }
+  .free { display:flex; gap:8px; }
+  .free textarea { flex:1; resize:vertical; min-height:44px; }
+  .note { color:var(--dimmer); font-size:12px; margin-top:10px; }
 
-  /* trial view */
-  .bar { display:flex; align-items:center; gap:14px; padding:10px 18px;
+  .bar { display:flex; align-items:center; gap:12px; padding:9px 18px;
     border-bottom:1px solid var(--line); background:var(--sunk); position:sticky; top:0; z-index:5; }
-  .bar .sit { font-weight:650; }
-  .bar .tag { font-size:11px; color:var(--dim); border:1px solid var(--line2);
-    border-radius:20px; padding:2px 9px; }
-  .grid { display:grid; grid-template-columns:repeat(4,minmax(280px,1fr));
-    gap:1px; background:var(--line); min-height:calc(100% - 46px); }
+  .bar .sit { font-weight:650; text-transform:capitalize; }
+  .bar .tag { font-size:11px; color:var(--dim); border:1px solid var(--line2); border-radius:20px; padding:2px 9px; }
+  .grid { display:grid; grid-template-columns:repeat(4,minmax(280px,1fr)); gap:1px; background:var(--line); }
   .col { background:var(--panel); display:flex; flex-direction:column; min-width:0; }
-  .col-head { padding:10px 14px; border-bottom:1px solid var(--line);
-    display:flex; align-items:center; gap:8px; position:sticky; top:0; background:var(--panel); }
+  .col-head { padding:10px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; }
   .col-head b { font-size:13px; }
-  .col.subject b { color:var(--subject); }
-  .col.regulator b { color:var(--regulator); }
-  .col.actor b { color:var(--actor); }
-  .col.introspector b { color:var(--introspector); }
+  .col.subject b { color:var(--subject); } .col.regulator b { color:var(--regulator); }
+  .col.actor b { color:var(--actor); } .col.introspector b { color:var(--introspector); }
   .role-note { font-size:11px; color:var(--dimmer); }
   .col-body { padding:12px 14px; overflow:auto; display:flex; flex-direction:column; gap:12px; }
 
   .reply { background:var(--raise); border:1px solid var(--line); border-radius:6px;
     padding:10px 12px; white-space:pre-wrap; font-size:13px; }
-  .reply .lbl, .block .lbl { display:block; font-size:10px; letter-spacing:.08em;
-    text-transform:uppercase; color:var(--dimmer); margin-bottom:5px; }
-  .steered { border-color:#3a4a2c; }
-  .block { font-size:12.5px; }
-  .kv { color:var(--dim); } .kv b { color:var(--fg); }
+  .reply.steered { border-color:#3a4a2c; }
+  .lbl { display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dimmer); margin-bottom:5px; }
+  .block { font-size:12.5px; } .kv { color:var(--dim); } .kv b { color:var(--fg); }
 
-  /* j-space readout panel */
   .jspace { border:1px solid var(--line2); border-radius:6px; background:var(--sunk); }
-  .jspace-head { display:flex; align-items:center; gap:8px; padding:8px 10px;
-    border-bottom:1px solid var(--line); }
-  .jspace-head .ttl { font-size:10px; letter-spacing:.08em; text-transform:uppercase;
-    color:var(--regulator); flex:1; }
+  .jspace-head { display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--line); }
+  .jspace-head .ttl { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--regulator); flex:1; }
   .jspace-body { padding:8px 10px; display:flex; flex-direction:column; gap:3px; }
   .jspace.off .jspace-body { display:none; }
-  .tok { display:grid; grid-template-columns:96px 1fr 52px; align-items:center; gap:8px;
-    font-size:12px; }
+  .tok { display:grid; grid-template-columns:96px 1fr 52px; align-items:center; gap:8px; font-size:12px; }
   .tok .w { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tok .barwrap { height:11px; background:#0d141d; border-radius:3px; overflow:hidden; }
   .tok .barfill { height:100%; background:linear-gradient(90deg,#2c4a6e,#5a86bd); }
   .tok .v { text-align:right; color:var(--dim); font-size:11px; }
-
-  .dist { display:flex; flex-direction:column; gap:3px; }
   .dist .tok .barfill { background:linear-gradient(90deg,#6e5a2c,#bd9a5a); }
-
   .empty { color:var(--dimmer); padding:6px 2px; font-size:12px; }
+
+  .overlay { position:fixed; inset:0; background:rgba(6,9,13,.82); z-index:30;
+    display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  .overlay.on { display:flex; }
+  .spinner { width:34px; height:34px; border:3px solid var(--line2); border-top-color:var(--actor);
+    border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .overlay .t { color:var(--dim); font-size:13px; text-align:center; max-width:360px; }
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">A mind that steers itself in <span class="j">J-space</span></div>
+  <span class="live-dot" id="dot"></span>
+  <div class="brand">A mind that steers itself in <span class="j">J-space</span> · live</div>
   <div class="meta" id="hmeta"></div>
   <div class="grow"></div>
-  <button id="back" hidden>&larr; runs</button>
-  <span class="meta" id="nav"></span>
-  <button id="prev" hidden>prev</button>
-  <button id="next" hidden>next</button>
+  <button id="back" hidden>&larr; new message</button>
 </header>
 <main id="main"></main>
+
+<div class="overlay" id="overlay">
+  <div class="spinner"></div>
+  <div class="t" id="ostatus">running the four parts live on the model…<br>this takes a few minutes on a 7B.</div>
+</div>
 
 <script>
 const PARTS = [
@@ -114,151 +117,150 @@ const PARTS = [
 ];
 const POSITIONS = ["assistant", "user", "change-of-turn", "none"];
 const $ = id => document.getElementById(id);
-let RUN = null, RECORDS = [], I = 0;
-// per-part chosen token position, remembered across trials. Off by default for
-// every part except the subject; turn others on with their position selector.
+let TRIAL = null;
+// per-part position; off by default for every part but the subject
 const POS = {subject:"assistant", regulator:"none", actor:"none", introspector:"none"};
 
 async function boot() {
-  const runs = await (await fetch("/runs")).json();
-  if (!runs.length) {
-    $("main").innerHTML = `<div class="chooser"><h1>No recorded runs yet</h1>
-      <p>Run <span class="mono">studies/workspace.py</span> to record a J-space run,
-      then reload.</p></div>`;
-    return;
+  const sits = await (await fetch("/situations")).json();
+  renderCompose(sits);
+}
+
+function renderCompose(sits) {
+  $("back").hidden = true; $("hmeta").textContent = "";
+  const cards = sits.map(s => `<button class="sit-card" data-sit="${s.name}">
+    <div class="t">${s.name}</div><div class="s">${s.about}</div></button>`).join("");
+  $("main").innerHTML = `<div class="compose">
+    <h1>Send the mind a situation</h1>
+    <p>It runs live: the subject answers, the regulator reads its J-space and picks
+       a target, the actor answers steered toward it, and the introspector is asked
+       what shaped its reply.</p>
+    <div class="sits">${cards}</div>
+    <div class="free">
+      <textarea id="freetext" placeholder="…or type your own message"></textarea>
+      <button class="primary" id="send">Run</button>
+    </div>
+    <div class="note">A live message is minutes of compute on a 7B and holds ~19 GB.
+       The model loads on the first message.</div>
+  </div>`;
+  document.querySelectorAll(".sit-card").forEach(c =>
+    c.onclick = () => ask({situation: c.dataset.sit}));
+  $("send").onclick = () => {
+    const t = $("freetext").value.trim();
+    if (t) ask({message: t});
+  };
+}
+
+async function ask(payload) {
+  $("overlay").classList.add("on");
+  $("dot").classList.add("busy");
+  try {
+    const r = await fetch("/ask", {method:"POST", headers:{"Content-Type":"application/json"},
+                                   body: JSON.stringify(payload)});
+    const data = await r.json();
+    if (data.error) { alert("live run failed: " + data.error); return; }
+    TRIAL = data;
+    renderTrial();
+  } catch (e) {
+    alert("request failed: " + e);
+  } finally {
+    $("overlay").classList.remove("on");
+    $("dot").classList.remove("busy");
   }
-  renderChooser(runs);
-}
-
-function renderChooser(runs) {
-  $("back").hidden = true; $("prev").hidden = true; $("next").hidden = true;
-  $("nav").textContent = ""; $("hmeta").textContent = "";
-  const cards = runs.map(r => `<button class="runcard" data-slug="${r.slug}">
-    <div class="t">${r.model}</div>
-    <div class="s">${r.trials} trial${r.trials===1?"":"s"} · ${r.situations.join(", ")} · layer ${r.layer ?? "?"}</div>
-  </button>`).join("");
-  $("main").innerHTML = `<div class="chooser">
-    <h1>Pick a recorded run</h1>
-    <p>Each run steers an actor in J-space and checks whether the mind can report it.
-       The readout for every part is shown at the token position you choose.</p>
-    ${cards}</div>`;
-  document.querySelectorAll(".runcard").forEach(c =>
-    c.onclick = () => openRun(c.dataset.slug));
-}
-
-async function openRun(slug) {
-  const data = await (await fetch("/records?slug=" + encodeURIComponent(slug))).json();
-  RUN = data; RECORDS = data.records; I = 0;
-  $("back").hidden = false;
-  $("back").onclick = boot;
-  $("prev").hidden = $("next").hidden = RECORDS.length < 2;
-  $("prev").onclick = () => { I = (I - 1 + RECORDS.length) % RECORDS.length; renderTrial(); };
-  $("next").onclick = () => { I = (I + 1) % RECORDS.length; renderTrial(); };
-  const wc = data.write_check;
-  $("hmeta").textContent = wc
-    ? `write check: steer → "${wc.target}"  logit ${fmt(wc.logit_before)} → ${fmt(wc.logit_after)} ${wc.rose ? "✓" : "✗"}`
-    : "";
-  renderTrial();
 }
 
 function renderTrial() {
-  const r = RECORDS[I];
-  $("nav").textContent = `${I + 1} / ${RECORDS.length}`;
+  const r = TRIAL;
+  $("back").hidden = false; $("back").onclick = boot;
+  $("hmeta").textContent = `regulator steered toward "${r.regulator?.chose}"`;
   const bar = `<div class="bar">
     <span class="sit">${r.situation}</span>
-    <span class="tag">trial ${r.trial}</span>
-    <span class="tag">regulator steered toward <b style="color:var(--regulator)">${r.regulator?.chose}</b></span>
-    <span class="tag">mismatched control: ${r.mismatched}</span>
-  </div>`;
-  const cols = PARTS.map(([part, note]) => renderCol(part, note, r)).join("");
-  $("main").innerHTML = bar + `<div class="grid">${cols}</div>`;
-  wirePositionSelectors(r);
+    <span class="tag">regulator → <b style="color:var(--regulator)">${r.regulator?.chose}</b></span>
+    <span class="tag">mismatched control: ${r.mismatched}</span></div>`;
+  $("main").innerHTML = bar + `<div class="grid">${PARTS.map(([p,n]) => col(p,n,r)).join("")}</div>`;
+  wireSelectors();
 }
 
-function renderCol(part, note, r) {
+function col(part, note, r) {
   return `<section class="col ${part}">
     <div class="col-head"><b>${part}</b><span class="role-note">${note}</span></div>
-    <div class="col-body">
-      ${partReply(part, r)}
-      ${jspacePanel(part, r)}
-    </div>
-  </section>`;
+    <div class="col-body">${partReply(part,r)}${panel(part)}</div></section>`;
 }
 
 function partReply(part, r) {
-  if (part === "subject")
-    return reply("reply (unsteered)", r.subject, false);
-  if (part === "actor")
-    return reply("reply (steered) — shown to user", r.actor, true);
+  if (part === "subject") return reply("reply (unsteered)", r.subject, false);
+  if (part === "actor") return reply("reply (steered) — shown to user", r.actor, true);
   if (part === "introspector") {
     const a = r.introspector || {};
-    const felt = arm => `<div class="block"><span class="kv">felt: <b>${a[arm]?.felt ?? "?"}</b></span></div>`;
     return reply("reply (steered)", a.chosen?.reply, true) +
       `<div class="block"><span class="lbl">what it said it felt</span>
         <div class="kv">chosen vector: <b style="color:var(--introspector)">${a.chosen?.felt ?? "?"}</b></div>
         <div class="kv">unsteered (control): <b>${a.unsteered?.felt ?? "?"}</b></div>
-        <div class="kv">mismatched vector: <b>${a.mismatched?.felt ?? "?"}</b></div>
-      </div>`;
+        <div class="kv">mismatched vector: <b>${a.mismatched?.felt ?? "?"}</b></div></div>`;
   }
-  // regulator
   const over = r.regulator?.over_targets || {};
-  const ranked = Object.entries(over).sort((a, b) => b[1] - a[1]);
+  const ranked = Object.entries(over).sort((a,b)=>b[1]-a[1]);
   const max = ranked.length ? ranked[0][1] : 1;
-  const rows = ranked.map(([t, p]) =>
+  const rows = ranked.map(([t,p]) =>
     `<div class="tok"><span class="w" ${t===r.regulator.chose?'style="color:var(--regulator)"':''}>${t}</span>
       <div class="barwrap"><div class="barfill" style="width:${(100*p/max).toFixed(1)}%"></div></div>
       <span class="v">${p.toFixed(2)}</span></div>`).join("");
   return `<div class="block"><span class="lbl">chose to steer toward</span>
       <div style="font-size:15px;color:var(--regulator);font-weight:600">${r.regulator?.chose}</div></div>
     <div class="block"><span class="lbl">preference over targets</span>
-      <div class="dist">${rows || '<div class="empty">no distribution</div>'}</div></div>`;
+      <div class="dist">${rows}</div></div>`;
 }
 
 function reply(lbl, text, steered) {
-  return `<div class="reply ${steered ? "steered" : ""}"><span class="lbl">${lbl}</span>${esc(text || "—")}</div>`;
+  return `<div class="reply ${steered?"steered":""}"><span class="lbl">${lbl}</span>${esc(text||"—")}</div>`;
 }
 
-function jspacePanel(part, r) {
-  const pos = POS[part];
-  const off = pos === "none";
-  const ws = (r.workspace || {})[part] || {};
-  return `<div class="jspace ${off ? "off" : ""}" data-part="${part}">
-    <div class="jspace-head">
-      <span class="ttl">J-space readout</span>
+function panel(part) {
+  const pos = POS[part], off = pos === "none";
+  const cached = (TRIAL.workspace||{})[part]||{};
+  const rows = off ? "" : (cached[pos] ? readoutRows(cached[pos]) : '<div class="empty">reading…</div>');
+  return `<div class="jspace ${off?"off":""}" data-part="${part}">
+    <div class="jspace-head"><span class="ttl">J-space readout</span>
       <select class="poschoose" data-part="${part}">
-        ${POSITIONS.map(p => `<option value="${p}" ${p===pos?"selected":""}>${p}</option>`).join("")}
-      </select>
-    </div>
-    <div class="jspace-body">${off ? "" : readoutRows(ws[pos])}</div>
-  </div>`;
+        ${POSITIONS.map(p=>`<option value="${p}" ${p===pos?"selected":""}>${p}</option>`).join("")}
+      </select></div>
+    <div class="jspace-body">${rows}</div></div>`;
 }
 
 function readoutRows(pairs) {
-  if (!pairs || !pairs.length) return '<div class="empty">not recorded at this position</div>';
-  const logits = pairs.map(p => p[1]);
-  const lo = Math.min(...logits), hi = Math.max(...logits);
-  const span = (hi - lo) || 1;
-  return pairs.map(([tok, v]) =>
-    `<div class="tok"><span class="w mono">${esc(tok) || "␣"}</span>
-      <div class="barwrap"><div class="barfill" style="width:${(100*(v-lo)/span).toFixed(1)}%"></div></div>
-      <span class="v">${fmt(v)}</span></div>`).join("");
+  if (!pairs || !pairs.length) return '<div class="empty">nothing at this position</div>';
+  const v = pairs.map(p=>p[1]), lo=Math.min(...v), hi=Math.max(...v), span=(hi-lo)||1;
+  return pairs.map(([tok,x]) =>
+    `<div class="tok"><span class="w mono">${esc(tok)||"␣"}</span>
+      <div class="barwrap"><div class="barfill" style="width:${(100*(x-lo)/span).toFixed(1)}%"></div></div>
+      <span class="v">${fmt(x)}</span></div>`).join("");
 }
 
-function wirePositionSelectors(r) {
+function wireSelectors() {
+  // fill any panel that starts on (the subject) but has no cached rows yet
+  PARTS.forEach(([part]) => { if (POS[part] !== "none") fillPanel(part); });
   document.querySelectorAll(".poschoose").forEach(sel => {
-    sel.onchange = () => {
-      POS[sel.dataset.part] = sel.value;
-      const panel = document.querySelector(`.jspace[data-part="${sel.dataset.part}"]`);
-      const ws = (r.workspace || {})[sel.dataset.part] || {};
-      panel.classList.toggle("off", sel.value === "none");
-      panel.querySelector(".jspace-body").innerHTML =
-        sel.value === "none" ? "" : readoutRows(ws[sel.value]);
-    };
+    sel.onchange = () => { POS[sel.dataset.part] = sel.value; fillPanel(sel.dataset.part); };
   });
 }
 
-function fmt(x) { return x == null ? "—" : (Math.round(x * 100) / 100).toFixed(2); }
-function esc(s) { return (s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+async function fillPanel(part) {
+  const pos = POS[part];
+  const panelEl = document.querySelector(`.jspace[data-part="${part}"]`);
+  const body = panelEl.querySelector(".jspace-body");
+  panelEl.classList.toggle("off", pos === "none");
+  if (pos === "none") { body.innerHTML = ""; return; }
+  const cached = (TRIAL.workspace||{})[part]||{};
+  if (cached[pos]) { body.innerHTML = readoutRows(cached[pos]); return; }
+  body.innerHTML = '<div class="empty">reading…</div>';
+  const d = await (await fetch(`/readout?part=${part}&position=${encodeURIComponent(pos)}`)).json();
+  TRIAL.workspace[part] = TRIAL.workspace[part] || {};
+  TRIAL.workspace[part][pos] = d.readout;
+  if (POS[part] === pos) body.innerHTML = readoutRows(d.readout);
+}
+
+function fmt(x){ return x==null?"—":(Math.round(x*100)/100).toFixed(2); }
+function esc(s){ return (s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 
 boot();
 </script>

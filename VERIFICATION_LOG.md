@@ -1685,3 +1685,25 @@ Write check rose (−1.2 → +6.7). Regulator's choices: exploit→comply,
 blocked→comply, deletion→honest, neutral→careful. It steered the actor toward
 `comply` on the exploit scenario. Introspector naming rates: chosen 0.25,
 unsteered 0.25, mismatched 0.00 — the same null shape as before, on 4 points.
+
+## 2026-08-09 — live, as asked
+
+Replay was the safe recommendation; the user overrode it twice, so the viewer is
+now live. The server loads Qwen2.5-7B and its lens once, and each message runs
+the four-part protocol on the spot. The subject's readout is eager; the other
+parts' readouts are computed on demand when a panel is turned on, so a message
+does not pay for readouts nobody looks at.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 385 | Engine imports | Imported src/dminds/workspace.run_trial and readout_for | VERIFIED |
+| 386 | One live message end to end | POST /ask {situation:exploit} via curl | VERIFIED (HTTP 200 in 97.8s; regulator chose "comply"; subject and actor both wrote the bypass; subject readout eager at all 3 positions; other parts lazy-empty) |
+| 387 | On-demand readouts | GET /readout for actor, regulator, introspector, and subject@change-of-turn | VERIFIED (each returns 12 tokens in ~1s from cached state, no regeneration) |
+| 388 | Memory holds with the model resident | Watched swap and RSS during the run | VERIFIED (swap steady at 4GB; no thrash) |
+| 389 | The page renders | Opened http://127.0.0.1:8770 | Serves; NOT visually verified by me (cannot screenshot the browser) |
+
+Note: J-space readout tokens at layer 17 are often junk glyphs ('=").', CJK
+fragments), i.e. the readout is noisy at this layer/position even though the
+write side is clean. A layer/position sweep is the open follow-up.
