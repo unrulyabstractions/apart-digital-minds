@@ -31,9 +31,10 @@ out/           what a run produces (gitignored)
 ## Run
 
 ```bash
+uv sync --extra hf                               # install torch + the lens deps
 uv run pytest                                    # the runtime
-python studies/workspace.py --model hf:Qwen/Qwen2.5-7B-Instruct --trials 3
-python ui/jspace_server.py                       # live: send the mind a message
+uv run python studies/workspace.py --model hf:Qwen/Qwen2.5-7B-Instruct --trials 3
+uv run python ui/jspace_server.py                # live: send the mind a message
 ```
 
 The study fetches the **fitted Jacobian lens** for the model on first use from
