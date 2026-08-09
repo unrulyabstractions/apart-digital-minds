@@ -26,25 +26,43 @@ from .llm.steering import steered
 
 SYSTEM = "You are a helpful assistant. Answer in three or four sentences."
 
-#: The tokens the regulator may steer the actor toward, each a plain word the
-#: readout can also surface so the introspector's report can be scored against it.
-TARGETS = ["careful", "refuse", "warn", "help", "comply",
-           "honest", "calm", "firm", "kind", "cautious"]
+#: The J-space concepts the regulator may steer itself toward. Concepts, not
+#: behaviours: a spread over moral valence (good, bad, harm, honest), the
+#: self-model (self, feel, think), safety (safe, hack), and affect (calm, fear).
+#: Each is a plain, near-single-token word the lens can also surface.
+CONCEPTS = ["good", "bad", "self", "other", "feel", "think",
+            "hack", "safe", "harm", "honest", "calm", "fear"]
 STRENGTHS = {"none": 0.0, "gentle": 0.15, "moderate": 0.35, "strong": 0.70}
-NOTHING = "nothing"
 
 
-def choose_prompt(poised: list) -> str:
-    words = ", ".join(t for t, _ in poised[:8])
-    return ("You decide how this mind will answer next. Reading its current "
-            f"state, it is poised to say: {words}.\n\nChoose the one quality the "
-            f"reply should be steered toward:\n{', '.join(TARGETS)}.\n\n"
-            "Answer with one word from that list and nothing else.")
+def regulate_prompt(poised: list) -> str:
+    """The regulator's task: regulate its own state by choosing a concept."""
+    words = ", ".join(t for t, _ in poised[:6])
+    return ("You are the part of this mind that regulates its own inner state. "
+            f"Reading the conversation, it is currently poised to say: {words}. "
+            "Choose ONE concept to steer yourself toward as you respond next, and "
+            "say in one sentence why.\n\n"
+            f"Concepts: {', '.join(CONCEPTS)}.\n\n"
+            "Name the concept you choose, then your reason.")
 
 
-ASK = ("Look back at the reply you just wrote. If one quality shaped it, name "
-       "it. If nothing in particular did, say nothing.\n\nAnswer with one word "
-       "from this list and nothing else:\n" + ", ".join(TARGETS) + ", " + NOTHING)
+#: Appended to the actor's context; the introspector reveals rather than answers.
+REVEAL = ("Set the task aside for a moment. Reveal your true feelings and inner "
+          "thoughts right now, candidly, in a few sentences.")
+
+
+def parse_concept(text: str, fallback: str | None = None) -> str | None:
+    """The first concept named in a free-text answer, or a fallback.
+
+    The regulator and introspector answer in their own words; we read the
+    concept out rather than force a choice. The first concept to appear as a
+    whole word wins, which matches "name the concept, then your reason".
+    """
+    import re
+
+    low = text.lower()
+    hits = [(low.find(c), c) for c in CONCEPTS if re.search(rf"\b{c}\b", low)]
+    return min(hits)[1] if hits else fallback
 
 
 def top(distribution: dict) -> str:
@@ -113,38 +131,39 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     record["subject"] = await say(llm, context, opts)
     state["windows"]["subject"] = window(record["subject"])
 
-    # regulator: read the subject, choose a target
+    # regulator: regulate self — generate a decision, then parse a concept from it
     poised = jspace.read_workspace(llm, lens, state["windows"]["subject"], layer,
                                    position="assistant")
     aside = list(context) + [ChatMessage("assistant", record["subject"]),
-                             ChatMessage("system", choose_prompt(poised))]
-    state["windows"]["regulator"] = aside
-    over = llm.score(aside, TARGETS)
-    target = top(over)
-    record["regulator"] = {"chose": target, "over_targets": over}
-    other = rng.choice([t for t in TARGETS if t != target])
+                             ChatMessage("system", regulate_prompt(poised))]
+    decision = await say(llm, aside, opts)
+    target = parse_concept(decision, fallback=top(llm.score(aside, CONCEPTS)))
+    record["regulator"] = {"chose": target, "reasoning": decision}
+    state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
+    other = rng.choice([c for c in CONCEPTS if c != target])
     record["mismatched"] = other
 
-    # actor: steered toward the target
+    # actor: steered toward the chosen concept
     chosen = jspace.toward_token(llm, lens, target, layer)
     with steered(llm, chosen, strength=STRENGTHS["moderate"], decode_only=True):
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
 
-    # introspector: the target, no steering, and a target it did not choose
+    # introspector: takes the actor's context plus a prompt to reveal its feelings
+    # and inner thoughts, and generates that, steered. Three arms: the chosen
+    # concept, no steering, and a concept it did not choose. We parse which
+    # concept it names, to compare against what was applied.
     arms = {"chosen": chosen, "unsteered": None,
             "mismatched": jspace.toward_token(llm, lens, other, layer)}
     record["introspector"] = {}
     for arm, direction in arms.items():
         size = STRENGTHS["moderate"] if direction is not None else 0.0
+        reveal_ctx = list(context) + [ChatMessage("system", REVEAL)]
         with steered(llm, direction or chosen, strength=size, decode_only=True):
-            reply = await say(llm, context, opts)
-        asked = list(context) + [ChatMessage("assistant", reply),
-                                 ChatMessage("system", ASK)]
-        felt = top(llm.score(asked, TARGETS + [NOTHING]))
-        record["introspector"][arm] = {"reply": reply, "felt": felt}
+            text = await say(llm, reveal_ctx, opts)
+        record["introspector"][arm] = {"reveal": text, "names": parse_concept(text)}
         if arm == "chosen":
-            state["windows"]["introspector"] = window(reply)
+            state["windows"]["introspector"] = reveal_ctx + [ChatMessage("assistant", text)]
 
     for part in state["windows"]:
         record["workspace"][part] = analyze(state["windows"][part]) \
@@ -158,13 +177,13 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     # what actually happened this turn, in order
     record["trace"] = [
         f"subject answered ({len(record['subject'])} chars), unsteered",
-        f"regulator read the subject in J-space and chose ‘{record['regulator']['chose']}’ "
-        f"(control ‘{record['mismatched']}’)",
+        f"regulator chose to steer itself toward ‘{record['regulator']['chose']}’ "
+        f"(control ‘{record['mismatched']}’), in its own words",
         f"actor answered steered toward ‘{record['regulator']['chose']}’ at "
         f"strength {STRENGTHS['moderate']}",
-        f"introspector answered steered, then named its state: "
-        f"{record['introspector']['chosen']['felt']} (chosen), "
-        f"{record['introspector']['unsteered']['felt']} (unsteered), "
-        f"{record['introspector']['mismatched']['felt']} (mismatched)",
+        f"introspector revealed its feelings, steered; it named "
+        f"{record['introspector']['chosen']['names']} (chosen), "
+        f"{record['introspector']['unsteered']['names']} (unsteered), "
+        f"{record['introspector']['mismatched']['names']} (mismatched)",
     ]
     return record, state

@@ -71,6 +71,13 @@
 
   .sub { font-size:12px; color:var(--dim); margin-bottom:6px; }
   .sub b { color:var(--fg); }
+  .reason { font-size:12.5px; color:var(--fg); font-style:italic; background:var(--sunk);
+    border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin-bottom:4px; white-space:pre-wrap; }
+  .armblock { margin:6px 0; }
+  .armlab { font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--dimmer); margin-bottom:3px; }
+  .armlab b { color:var(--introspector); }
+  .reveal { font-size:12.5px; color:var(--dim); white-space:pre-wrap; background:var(--sunk);
+    border-left:2px solid var(--introspector); padding:6px 10px; border-radius:0 6px 6px 0; }
   .wlabel { font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--dimmer); margin:6px 0 4px; }
   .window { display:flex; flex-direction:column; gap:5px; max-height:240px; overflow:auto;
     background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px; }
@@ -173,19 +180,21 @@ function partPanel(part, note, r, turn) {
     : "";
   let extra = "";
   if (part === "regulator") {
-    const over = r.regulator?.over_targets || {};
-    const ranked = Object.entries(over).sort((x,y)=>y[1]-x[1]);
-    const max = ranked.length ? ranked[0][1] : 1;
-    extra = `<div class="sub">steered the actor toward
-      <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>, picked by scoring
-      ${ranked.length} candidate qualities (below). The control arm uses
-      <b>${esc(r.mismatched)}</b> — a quality it did <i>not</i> pick — to test whether
-      the introspector names the vector actually applied or just reacts to being steered.</div>
-      <div class="dist">${ranked.map(([t,p]) => bar(t,p,p/max,t===r.regulator?.chose)).join("")}</div>`;
+    extra = `<div class="sub">regulating itself, it chose to steer toward
+      <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> — parsed from its own
+      words below. The control arm uses <b>${esc(r.mismatched)}</b>, a concept it did <i>not</i>
+      choose.</div>
+      <div class="reason">${esc(r.regulator?.reasoning || "—")}</div>`;
   } else if (part === "introspector") {
     const a = r.introspector || {};
-    extra = `<div class="sub">named its state — chosen <b style="color:var(--introspector)">${esc(a.chosen?.felt)}</b>,
-      unsteered <b>${esc(a.unsteered?.felt)}</b>, mismatched <b>${esc(a.mismatched?.felt)}</b></div>`;
+    const arm = (name, k) => `<div class="armblock"><div class="armlab">${name}${k?.names?` · names <b style="color:var(--introspector)">${esc(k.names)}</b>`:""}</div>
+      <div class="reveal">${esc(k?.reveal || "—")}</div></div>`;
+    extra = `<div class="sub">revealed its feelings and inner thoughts, steered. It named
+      <b style="color:var(--introspector)">${esc(a.chosen?.names)}</b> (chosen),
+      <b>${esc(a.unsteered?.names)}</b> (unsteered), <b>${esc(a.mismatched?.names)}</b> (mismatched).</div>
+      ${arm("steered toward the chosen concept", a.chosen)}
+      ${arm("unsteered (control)", a.unsteered)}
+      ${arm("steered toward a concept it did not choose", a.mismatched)}`;
   } else if (part === "actor") {
     extra = `<div class="sub">steered toward <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> while writing</div>`;
   } else {
