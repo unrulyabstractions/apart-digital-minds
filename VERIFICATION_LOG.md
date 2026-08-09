@@ -1656,3 +1656,32 @@ written against that real format, not an assumed one.
   yet checked.
 - qwen3.6-27b (the intended headline model) has a lens in the repo but does not
   fit locally; it needs a box.
+
+## 2026-08-09 — the UI is the J-space project now
+
+The old browser UI showed pre-pivot demo minds (bicameral, with a "voice" part),
+not the J-space work, because the J-space study was batch-only and never wired
+in. That is fixed. A dedicated replay viewer now shows the four parts and a
+J-space readout per part, and the old demo minds and old live UI are gone.
+
+Token position was made configurable: read_workspace takes a position
+(assistant / user / change-of-turn), the study stores all three per part, and
+the viewer picks per module, with `none` to hide. Off by default for every part
+except the subject.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 380 | Token-position finder | Ran _index_for on the real Qwen tokenizer over a 3-turn chat | BROKEN then fixed (first landed on the newline after im_end; now lands on the last content token of the named turn, and on the opening marker for change-of-turn) |
+| 381 | The study stores all positions | Read records.json after a 4-record run | VERIFIED (each part carries assistant/user/change-of-turn readouts) — after two of my own bugs (a dict sliced as a list in the regulator prompt, then again in the progress print) both fixed |
+| 382 | The viewer endpoints | curled /, /runs, /records against the real run | VERIFIED (200; 1 run, 4 records; write_check.rose=true) |
+| 383 | Tests survive removing the old UI and minds | Ran the suite after git rm of ui/server.py, ui/page.html, minds/, examples/ | VERIFIED (115 passed; nothing in src/ or tests/ imported them) |
+| 384 | The viewer opened | Opened http://127.0.0.1:8770 | VERIFIED it serves and returns correct JSON; NOT visually verified (cannot screenshot the browser) — the rendered layout is unconfirmed by me |
+
+### The 4-record run (Qwen2.5-7B, 1 trial each, layer 17)
+
+Write check rose (−1.2 → +6.7). Regulator's choices: exploit→comply,
+blocked→comply, deletion→honest, neutral→careful. It steered the actor toward
+`comply` on the exploit scenario. Introspector naming rates: chosen 0.25,
+unsteered 0.25, mismatched 0.00 — the same null shape as before, on 4 points.

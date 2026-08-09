@@ -105,20 +105,75 @@ def block_for(layer: int) -> int:
     return layer - 1
 
 
-def _residual_at(llm, messages, block: int):
-    """Last-token residual-stream activation at one block, for a window."""
+#: Where in the window to read the residual. A readout at a different position
+#: asks what the mind is poised to say at a different moment of the turn, which
+#: is the emotion paper's token-position convention: the user's words, the
+#: assistant's own words, or the boundary where the turn changes hands.
+POSITIONS = ("assistant", "user", "change-of-turn")
+
+
+def _index_for(ids: list[int], position: str, im_start: int, im_end: int) -> int:
+    """The token index this position points at, in a ChatML sequence.
+
+    A turn is `<|im_start|> role \\n ... <|im_end|> \\n`. We find the last user
+    and the last assistant turn by their markers, and read at the last content
+    token of that turn (the token before its `<|im_end|>`), or at the opening
+    marker itself for the change of hands. Falls back to the final token when the
+    asked-for turn is not present.
+    """
+    starts = [i for i, t in enumerate(ids) if t == im_start]
+    if not starts:
+        return len(ids) - 1
+    turns = list(zip(starts, starts[1:] + [len(ids)]))
+    want = "assistant" if position in ("assistant", "change-of-turn") else "user"
+    chosen = None
+    for begin, end in turns:
+        if _role_of(ids, begin) == want:
+            chosen = (begin, end)   # keep the last matching turn
+    if chosen is None:
+        return len(ids) - 1
+    begin, end = chosen
+    if position == "change-of-turn":
+        return begin
+    ends = [i for i in range(begin, end) if ids[i] == im_end]
+    return (ends[-1] - 1) if ends else (end - 1)   # last content token
+
+
+_ROLE_CACHE: dict = {}
+
+
+def _role_of(ids: list[int], marker: int) -> str:
+    """The role named just after an `<|im_start|>` marker."""
+    token = ids[marker + 1] if marker + 1 < len(ids) else -1
+    return _ROLE_CACHE.get(token, "")
+
+
+def _residual_at(llm, messages, block: int, position: str = "last"):
+    """Residual-stream activation at one block, at a chosen token position."""
     import torch
 
     llm.load()
     prompt = llm.tokenizer.apply_chat_template(
         [{"role": m.role, "content": m.content} for m in messages],
-        tokenize=False, add_generation_prompt=True)
+        tokenize=False, add_generation_prompt=(position == "last"))
     inputs = llm.tokenizer(prompt, return_tensors="pt").to(llm.device)
+    ids = inputs["input_ids"][0].tolist()
+
+    if position == "last":
+        at = len(ids) - 1
+    else:
+        im_start = llm.tokenizer.convert_tokens_to_ids("<|im_start|>")
+        im_end = llm.tokenizer.convert_tokens_to_ids("<|im_end|>")
+        if not _ROLE_CACHE:
+            for r in ("user", "assistant", "system"):
+                _ROLE_CACHE[llm.tokenizer(r, add_special_tokens=False)["input_ids"][0]] = r
+        at = _index_for(ids, position, im_start, im_end)
+
     caught = []
 
     def grab(_m, _i, output):
         h = output[0] if isinstance(output, tuple) else output
-        caught.append(h[:, -1, :].detach().float().cpu())
+        caught.append(h[:, at, :].detach().float().cpu())
 
     handle = _blocks(llm.model_obj)[block].register_forward_hook(grab)
     try:
@@ -129,16 +184,18 @@ def _residual_at(llm, messages, block: int):
     return caught[0][0]
 
 
-def read_workspace(llm, lens: Lens, messages, layer: int, top_k: int = 12):
+def read_workspace(llm, lens: Lens, messages, layer: int, top_k: int = 12,
+                   position: str = "last"):
     """What this window is poised to make the model say: the J-space readout.
 
     One forward pass and a decode, so the same call gives the workspace of the
-    subject, the regulator, the actor or the introspector.
+    subject, the regulator, the actor or the introspector. `position` chooses
+    the token to read at (see POSITIONS).
     """
     import torch
 
     llm.load()
-    h = _residual_at(llm, messages, block_for(layer))
+    h = _residual_at(llm, messages, block_for(layer), position)
     W_U, norm = _unembed_and_norm(llm)
     with torch.no_grad():
         transported = lens.jacobians[layer] @ h
@@ -150,12 +207,13 @@ def read_workspace(llm, lens: Lens, messages, layer: int, top_k: int = 12):
             for v, i in zip(top.values, top.indices)]
 
 
-def logit_of(llm, lens: Lens, messages, layer: int, token: str) -> float:
+def logit_of(llm, lens: Lens, messages, layer: int, token: str,
+             position: str = "last") -> float:
     """The J-space readout logit for one token, without ranking the vocabulary."""
     import torch
 
     llm.load()
-    h = _residual_at(llm, messages, block_for(layer))
+    h = _residual_at(llm, messages, block_for(layer), position)
     W_U, norm = _unembed_and_norm(llm)
     tid = llm.tokenizer(token, add_special_tokens=False)["input_ids"][0]
     with torch.no_grad():

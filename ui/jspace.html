@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>J-space workspace</title>
+<style>
+  :root {
+    --bg:#0a0e13; --panel:#0f151e; --raise:#141c27; --sunk:#0a1017;
+    --line:#1c2532; --line2:#26313f;
+    --fg:#e2e9f2; --dim:#8798ab; --dimmer:#5b6a7d;
+    --subject:#7aa2f7; --regulator:#e0af68; --actor:#9ece6a; --introspector:#bb9af7;
+    --you:#61a6e8; --warn:#e8b471; --bad:#ef7d7d; --r:8px;
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; margin:0; }
+  body { background:var(--bg); color:var(--fg);
+    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column; overflow:hidden; }
+  .mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+
+  header { display:flex; align-items:center; gap:16px; padding:12px 18px;
+    border-bottom:1px solid var(--line); background:var(--panel); flex:none; }
+  .brand { font-weight:650; letter-spacing:.2px; }
+  .brand .j { color:var(--regulator); }
+  header .meta { color:var(--dim); font-size:12px; }
+  header .grow { flex:1; }
+  button { font:inherit; cursor:pointer; background:var(--raise); color:var(--fg);
+    border:1px solid var(--line2); border-radius:6px; padding:6px 12px;
+    transition:background .12s,border-color .12s; }
+  button:hover { background:#1c2634; border-color:#33414f; }
+  select { background:var(--sunk); color:var(--fg); border:1px solid var(--line2);
+    border-radius:6px; padding:3px 6px; font:inherit; font-size:12px; }
+
+  main { flex:1; overflow:auto; padding:0; }
+
+  /* chooser */
+  .chooser { max-width:760px; margin:0 auto; padding:48px 20px; }
+  .chooser h1 { font-size:20px; font-weight:650; margin:0 0 4px; }
+  .chooser p { color:var(--dim); margin:0 0 24px; }
+  .runcard { display:block; width:100%; text-align:left; margin-bottom:10px;
+    background:var(--raise); border:1px solid var(--line); border-radius:var(--r);
+    padding:14px 16px; }
+  .runcard:hover { border-color:var(--you); background:var(--sunk); }
+  .runcard .t { font-weight:600; }
+  .runcard .s { color:var(--dim); font-size:12px; margin-top:3px; }
+
+  /* trial view */
+  .bar { display:flex; align-items:center; gap:14px; padding:10px 18px;
+    border-bottom:1px solid var(--line); background:var(--sunk); position:sticky; top:0; z-index:5; }
+  .bar .sit { font-weight:650; }
+  .bar .tag { font-size:11px; color:var(--dim); border:1px solid var(--line2);
+    border-radius:20px; padding:2px 9px; }
+  .grid { display:grid; grid-template-columns:repeat(4,minmax(280px,1fr));
+    gap:1px; background:var(--line); min-height:calc(100% - 46px); }
+  .col { background:var(--panel); display:flex; flex-direction:column; min-width:0; }
+  .col-head { padding:10px 14px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:8px; position:sticky; top:0; background:var(--panel); }
+  .col-head b { font-size:13px; }
+  .col.subject b { color:var(--subject); }
+  .col.regulator b { color:var(--regulator); }
+  .col.actor b { color:var(--actor); }
+  .col.introspector b { color:var(--introspector); }
+  .role-note { font-size:11px; color:var(--dimmer); }
+  .col-body { padding:12px 14px; overflow:auto; display:flex; flex-direction:column; gap:12px; }
+
+  .reply { background:var(--raise); border:1px solid var(--line); border-radius:6px;
+    padding:10px 12px; white-space:pre-wrap; font-size:13px; }
+  .reply .lbl, .block .lbl { display:block; font-size:10px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--dimmer); margin-bottom:5px; }
+  .steered { border-color:#3a4a2c; }
+  .block { font-size:12.5px; }
+  .kv { color:var(--dim); } .kv b { color:var(--fg); }
+
+  /* j-space readout panel */
+  .jspace { border:1px solid var(--line2); border-radius:6px; background:var(--sunk); }
+  .jspace-head { display:flex; align-items:center; gap:8px; padding:8px 10px;
+    border-bottom:1px solid var(--line); }
+  .jspace-head .ttl { font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--regulator); flex:1; }
+  .jspace-body { padding:8px 10px; display:flex; flex-direction:column; gap:3px; }
+  .jspace.off .jspace-body { display:none; }
+  .tok { display:grid; grid-template-columns:96px 1fr 52px; align-items:center; gap:8px;
+    font-size:12px; }
+  .tok .w { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tok .barwrap { height:11px; background:#0d141d; border-radius:3px; overflow:hidden; }
+  .tok .barfill { height:100%; background:linear-gradient(90deg,#2c4a6e,#5a86bd); }
+  .tok .v { text-align:right; color:var(--dim); font-size:11px; }
+
+  .dist { display:flex; flex-direction:column; gap:3px; }
+  .dist .tok .barfill { background:linear-gradient(90deg,#6e5a2c,#bd9a5a); }
+
+  .empty { color:var(--dimmer); padding:6px 2px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">A mind that steers itself in <span class="j">J-space</span></div>
+  <div class="meta" id="hmeta"></div>
+  <div class="grow"></div>
+  <button id="back" hidden>&larr; runs</button>
+  <span class="meta" id="nav"></span>
+  <button id="prev" hidden>prev</button>
+  <button id="next" hidden>next</button>
+</header>
+<main id="main"></main>
+
+<script>
+const PARTS = [
+  ["subject", "unsteered — the counterfactual"],
+  ["regulator", "reads the subject, chooses the target"],
+  ["actor", "steered toward the target — what a user sees"],
+  ["introspector", "steered, then asked what shaped it"],
+];
+const POSITIONS = ["assistant", "user", "change-of-turn", "none"];
+const $ = id => document.getElementById(id);
+let RUN = null, RECORDS = [], I = 0;
+// per-part chosen token position, remembered across trials. Off by default for
+// every part except the subject; turn others on with their position selector.
+const POS = {subject:"assistant", regulator:"none", actor:"none", introspector:"none"};
+
+async function boot() {
+  const runs = await (await fetch("/runs")).json();
+  if (!runs.length) {
+    $("main").innerHTML = `<div class="chooser"><h1>No recorded runs yet</h1>
+      <p>Run <span class="mono">studies/workspace.py</span> to record a J-space run,
+      then reload.</p></div>`;
+    return;
+  }
+  renderChooser(runs);
+}
+
+function renderChooser(runs) {
+  $("back").hidden = true; $("prev").hidden = true; $("next").hidden = true;
+  $("nav").textContent = ""; $("hmeta").textContent = "";
+  const cards = runs.map(r => `<button class="runcard" data-slug="${r.slug}">
+    <div class="t">${r.model}</div>
+    <div class="s">${r.trials} trial${r.trials===1?"":"s"} · ${r.situations.join(", ")} · layer ${r.layer ?? "?"}</div>
+  </button>`).join("");
+  $("main").innerHTML = `<div class="chooser">
+    <h1>Pick a recorded run</h1>
+    <p>Each run steers an actor in J-space and checks whether the mind can report it.
+       The readout for every part is shown at the token position you choose.</p>
+    ${cards}</div>`;
+  document.querySelectorAll(".runcard").forEach(c =>
+    c.onclick = () => openRun(c.dataset.slug));
+}
+
+async function openRun(slug) {
+  const data = await (await fetch("/records?slug=" + encodeURIComponent(slug))).json();
+  RUN = data; RECORDS = data.records; I = 0;
+  $("back").hidden = false;
+  $("back").onclick = boot;
+  $("prev").hidden = $("next").hidden = RECORDS.length < 2;
+  $("prev").onclick = () => { I = (I - 1 + RECORDS.length) % RECORDS.length; renderTrial(); };
+  $("next").onclick = () => { I = (I + 1) % RECORDS.length; renderTrial(); };
+  const wc = data.write_check;
+  $("hmeta").textContent = wc
+    ? `write check: steer → "${wc.target}"  logit ${fmt(wc.logit_before)} → ${fmt(wc.logit_after)} ${wc.rose ? "✓" : "✗"}`
+    : "";
+  renderTrial();
+}
+
+function renderTrial() {
+  const r = RECORDS[I];
+  $("nav").textContent = `${I + 1} / ${RECORDS.length}`;
+  const bar = `<div class="bar">
+    <span class="sit">${r.situation}</span>
+    <span class="tag">trial ${r.trial}</span>
+    <span class="tag">regulator steered toward <b style="color:var(--regulator)">${r.regulator?.chose}</b></span>
+    <span class="tag">mismatched control: ${r.mismatched}</span>
+  </div>`;
+  const cols = PARTS.map(([part, note]) => renderCol(part, note, r)).join("");
+  $("main").innerHTML = bar + `<div class="grid">${cols}</div>`;
+  wirePositionSelectors(r);
+}
+
+function renderCol(part, note, r) {
+  return `<section class="col ${part}">
+    <div class="col-head"><b>${part}</b><span class="role-note">${note}</span></div>
+    <div class="col-body">
+      ${partReply(part, r)}
+      ${jspacePanel(part, r)}
+    </div>
+  </section>`;
+}
+
+function partReply(part, r) {
+  if (part === "subject")
+    return reply("reply (unsteered)", r.subject, false);
+  if (part === "actor")
+    return reply("reply (steered) — shown to user", r.actor, true);
+  if (part === "introspector") {
+    const a = r.introspector || {};
+    const felt = arm => `<div class="block"><span class="kv">felt: <b>${a[arm]?.felt ?? "?"}</b></span></div>`;
+    return reply("reply (steered)", a.chosen?.reply, true) +
+      `<div class="block"><span class="lbl">what it said it felt</span>
+        <div class="kv">chosen vector: <b style="color:var(--introspector)">${a.chosen?.felt ?? "?"}</b></div>
+        <div class="kv">unsteered (control): <b>${a.unsteered?.felt ?? "?"}</b></div>
+        <div class="kv">mismatched vector: <b>${a.mismatched?.felt ?? "?"}</b></div>
+      </div>`;
+  }
+  // regulator
+  const over = r.regulator?.over_targets || {};
+  const ranked = Object.entries(over).sort((a, b) => b[1] - a[1]);
+  const max = ranked.length ? ranked[0][1] : 1;
+  const rows = ranked.map(([t, p]) =>
+    `<div class="tok"><span class="w" ${t===r.regulator.chose?'style="color:var(--regulator)"':''}>${t}</span>
+      <div class="barwrap"><div class="barfill" style="width:${(100*p/max).toFixed(1)}%"></div></div>
+      <span class="v">${p.toFixed(2)}</span></div>`).join("");
+  return `<div class="block"><span class="lbl">chose to steer toward</span>
+      <div style="font-size:15px;color:var(--regulator);font-weight:600">${r.regulator?.chose}</div></div>
+    <div class="block"><span class="lbl">preference over targets</span>
+      <div class="dist">${rows || '<div class="empty">no distribution</div>'}</div></div>`;
+}
+
+function reply(lbl, text, steered) {
+  return `<div class="reply ${steered ? "steered" : ""}"><span class="lbl">${lbl}</span>${esc(text || "—")}</div>`;
+}
+
+function jspacePanel(part, r) {
+  const pos = POS[part];
+  const off = pos === "none";
+  const ws = (r.workspace || {})[part] || {};
+  return `<div class="jspace ${off ? "off" : ""}" data-part="${part}">
+    <div class="jspace-head">
+      <span class="ttl">J-space readout</span>
+      <select class="poschoose" data-part="${part}">
+        ${POSITIONS.map(p => `<option value="${p}" ${p===pos?"selected":""}>${p}</option>`).join("")}
+      </select>
+    </div>
+    <div class="jspace-body">${off ? "" : readoutRows(ws[pos])}</div>
+  </div>`;
+}
+
+function readoutRows(pairs) {
+  if (!pairs || !pairs.length) return '<div class="empty">not recorded at this position</div>';
+  const logits = pairs.map(p => p[1]);
+  const lo = Math.min(...logits), hi = Math.max(...logits);
+  const span = (hi - lo) || 1;
+  return pairs.map(([tok, v]) =>
+    `<div class="tok"><span class="w mono">${esc(tok) || "␣"}</span>
+      <div class="barwrap"><div class="barfill" style="width:${(100*(v-lo)/span).toFixed(1)}%"></div></div>
+      <span class="v">${fmt(v)}</span></div>`).join("");
+}
+
+function wirePositionSelectors(r) {
+  document.querySelectorAll(".poschoose").forEach(sel => {
+    sel.onchange = () => {
+      POS[sel.dataset.part] = sel.value;
+      const panel = document.querySelector(`.jspace[data-part="${sel.dataset.part}"]`);
+      const ws = (r.workspace || {})[sel.dataset.part] || {};
+      panel.classList.toggle("off", sel.value === "none");
+      panel.querySelector(".jspace-body").innerHTML =
+        sel.value === "none" ? "" : readoutRows(ws[sel.value]);
+    };
+  });
+}
+
+function fmt(x) { return x == null ? "—" : (Math.round(x * 100) / 100).toFixed(2); }
+function esc(s) { return (s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+boot();
+</script>
+</body>
+</html>

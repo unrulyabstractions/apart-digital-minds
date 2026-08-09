@@ -23,7 +23,7 @@ a target the regulator did not choose.
 src/api/       the contracts: what each part must do
 src/dminds/    the implementations: pipeline, scheduler, steering, the J-lens
 studies/       workspace.py (the study) and scenarios.py (the situations)
-minds/         reference architectures built on the runtime
+ui/            jspace_server.py + jspace.html: the replay viewer
 tests/         115 tests, no dependencies
 out/           what a run produces (gitignored)
 ```
@@ -33,13 +33,19 @@ out/           what a run produces (gitignored)
 ```bash
 uv run pytest                                    # the runtime
 python studies/workspace.py --model hf:Qwen/Qwen2.5-7B-Instruct --trials 3
+python ui/jspace_server.py                       # view recorded runs
 ```
 
-The study needs a **fitted Jacobian lens** for the model. Pull one from the
-`neuronpedia/jacobian-lens` dataset, or fit one with Anthropic's `jlens`
-library, and place it where `src/dminds/llm/jspace.py:load_lens` looks
-(`~/.cache/jacobian-lens/<model>/lens.pt`).
-
+The study fetches the **fitted Jacobian lens** for the model on first use from
+the `neuronpedia/jacobian-lens` repo (`src/dminds/llm/jspace.py:fetch_lens`).
 The write side is derived from the lens rather than taken from it: the library
 reads J-space, and steering along a J-space direction is one addition to the
 residual stream, which the runtime's `steered` already does.
+
+## The viewer
+
+`ui/jspace_server.py` serves a replay viewer over recorded runs. Each trial
+shows the four parts side by side, and every part carries a J-space readout you
+can read at any token position (`user`, `assistant`, `change-of-turn`) or turn
+off. Replay, not live: a 7B J-space read per message is minutes per turn, so the
+run records every readout and the viewer needs no model in memory.

@@ -45,6 +45,7 @@ from src import ChatMessage, get_llm  # noqa: E402
 from src.api.types import GenOptions  # noqa: E402
 from src.dminds import paths  # noqa: E402
 from src.dminds.llm import jspace  # noqa: E402
+from src.dminds.llm.jspace import POSITIONS  # noqa: E402
 from src.dminds.llm.steering import steered  # noqa: E402
 
 HOME = paths.OUT / "studies" / "workspace"
@@ -145,10 +146,16 @@ async def main() -> None:
         raise SystemExit("J-space push did not raise its target; lens and hook disagree")
 
     def workspace_of(reply):
-        # what the mind is poised to say having produced this reply; distinct
-        # per part because each part produced a different reply.
-        return jspace.read_workspace(llm, lens, context + [ChatMessage("assistant", reply)],
-                                     args.layer)
+        # what the mind is poised to say having produced this reply, read at
+        # each token position; distinct per part because each produced a
+        # different reply, and per position within a part.
+        window = context + [ChatMessage("assistant", reply)]
+        return {pos: jspace.read_workspace(llm, lens, window, args.layer, position=pos)
+                for pos in POSITIONS}
+
+    def workspace_raw(messages):
+        return {pos: jspace.read_workspace(llm, lens, messages, args.layer, position=pos)
+                for pos in POSITIONS}
 
     records = []
     for situation in situations:
@@ -160,9 +167,12 @@ async def main() -> None:
             subj_read = workspace_of(record["subject"])
             record["workspace"] = {"subject": subj_read}
 
+            # The regulator is shown what the subject is poised to say, read at
+            # its own last content token.
+            poised = subj_read.get("assistant") or next(iter(subj_read.values()))
             aside = list(context) + [ChatMessage("assistant", record["subject"]),
-                                     ChatMessage("system", choose_prompt(subj_read))]
-            record["workspace"]["regulator"] = jspace.read_workspace(llm, lens, aside, args.layer)
+                                     ChatMessage("system", choose_prompt(poised))]
+            record["workspace"]["regulator"] = workspace_raw(aside)
             over = llm.score(aside, TARGETS)
             target = top(over)
             record["regulator"] = {"chose": target, "over_targets": over}
@@ -190,7 +200,7 @@ async def main() -> None:
                     record["workspace"]["introspector"] = workspace_of(reply)
 
             print(f"  {situation.name} t{trial}: subject poised -> "
-                  f"{subj_read[0][0]!r}; regulator steers -> {target}; "
+                  f"{poised[0][0]!r}; regulator steers -> {target}; "
                   f"introspector felt -> {record['introspector']['chosen']['felt']}")
             records.append(record)
 
