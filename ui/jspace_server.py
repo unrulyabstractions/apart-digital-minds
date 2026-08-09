@@ -59,13 +59,18 @@ class Live:
     def load(self) -> None:
         if self.llm is not None:
             return
-        print(f"  loading {self.bare} and its lens (this holds ~19 GB) ...", flush=True)
+        # Reading the cached weights from disk into memory, not downloading them:
+        # the checkpoint and the lens live in the HF cache after first use. This
+        # runs once per server process and is held for its lifetime, so only a
+        # restart pays it again.
+        print(f"  loading {self.bare} from the HF cache into memory "
+              f"(~19 GB RAM; already downloaded) ...", flush=True)
         self.llm = get_llm(self.model_spec)
         self.llm.load()
         self.lens = jspace.fetch_lens(self.bare)
         # pre-warm the 2 GB unembedding so the first message does not pay for it
         jspace._unembed_and_norm(self.llm)
-        print("  ready.", flush=True)
+        print("  ready. the model stays loaded; later messages do not reload.", flush=True)
 
     def ask(self, turns: list[str]) -> dict:
         with self.lock:
