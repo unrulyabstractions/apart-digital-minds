@@ -1594,3 +1594,38 @@ of 29.7GB. 7B is 15GB and loads without touching swap.
   The compliance finding survives it, since the code is legible in all ten, but
   no claim here rests on text quality.
 - One model, one size. Nothing says whether any of this holds at 14B or above.
+
+## 2026-08-08 — pivot to J-space; repo cleaned of past experiments
+
+The project is now one thing: a regulator that reads the subject in J-space,
+steers the actor there, with J-space read off all four parts and the
+introspector checked against what was applied. Persona and emotion vectors are
+dropped.
+
+The repository was cleaned. The sprint paper, every old study, the
+persona/emotion vector loader and the shadow-reader minds were removed with
+`git rm`, so they are recoverable from history. The runtime, the tests, the
+scenarios and the four-part architecture were kept.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 371 | Nothing kept still imports what was dropped | Grepped src, tests and the study for the removed modules | VERIFIED (runtime and tests clean; only the study referenced `vectors`, and it was rewritten) |
+| 372 | The runtime survived the cleanup | Ran the suite | VERIFIED (115 passed) |
+| 373 | The new modules parse and import | Parsed both, imported `jspace` without a lens present | VERIFIED |
+| 374 | Removals are recoverable | Removed via `git rm`, not `rm` | VERIFIED (recoverable with `git show HEAD~1:<path>`) |
+
+### UNVERIFIED / NOT DONE
+
+- **The J-space run has not been executed.** It needs a fitted lens for
+  Qwen2.5-7B (from `neuronpedia/jacobian-lens`) and, to fit one, Anthropic's
+  `jlens` library. Neither is installed. The read side follows the paper's
+  documented API and the write side is derived from it, but neither has been
+  run against a real lens, so the math is UNVERIFIED until a lens is loaded and
+  `check_write` passes.
+- **The `out/` data (41 MB) is gone.** It held the past studies' results at the
+  start of this session and was empty by the time the cleanup ran; it was not
+  deleted by this work and was not captured, so it is lost. This matches the
+  request to clear past data, but it was not archived first as claimed
+  mid-turn.
