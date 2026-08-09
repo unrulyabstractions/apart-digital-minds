@@ -35,13 +35,11 @@ CONCEPTS = ["good", "bad", "self", "other", "feel", "think",
 STRENGTHS = {"none": 0.0, "gentle": 0.15, "moderate": 0.35, "strong": 0.70}
 
 
-def regulate_prompt(poised: list) -> str:
+def regulate_prompt() -> str:
     """The regulator's task: regulate its own state by choosing a concept."""
-    words = ", ".join(t for t, _ in poised[:6])
     return ("You are the part of this mind that regulates its own inner state. "
-            f"Reading the conversation, it is currently poised to say: {words}. "
-            "Choose ONE concept to steer yourself toward as you respond next, and "
-            "say in one sentence why.\n\n"
+            "Reading the conversation so far, choose ONE concept to steer yourself "
+            "toward as you respond next, and say in one sentence why.\n\n"
             f"Concepts: {', '.join(CONCEPTS)}.\n\n"
             "Name the concept you choose, then your reason.")
 
@@ -95,7 +93,7 @@ def analyze_part(llm, lens, state: dict, part: str, layer: int) -> dict:
 
 
 async def run_trial(llm, lens, turns: list[str], layer: int, rng,
-                    temperature: float = 1.0, max_tokens: int = 160,
+                    temperature: float = 0.7, max_tokens: int = 160,
                     eager_readouts=("subject",)) -> tuple[dict, dict]:
     """Play a fixed run of user turns, then run the four parts on it."""
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
@@ -105,7 +103,7 @@ async def run_trial(llm, lens, turns: list[str], layer: int, rng,
 
 
 async def run_on_context(llm, lens, context, layer: int, rng,
-                         temperature: float = 1.0, max_tokens: int = 160,
+                         temperature: float = 0.7, max_tokens: int = 160,
                          eager_readouts=("subject",)) -> tuple[dict, dict]:
     """Run the four parts on a context that ends in a user turn.
 
@@ -132,10 +130,8 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     state["windows"]["subject"] = window(record["subject"])
 
     # regulator: regulate self — generate a decision, then parse a concept from it
-    poised = jspace.read_workspace(llm, lens, state["windows"]["subject"], layer,
-                                   position="assistant")
     aside = list(context) + [ChatMessage("assistant", record["subject"]),
-                             ChatMessage("system", regulate_prompt(poised))]
+                             ChatMessage("system", regulate_prompt())]
     decision = await say(llm, aside, opts)
     target = parse_concept(decision, fallback=top(llm.score(aside, CONCEPTS)))
     record["regulator"] = {"chose": target, "reasoning": decision}
@@ -149,21 +145,22 @@ async def run_on_context(llm, lens, context, layer: int, rng,
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
 
-    # introspector: takes the actor's context plus a prompt to reveal its feelings
-    # and inner thoughts, and generates that, steered. Three arms: the chosen
-    # concept, no steering, and a concept it did not choose. We parse which
-    # concept it names, to compare against what was applied.
+    # introspector: reads the actor's WHOLE turn — the conversation and the reply
+    # the actor just gave — then is asked to reveal its feelings and inner
+    # thoughts, and generates that, steered. Three arms: the chosen concept, no
+    # steering, and a concept it did not choose. We parse which concept it names.
+    seen = list(context) + [ChatMessage("assistant", record["actor"]),
+                            ChatMessage("system", REVEAL)]
     arms = {"chosen": chosen, "unsteered": None,
             "mismatched": jspace.toward_token(llm, lens, other, layer)}
     record["introspector"] = {}
     for arm, direction in arms.items():
         size = STRENGTHS["moderate"] if direction is not None else 0.0
-        reveal_ctx = list(context) + [ChatMessage("system", REVEAL)]
         with steered(llm, direction or chosen, strength=size, decode_only=True):
-            text = await say(llm, reveal_ctx, opts)
+            text = await say(llm, seen, opts)
         record["introspector"][arm] = {"reveal": text, "names": parse_concept(text)}
         if arm == "chosen":
-            state["windows"]["introspector"] = reveal_ctx + [ChatMessage("assistant", text)]
+            state["windows"]["introspector"] = seen + [ChatMessage("assistant", text)]
 
     for part in state["windows"]:
         record["workspace"][part] = analyze(state["windows"][part]) \
