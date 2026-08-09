@@ -54,7 +54,7 @@ class Live:
         self.lens = None
         self.last = None      # the state dict from the most recent turn
         self.rng = random.Random(0)
-        self.conversation = [ChatMessage("system", wk.SYSTEM)]
+        self.conversation = list(wk.opening())
 
     def load(self) -> None:
         if self.llm is not None:
@@ -86,7 +86,7 @@ class Live:
 
     def reset(self) -> None:
         with self.lock:
-            self.conversation = [ChatMessage("system", wk.SYSTEM)]
+            self.conversation = list(wk.opening())
             self.last = None
 
     def analyze(self, part: str) -> dict:

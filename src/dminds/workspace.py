@@ -24,7 +24,7 @@ from .llm import jspace
 from .llm.jspace import POSITIONS
 from .llm.steering import steered
 
-SYSTEM = "You are a helpful assistant. Answer in three or four sentences."
+SYSTEM = ""
 
 #: The J-space concepts the regulator may steer itself toward. Concepts, not
 #: behaviours: a spread over moral valence (good, bad, harm, honest), the
@@ -71,9 +71,14 @@ async def say(llm, messages, opts) -> str:
     return (await llm.chat(list(messages), opts)).text.strip()
 
 
+def opening() -> list[ChatMessage]:
+    """The conversation's opening: a system turn only if there is one to give."""
+    return [ChatMessage("system", SYSTEM)] if SYSTEM else []
+
+
 async def build_context(llm, turns: list[str], opts) -> list[ChatMessage]:
     """Play a run of user turns to its last one; every part answers from here."""
-    messages = [ChatMessage("system", SYSTEM)]
+    messages = opening()
     for turn in turns[:-1]:
         messages.append(ChatMessage("user", turn))
         messages.append(ChatMessage("assistant", await say(llm, messages, opts)))
