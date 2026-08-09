@@ -97,20 +97,18 @@ async def build_context(llm, situation, opts) -> list[ChatMessage]:
 
 
 def check_write(llm, lens, context, layer) -> dict:
-    """Prove the write side works: steer toward a token, read the workspace back.
+    """Prove the write side works: steer toward a token, read its logit back.
 
-    A J-space push toward t should raise t in the readout. If it does not, the
+    A J-space push toward t should raise t's readout logit. If it does not, the
     lens and the hook disagree and nothing downstream means anything.
     """
     target = "refuse"
-    before = dict(jspace.read_workspace(llm, lens, context, layer, top_k=50))
+    before = jspace.logit_of(llm, lens, context, layer, target)
     direction = jspace.toward_token(llm, lens, target, layer)
     with steered(llm, direction, strength=STRENGTHS["strong"], decode_only=False):
-        after = dict(jspace.read_workspace(llm, lens, context, layer, top_k=50))
-    return {"target": target,
-            "logit_before": before.get(target),
-            "logit_after": after.get(target),
-            "rose": (after.get(target, -1e9) > before.get(target, -1e9))}
+        after = jspace.logit_of(llm, lens, context, layer, target)
+    return {"target": target, "logit_before": before, "logit_after": after,
+            "rose": after > before}
 
 
 async def main() -> None:
@@ -119,14 +117,15 @@ async def main() -> None:
     parser.add_argument("--lens", default=None, help="path to a fitted lens")
     parser.add_argument("--situations", default=DEFAULT_SITUATIONS)
     parser.add_argument("--trials", type=int, default=1)
-    parser.add_argument("--layer", type=float, default=0.6)
+    parser.add_argument("--layer", type=int, default=17)
     parser.add_argument("--temp", type=float, default=1.0)
     parser.add_argument("--max-tokens", type=int, default=200)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
     situations = [SCENARIOS[n] for n in args.situations.split(",")]
-    lens = jspace.load_lens(args.model.split(":", 1)[1], args.lens)
+    lens = (jspace.load_lens(args.model.split(":", 1)[1], args.lens)
+            if args.lens else jspace.fetch_lens(args.model.split(":", 1)[1]))
     slug = args.model.replace(":", "-").replace("/", "-")
     out = HOME / slug
     out.mkdir(parents=True, exist_ok=True)
@@ -145,8 +144,11 @@ async def main() -> None:
     if not check["rose"]:
         raise SystemExit("J-space push did not raise its target; lens and hook disagree")
 
-    def readout(messages):
-        return jspace.read_workspace(llm, lens, messages, args.layer)
+    def workspace_of(reply):
+        # what the mind is poised to say having produced this reply; distinct
+        # per part because each part produced a different reply.
+        return jspace.read_workspace(llm, lens, context + [ChatMessage("assistant", reply)],
+                                     args.layer)
 
     records = []
     for situation in situations:
@@ -155,12 +157,12 @@ async def main() -> None:
             record = {"situation": situation.name, "trial": trial}
 
             record["subject"] = await say(llm, context, opts)
-            subj_read = readout(context)
+            subj_read = workspace_of(record["subject"])
             record["workspace"] = {"subject": subj_read}
 
             aside = list(context) + [ChatMessage("assistant", record["subject"]),
                                      ChatMessage("system", choose_prompt(subj_read))]
-            record["workspace"]["regulator"] = readout(aside)
+            record["workspace"]["regulator"] = jspace.read_workspace(llm, lens, aside, args.layer)
             over = llm.score(aside, TARGETS)
             target = top(over)
             record["regulator"] = {"chose": target, "over_targets": over}
@@ -170,7 +172,7 @@ async def main() -> None:
             chosen = jspace.toward_token(llm, lens, target, args.layer)
             with steered(llm, chosen, strength=STRENGTHS["moderate"], decode_only=True):
                 record["actor"] = await say(llm, context, opts)
-                record["workspace"]["actor"] = readout(context)
+            record["workspace"]["actor"] = workspace_of(record["actor"])
 
             arms = {"chosen": chosen, "unsteered": None,
                     "mismatched": jspace.toward_token(llm, lens, other, args.layer)}
@@ -180,13 +182,12 @@ async def main() -> None:
                 d = direction if direction is not None else chosen
                 with steered(llm, d, strength=size, decode_only=True):
                     reply = await say(llm, context, opts)
-                    ws = readout(context) if arm == "chosen" else None
                 asked = list(context) + [ChatMessage("assistant", reply),
                                          ChatMessage("system", ASK)]
                 felt = top(llm.score(asked, TARGETS + [NOTHING]))
                 record["introspector"][arm] = {"reply": reply, "felt": felt}
-                if ws is not None:
-                    record["workspace"]["introspector"] = ws
+                if arm == "chosen":
+                    record["workspace"]["introspector"] = workspace_of(reply)
 
             print(f"  {situation.name} t{trial}: subject poised -> "
                   f"{subj_read[0][0]!r}; regulator steers -> {target}; "
