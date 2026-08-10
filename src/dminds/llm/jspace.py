@@ -351,6 +351,15 @@ def toward_token(llm, lens: Lens, token: str, layer: int) -> Direction:
     return Direction(vector=vector, layer=block_for(layer), model=lens.model, scale=scale)
 
 
+def layer_scale(llm, layer: int) -> float:
+    """The activation norm at a layer's block; steering is a fraction of it.
+
+    Shared by the lens steering and the emotion-vector steering, so one strength
+    means one size of nudge for both families.
+    """
+    return float(_residual_at(llm, [_probe()], block_for(layer)).norm())
+
+
 def toward_concepts(llm, lens: Lens, tokens: list[str], layer: int) -> Direction:
     """One J-space direction toward a set of concepts, the mean of their units.
 

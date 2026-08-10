@@ -15,7 +15,6 @@ Routes:
     GET  /                          the chat page
     POST /chat                      {message} -> the actor's reply and the four-part detail
     POST /reset                     start a new conversation
-    GET  /analyze?part=            one part's full J-space turn (positions, per token, stats)
 """
 
 from __future__ import annotations
@@ -38,6 +37,7 @@ from src import get_llm  # noqa: E402
 from src.api.types.messages import ChatMessage  # noqa: E402
 from src.dminds import workspace as wk  # noqa: E402
 from src.dminds.llm import jspace  # noqa: E402
+from src.dminds.llm import emotions as emo  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 
@@ -53,6 +53,7 @@ class Live:
         self.lock = threading.Lock()
         self.llm = None
         self.lens = None
+        self.emotions = None
         self.last = None      # the state dict from the most recent turn
         self.rng = random.Random(0)
         self.conversation = list(wk.opening())
@@ -69,6 +70,7 @@ class Live:
         self.llm = get_llm(self.model_spec)
         self.llm.load()
         self.lens = jspace.fetch_lens(self.bare)
+        self.emotions = emo.load_emotions(self.bare)
         # pre-warm the 2 GB unembedding so the first message does not pay for it
         jspace._unembed_and_norm(self.llm)
         print("  ready. the model stays loaded; later messages do not reload.", flush=True)
@@ -78,8 +80,8 @@ class Live:
             self.load()
             context = self.conversation + [ChatMessage("user", message)]
             record, state = asyncio.run(
-                wk.run_on_context(self.llm, self.lens, context, self.layer, self.rng,
-                                  strength=self.strength))
+                wk.run_on_context(self.llm, self.lens, self.emotions, context,
+                                  self.layer, self.rng, strength=self.strength))
             # the actor's reply is what the conversation carries forward
             self.conversation = context + [ChatMessage("assistant", record["actor"])]
             self.last = state
@@ -90,12 +92,6 @@ class Live:
         with self.lock:
             self.conversation = list(wk.opening())
             self.last = None
-
-    def analyze(self, part: str) -> dict:
-        with self.lock:
-            if self.last is None:
-                return {"positions": {}, "per_token": [], "stats": {}}
-            return wk.analyze_part(self.llm, self.lens, self.last, part, self.layer)
 
 
 def make_handler(live: Live):
@@ -121,9 +117,6 @@ def make_handler(live: Live):
             route = urlsplit(self.path)
             if route.path == "/":
                 self._send(200, (HERE / "jspace.html").read_bytes(), "text/html")
-            elif route.path == "/analyze":
-                part = parse_qs(route.query).get("part", [""])[0]
-                self._json({"part": part, "analysis": live.analyze(part)})
             else:
                 self._send(404, b"not found", "text/plain")
 

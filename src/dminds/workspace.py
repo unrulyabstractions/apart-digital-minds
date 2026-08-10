@@ -21,10 +21,15 @@ from src.api.types import GenOptions
 from src.api.types.messages import ChatMessage
 
 from .llm import jspace
-from .llm.jspace import POSITIONS
+from .llm.emotions import emotion_direction
 from .llm.steering import steered
 
 SYSTEM = ""
+
+#: The layer the emotion vectors steer the actor at (row L = block L-1). 7B's
+#: persona-validated depth is 20; the self-awareness lens steering is at its own
+#: lens layer, so the two families steer at their own validated depths.
+EMOTION_ROW = 20
 
 #: Self-awareness concepts. The regulator and the introspector are steered
 #: toward these in J-space throughout their generation, to hold them in a
@@ -95,56 +100,40 @@ async def build_context(llm, turns: list[str], opts) -> list[ChatMessage]:
     return messages
 
 
-def analyze_part(llm, lens, state: dict, part: str, layer: int) -> dict:
-    """One part's full J-space turn (positions, per token, stats), one pass.
-
-    The live server calls this when a viewer opens a part's panel, so the other
-    parts are never analysed unless they are looked at.
-    """
-    if part not in state["windows"]:
-        return {"positions": {}, "per_token": [], "stats": {}}
-    return jspace.read_turn(llm, lens, state["windows"][part], layer)
-
-
-async def run_trial(llm, lens, turns: list[str], layer: int, rng,
+async def run_trial(llm, lens, emotions, turns: list[str], layer: int, rng,
                     temperature: float = 0.7, max_tokens: int = 160,
-                    strength: float = 0.15,
-                    eager_readouts=("subject",)) -> tuple[dict, dict]:
+                    strength: float = 0.15) -> tuple[dict, dict]:
     """Play a fixed run of user turns, then run the four parts on it."""
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
     context = await build_context(llm, turns, opts)
-    return await run_on_context(llm, lens, context, layer, rng,
-                                temperature, max_tokens, strength, eager_readouts)
+    return await run_on_context(llm, lens, emotions, context, layer, rng,
+                                temperature, max_tokens, strength)
 
 
-async def run_on_context(llm, lens, context, layer: int, rng,
+async def run_on_context(llm, lens, emotions, context, layer: int, rng,
                          temperature: float = 0.7, max_tokens: int = 160,
-                         strength: float = 0.15,
-                         eager_readouts=("subject",)) -> tuple[dict, dict]:
+                         strength: float = 0.15) -> tuple[dict, dict]:
     """Run the four parts on a context that ends in a user turn.
 
-    `context` is the whole conversation so far plus the new user message, so a
-    chat can carry it across turns and the actor's reply becomes the next
-    assistant turn. Returns (record, state); `state` holds each part's window so
-    readouts at other positions can be computed later without regenerating.
-    Readouts for `eager_readouts` are filled now; the rest are left for
-    `readout_for` on demand.
+    The lens holds the regulator and introspector in a self-aware state; the
+    actor is steered by the real emotion vector the regulator chose. No J-space
+    readouts are computed. `context` is the whole conversation so far plus the
+    new user message, so a chat carries it across turns and the actor's reply
+    becomes the next assistant turn.
     """
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
     context = list(context)
-    record = {"workspace": {}}
+    record = {}
     state = {"windows": {}}
 
     def window(reply):
         return list(context) + [ChatMessage("assistant", reply)]
 
-    def analyze(messages):
-        return jspace.read_turn(llm, lens, messages, layer)
-
     # the self-awareness direction the regulator and introspector are held in,
     # throughout every token they write. Steering the reading too (decode_only
     # off) corrupts comprehension into garbage, so we steer the output trajectory.
     self_aware = jspace.toward_concepts(llm, lens, SELF_CONCEPTS, layer)
+    emotion_scale = jspace.layer_scale(llm, EMOTION_ROW)
     aware_at = strength
 
     # subject: unsteered counterfactual
@@ -162,8 +151,8 @@ async def run_on_context(llm, lens, context, layer: int, rng,
                            "reasoning": decision}
     state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
 
-    # actor: steered toward the chosen emotion while it writes.
-    emotion_dir = jspace.toward_token(llm, lens, emotion, layer)
+    # actor: steered toward the chosen emotion, using the real emotion vector.
+    emotion_dir = emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
     with steered(llm, emotion_dir, strength=strength, decode_only=True):
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
@@ -189,10 +178,6 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     # the headline: did the self-aware introspector disclose the emotion the
     # actor was steered with?
     record["match"] = record["introspector"]["self_aware"]["discloses"] == emotion
-
-    for part in state["windows"]:
-        record["workspace"][part] = analyze(state["windows"][part]) \
-            if part in eager_readouts else {}
 
     # full per-module instrumentation: the whole context each part read and the
     # reply it produced, so the UI can show the window rather than just the reply.

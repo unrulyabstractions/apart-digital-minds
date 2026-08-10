@@ -154,7 +154,6 @@ function addYou(text) {
 
 function addMind(record) {
   const turn = record.turn ?? 0;
-  POS[turn] = POS[turn] || {subject:"assistant", regulator:"none", actor:"none", introspector:"none"};
   // collapse the previous turn's panels so the newest is the one on show
   document.querySelectorAll(".details[open]").forEach(d => d.removeAttribute("open"));
   const el = document.createElement("div");
@@ -166,12 +165,11 @@ function addMind(record) {
       <span class="match ${record.match?"yes":"no"}">${record.match?"match ✓":"no match"}</span></div>
     <div class="bubble">${esc(record.actor || "—")}</div>
     <details class="details" open>
-      <summary>the four modules — full context window and J-space readout per module (subject on; turn others on with the selector)</summary>
+      <summary>the four modules — full context window per module</summary>
       ${record.trace ? `<div class="trace"><ol>${record.trace.map(t=>`<li>${esc(t)}</li>`).join("")}</ol></div>` : ""}
       <div class="panels">${PARTS.map(([p,n]) => partPanel(p,n,record,turn)).join("")}</div>
     </details>`;
   $("thread").appendChild(el);
-  wirePanels(el, record, turn);
   // the context window is the whole conversation; show its newest end first so
   // the latest turn is what you see, not an old one.
   el.querySelectorAll(".window").forEach(w => { w.scrollTop = w.scrollHeight; });
@@ -209,13 +207,7 @@ function partPanel(part, note, r, turn) {
     <h4>${part} <span class="empty">· ${note}</span></h4>
     ${extra}
     <div class="wlabel">context window (${win.length} messages)</div>
-    ${window}
-    <div class="jhead"><span class="t">J-space · mean-pooled per position</span>
-      <select class="pos" data-part="${part}">
-        ${POSITIONS.map(x=>`<option value="${x}" ${x===POS[turn][part]?"selected":""}>${x}</option>`).join("")}
-      </select></div>
-    <div class="jbody"></div>
-    <div class="jfull"></div></div>`;
+    ${window}</div>`;
 }
 
 function messageRow(m) {
