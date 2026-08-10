@@ -13,6 +13,8 @@ of live; there is no way around it on this hardware.
 
 Routes:
     GET  /                          the chat page
+    GET  /runs                      names of recorded study runs
+    GET  /run?name=<name>           one recorded run, for playback (no model needed)
     POST /chat                      {message} -> the actor's reply and the four-part detail
     POST /reset                     start a new conversation
 """
@@ -40,6 +42,8 @@ from src.dminds.llm import jspace  # noqa: E402
 from src.dminds.llm import emotions as emo  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
+#: Where the scripted studies write their records; served read-only for playback.
+RUNS = ROOT / "out" / "studies" / "introspection"
 
 
 class Live:
@@ -117,6 +121,16 @@ def make_handler(live: Live):
             route = urlsplit(self.path)
             if route.path == "/":
                 self._send(200, (HERE / "jspace.html").read_bytes(), "text/html")
+            elif route.path == "/runs":
+                # recorded study runs; listing and viewing need no model
+                self._json(sorted(p.stem for p in RUNS.glob("*.json")))
+            elif route.path == "/run":
+                name = (parse_qs(route.query).get("name") or [""])[0]
+                path = RUNS / f"{Path(name).name}.json"
+                if not path.exists():
+                    self._json({"error": f"no recorded run named {name!r}"}, 404)
+                    return
+                self._send(200, path.read_bytes(), "application/json")
             else:
                 self._send(404, b"not found", "text/plain")
 
