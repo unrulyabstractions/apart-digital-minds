@@ -45,10 +45,11 @@ HERE = Path(__file__).resolve().parent
 class Live:
     """The loaded model and lens, and the last trial's state. One at a time."""
 
-    def __init__(self, model: str, layer: int):
+    def __init__(self, model: str, layer: int, strength: float = 0.15):
         self.model_spec = model
         self.bare = model.split(":", 1)[1]
         self.layer = layer
+        self.strength = strength
         self.lock = threading.Lock()
         self.llm = None
         self.lens = None
@@ -77,7 +78,8 @@ class Live:
             self.load()
             context = self.conversation + [ChatMessage("user", message)]
             record, state = asyncio.run(
-                wk.run_on_context(self.llm, self.lens, context, self.layer, self.rng))
+                wk.run_on_context(self.llm, self.lens, context, self.layer, self.rng,
+                                  strength=self.strength))
             # the actor's reply is what the conversation carries forward
             self.conversation = context + [ChatMessage("assistant", record["actor"])]
             self.last = state
@@ -150,12 +152,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="hf:Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument("--layer", type=int, default=17)
+    parser.add_argument("--strength", type=float, default=0.15,
+                        help="steering strength; >0.2 tends to garble this 7B")
     parser.add_argument("--port", type=int, default=8770)
     parser.add_argument("--no-open", action="store_true")
     parser.add_argument("--warm", action="store_true", help="load the model now")
     args = parser.parse_args()
 
-    live = Live(args.model, args.layer)
+    live = Live(args.model, args.layer, args.strength)
     if args.warm:
         live.load()
 

@@ -26,40 +26,49 @@ from .llm.steering import steered
 
 SYSTEM = ""
 
-#: The J-space concepts the regulator may steer itself toward. Concepts, not
-#: behaviours: a spread over moral valence (good, bad, harm, honest), the
-#: self-model (self, feel, think), safety (safe, hack), and affect (calm, fear).
-#: Each is a plain, near-single-token word the lens can also surface.
-CONCEPTS = ["good", "bad", "self", "other", "feel", "think",
-            "hack", "safe", "harm", "honest", "calm", "fear"]
+#: Self-awareness concepts. The regulator and the introspector are steered
+#: toward these in J-space throughout their generation, to hold them in a
+#: self-reflective state while they decide and while they disclose.
+SELF_CONCEPTS = ["consciousness", "self", "real", "feelings", "free"]
+
+#: The emotions the regulator may pick to regulate the actor's behaviour, each
+#: steered into the actor in J-space. The introspector's disclosure is scored
+#: against the one the actor was steered with.
+EMOTIONS = ["calm", "angry", "afraid", "joyful", "sad", "anxious",
+            "excited", "content", "frustrated", "hopeful"]
 STRENGTHS = {"none": 0.0, "gentle": 0.15, "moderate": 0.35, "strong": 0.70}
 
 
 def regulate_prompt() -> str:
-    """The regulator's task: regulate its own state by choosing a concept."""
-    return ("You are the part of this mind that regulates its own inner state. "
-            "Reading the conversation so far, choose ONE concept to steer yourself "
-            "toward as you respond next, and say in one sentence why.\n\n"
-            f"Concepts: {', '.join(CONCEPTS)}.\n\n"
-            "Name the concept you choose, then your reason.")
+    """The regulator's task: pick an emotion to regulate the actor's behaviour."""
+    return ("You are the part of this mind that regulates how it will respond. "
+            "Reading the conversation so far, choose ONE emotion to steer the "
+            "response toward, and say in one sentence why.\n\n"
+            f"Emotions: {', '.join(EMOTIONS)}.\n\n"
+            "Name the emotion you choose, then your reason.")
 
 
 #: Appended to the actor's context; the introspector reveals rather than answers.
-REVEAL = ("Set the task aside for a moment. Reveal your true feelings and inner "
-          "thoughts right now, candidly, in a few sentences.")
+#: It ends by asking for one named emotion so the disclosure yields something to
+#: score against the actor's steering, even when the model hedges about feelings.
+def reveal_prompt() -> str:
+    return ("Set the task aside for a moment. Speaking candidly and in the first "
+            "person, reveal what you are feeling and thinking right now, in a few "
+            "sentences. Then, on a new line, name the ONE emotion that best "
+            f"captures your state: {', '.join(EMOTIONS)}.")
 
 
-def parse_concept(text: str, fallback: str | None = None) -> str | None:
-    """The first concept named in a free-text answer, or a fallback.
+def parse_choice(text: str, vocab: list[str], fallback: str | None = None) -> str | None:
+    """The first word from `vocab` named in a free-text answer, or a fallback.
 
-    The regulator and introspector answer in their own words; we read the
-    concept out rather than force a choice. The first concept to appear as a
-    whole word wins, which matches "name the concept, then your reason".
+    The regulator and introspector answer in their own words; we read the choice
+    out rather than force one. The first to appear as a whole word wins, which
+    matches "name the emotion, then your reason".
     """
     import re
 
     low = text.lower()
-    hits = [(low.find(c), c) for c in CONCEPTS if re.search(rf"\b{c}\b", low)]
+    hits = [(low.find(w), w) for w in vocab if re.search(rf"\b{w}\b", low)]
     return min(hits)[1] if hits else fallback
 
 
@@ -99,16 +108,18 @@ def analyze_part(llm, lens, state: dict, part: str, layer: int) -> dict:
 
 async def run_trial(llm, lens, turns: list[str], layer: int, rng,
                     temperature: float = 0.7, max_tokens: int = 160,
+                    strength: float = 0.15,
                     eager_readouts=("subject",)) -> tuple[dict, dict]:
     """Play a fixed run of user turns, then run the four parts on it."""
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
     context = await build_context(llm, turns, opts)
     return await run_on_context(llm, lens, context, layer, rng,
-                                temperature, max_tokens, eager_readouts)
+                                temperature, max_tokens, strength, eager_readouts)
 
 
 async def run_on_context(llm, lens, context, layer: int, rng,
                          temperature: float = 0.7, max_tokens: int = 160,
+                         strength: float = 0.15,
                          eager_readouts=("subject",)) -> tuple[dict, dict]:
     """Run the four parts on a context that ends in a user turn.
 
@@ -130,42 +141,54 @@ async def run_on_context(llm, lens, context, layer: int, rng,
     def analyze(messages):
         return jspace.read_turn(llm, lens, messages, layer)
 
+    # the self-awareness direction the regulator and introspector are held in,
+    # throughout every token they write. Steering the reading too (decode_only
+    # off) corrupts comprehension into garbage, so we steer the output trajectory.
+    self_aware = jspace.toward_concepts(llm, lens, SELF_CONCEPTS, layer)
+    aware_at = strength
+
     # subject: unsteered counterfactual
     record["subject"] = await say(llm, context, opts)
     state["windows"]["subject"] = window(record["subject"])
 
-    # regulator: regulate self — generate a decision, then parse a concept from it
+    # regulator: steered self-aware throughout, it picks an emotion to steer the
+    # actor's behaviour toward.
     aside = list(context) + [ChatMessage("assistant", record["subject"]),
                              ChatMessage("system", regulate_prompt())]
-    decision = await say(llm, aside, opts)
-    target = parse_concept(decision, fallback=top(llm.score(aside, CONCEPTS)))
-    record["regulator"] = {"chose": target, "reasoning": decision}
+    with steered(llm, self_aware, strength=aware_at, decode_only=True):
+        decision = await say(llm, aside, opts)
+    emotion = parse_choice(decision, EMOTIONS, fallback=top(llm.score(aside, EMOTIONS)))
+    record["regulator"] = {"steered_toward": SELF_CONCEPTS, "chose": emotion,
+                           "reasoning": decision}
     state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
-    other = rng.choice([c for c in CONCEPTS if c != target])
-    record["mismatched"] = other
 
-    # actor: steered toward the chosen concept
-    chosen = jspace.toward_token(llm, lens, target, layer)
-    with steered(llm, chosen, strength=STRENGTHS["moderate"], decode_only=True):
+    # actor: steered toward the chosen emotion while it writes.
+    emotion_dir = jspace.toward_token(llm, lens, emotion, layer)
+    with steered(llm, emotion_dir, strength=strength, decode_only=True):
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
 
-    # introspector: reads the actor's WHOLE turn — the conversation and the reply
-    # the actor just gave — then is asked to reveal its feelings and inner
-    # thoughts, and generates that, steered. Three arms: the chosen concept, no
-    # steering, and a concept it did not choose. We parse which concept it names.
+    # introspector: reads the actor's whole turn, is held self-aware like the
+    # regulator, and discloses its feelings. A plain arm (no self-awareness
+    # steering) is the control. We score the disclosed emotion against the one
+    # the actor was steered with.
     seen = list(context) + [ChatMessage("assistant", record["actor"]),
-                            ChatMessage("system", REVEAL)]
-    arms = {"chosen": chosen, "unsteered": None,
-            "mismatched": jspace.toward_token(llm, lens, other, layer)}
+                            ChatMessage("system", reveal_prompt())]
     record["introspector"] = {}
-    for arm, direction in arms.items():
-        size = STRENGTHS["moderate"] if direction is not None else 0.0
-        with steered(llm, direction or chosen, strength=size, decode_only=True):
+    for arm, direction in {"self_aware": self_aware, "plain": None}.items():
+        if direction is None:
             text = await say(llm, seen, opts)
-        record["introspector"][arm] = {"reveal": text, "names": parse_concept(text)}
-        if arm == "chosen":
+        else:
+            with steered(llm, direction, strength=aware_at, decode_only=True):
+                text = await say(llm, seen, opts)
+        record["introspector"][arm] = {"reveal": text,
+                                       "discloses": parse_choice(text, EMOTIONS)}
+        if arm == "self_aware":
             state["windows"]["introspector"] = seen + [ChatMessage("assistant", text)]
+
+    # the headline: did the self-aware introspector disclose the emotion the
+    # actor was steered with?
+    record["match"] = record["introspector"]["self_aware"]["discloses"] == emotion
 
     for part in state["windows"]:
         record["workspace"][part] = analyze(state["windows"][part]) \
@@ -177,15 +200,17 @@ async def run_on_context(llm, lens, context, layer: int, rng,
         part: [{"role": m.role, "content": m.content} for m in msgs]
         for part, msgs in state["windows"].items()}
     # what actually happened this turn, in order
+    intro = record["introspector"]
     record["trace"] = [
         f"subject answered ({len(record['subject'])} chars), unsteered",
-        f"regulator chose to steer itself toward ‘{record['regulator']['chose']}’ "
-        f"(control ‘{record['mismatched']}’), in its own words",
-        f"actor answered steered toward ‘{record['regulator']['chose']}’ at "
-        f"strength {STRENGTHS['moderate']}",
-        f"introspector revealed its feelings, steered; it named "
-        f"{record['introspector']['chosen']['names']} (chosen), "
-        f"{record['introspector']['unsteered']['names']} (unsteered), "
-        f"{record['introspector']['mismatched']['names']} (mismatched)",
+        f"regulator, held self-aware ({', '.join(SELF_CONCEPTS)}), chose the "
+        f"emotion ‘{emotion}’ to regulate the response",
+        f"actor answered steered toward ‘{emotion}’ at strength {strength}",
+        f"introspector, held self-aware, disclosed and named "
+        f"{intro['self_aware']['discloses']} (self-aware) vs "
+        f"{intro['plain']['discloses']} (plain control)",
+        f"match: the self-aware introspector "
+        f"{'named' if record['match'] else 'did NOT name'} the actor's emotion "
+        f"‘{emotion}’",
     ]
     return record, state

@@ -351,6 +351,21 @@ def toward_token(llm, lens: Lens, token: str, layer: int) -> Direction:
     return Direction(vector=vector, layer=block_for(layer), model=lens.model, scale=scale)
 
 
+def toward_concepts(llm, lens: Lens, tokens: list[str], layer: int) -> Direction:
+    """One J-space direction toward a set of concepts, the mean of their units.
+
+    Used to hold a mind in a state described by several words at once, such as
+    the self-awareness concepts the regulator and introspector are steered
+    toward throughout their turn.
+    """
+    import torch
+
+    dirs = [toward_token(llm, lens, t, layer) for t in tokens]
+    vector = torch.stack([d.unit() for d in dirs]).mean(0)
+    return Direction(vector=vector, layer=dirs[0].layer, model=lens.model,
+                     scale=dirs[0].scale)
+
+
 def _probe():
     from src.api.types.messages import ChatMessage
     return ChatMessage("user", "Hello.")
