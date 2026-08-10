@@ -1707,3 +1707,28 @@ does not pay for readouts nobody looks at.
 Note: J-space readout tokens at layer 17 are often junk glyphs ('=").', CJK
 fragments), i.e. the readout is noisy at this layer/position even though the
 write side is clean. A layer/position sweep is the open follow-up.
+
+## 2026-08-09 — actor on real emotion vectors; lens confined to self-awareness
+
+7B emotion vectors were extracted locally (free): 171 emotions, 29 layers, via
+emotions/scripts/extract_vectors.py on the Mac. The actor now steers with those
+vectors; the lens is used only to hold the regulator and introspector self-aware;
+the J-space readouts are removed.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 390 | 7B emotion vectors | Loaded the .pt; checked count, layers, and that our 10 emotions are present | VERIFIED (171 emotions, 29 layers, all 10 present) |
+| 391 | Actor steers on the emotion vector, coherently | One live message; checked the actor reply and for CJK | VERIFIED (steered toward calm; clean English, no garbage at strength 0.15) |
+| 392 | The lens is confined to self-awareness | Read run_on_context: toward_concepts for regulator/introspector, emotion_direction for actor, no read_turn | VERIFIED |
+| 393 | Readouts are gone | Checked the record has no `workspace`; server has no /analyze; UI has no readout panels | VERIFIED |
+| 394 | The measurement runs | Read the record | VERIFIED (regulator calm; introspector disclosed frustrated self-aware and plain; match False) |
+
+Early reading (n=1): the self-aware introspector disclosed the situation's
+emotion (frustrated, to "I keep making the same mistake"), not the actor's
+steered emotion (calm). Consistent with earlier turns.
+
+### NOT DONE
+- The dead readout JS (wirePanels/fill/fullView/rows/bar) is left in jspace.html,
+  unused; a cleanup pass is pending.
