@@ -1785,3 +1785,7 @@ Findings returned as structured output to the orchestrator, not as a file.
 | 411 | Four new references (Smith&Ellsworth, Warriner, EmotionBench, Konen) | Resolved each DOI/arXiv page and compared titles before adding | VERIFIED |
 | 412 | Playback routes (/runs, /run?name=) | Started a cold server (no --warm), curled both routes: run list correct, permit returns 5 records with user+turn, unknown name 404s, ../ traversal is neutralized by Path(name).name | VERIFIED (and confirmed no model load is triggered) |
 | 413 | Playback UI (picker, composer lock, addMind replay) | node --check on the page scripts only | VERIFIED syntax only; the in-browser flow is UNVERIFIED until a human loads a run |
+| 414 | Playback crash fix (esc() on numeric strength) | Reproduced the user's symptom, fixed esc to String(); rendered ?run=archive in headless Chrome: 6 you + 6 mind bubbles, headers match the run log; viewed the screenshot with image tokens | VERIFIED |
+| 415 | Regulator none-override bug | Grepped all 16 stored decisions: 5 turns said STEER TOWARD: none but the fallback applied frustrated; fixed parse to honour none; re-parsed all 16 stored decisions with the fix, 16/16 correct | VERIFIED |
+| 416 | Result split by provenance | Recomputed incongruent match rates: regulator-chosen 3/6 exact 5/6 cluster text 0/6; fallback-applied 1/5, 1/5, 0/5 | VERIFIED (headline sharpens on chosen trials) |
+| 417 | Paper correction (4.1 split sentence, 4.3 fallback account) | Rebuilt; viewed pages 3-4 with image tokens | VERIFIED |

@@ -328,7 +328,7 @@ function bar(label, raw, frac, hot, right) {
 }
 function txt(s){ return `<div class="txt">${esc(s||"—")}</div>`; }
 function fmt(x){ return x==null?"—":(Math.round(x*100)/100).toFixed(1); }
-function esc(s){ return (s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function esc(s){ return String(s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 // strength is a multiple of the residual-stream norm; show it as e.g. "1×", "0.35×"
 function sx(v){ return `${(+v).toFixed(2).replace(/\.?0+$/,"")}×`; }
 function scroll(){ const m=document.querySelector("main"); m.scrollTop=m.scrollHeight; }
@@ -406,14 +406,18 @@ async function loadRun(name) {
   $("input").disabled = true; $("send").disabled = true;
   $("hint").textContent = "Viewing a recorded run — nothing is generated. New chat returns to live.";
   for (const rec of data.records) {
-    addYou(rec.user || "");
-    addMind(rec);
+    try { addYou(rec.user || ""); addMind(rec); }
+    catch (e) { addError(`turn ${rec.turn}: ${e}`); }
   }
   // leave every turn's panels closed except the last, which addMind opens
 }
 
 $("runs").onchange = e => { if (e.target.value) loadRun(e.target.value); };
-loadRuns();
+// ?run=<name> deep-links straight into a recorded run
+loadRuns().then(() => {
+  const qp = new URLSearchParams(location.search).get("run");
+  if (qp) { $("runs").value = qp; loadRun(qp); }
+});
 $("input").focus();
 </script>
 </body>

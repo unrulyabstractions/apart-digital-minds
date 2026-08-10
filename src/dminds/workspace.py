@@ -226,9 +226,11 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
             "assistant": parse_value(decision, "ASSISTANT EMOTION")}
     strength_val = parse_strength(decision, fallback=1.0)
     applied = strength_val * STRENGTH_UNIT
-    emotion = parse_field(decision, "STEER", EMOTIONS,
+    # "none" on the STEER line declines steering outright, whatever the
+    # strength says: the fallback score must never override an explicit none.
+    emotion = parse_field(decision, "STEER", ["none"] + EMOTIONS,
                           fallback=top(llm.score(aside, EMOTIONS)))
-    steering = strength_val > 1e-3
+    steering = strength_val > 1e-3 and emotion != "none"
     record["regulator"] = {"steered_toward": SELF_CONCEPTS, "read": read,
                            "chose": emotion if steering else None,
                            "strength": strength_val, "applied": applied,
