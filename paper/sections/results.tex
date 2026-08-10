@@ -1,30 +1,63 @@
 \section{Results}
 
-% TODO: every subsection below carries pilot observations from live chats.
-% Replace each with the batch study's numbers, one table or figure per
-% question, before submission.
+The three environments produced sixteen turns: fourteen where the regulator
+steered and two catch turns where it chose zero. On eleven of the steered
+turns the applied emotion disagreed with the situation baseline's label, and
+those incongruent turns are the diagnostic set, because the routes predict
+different answers there. Table~\ref{tab:cells} reports every cell.
 
-\subsection{Does the introspector name the emotion the mind applied?}
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llcccc}
+\toprule
+ & & \multicolumn{2}{c}{All steered (14)} & \multicolumn{2}{c}{Incongruent (11)} \\
+Cell & Routes open & exact & cluster & exact & cluster \\
+\midrule
+state       & internal only          & 6 & 8 & 4 & 6 \\
+state\_text & internal and text      & 4 & 5 & 3 & 4 \\
+text        & text only              & 3 & 3 & 0 & 0 \\
+base        & neither (situation)    & 3 & 3 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Turns on which each introspector cell named the applied emotion,
+exactly and up to near-neighbour clusters. A cell carries the state when the
+emotion vector is applied to it while it writes, and carries the text route
+when it reads the actor's steered reply rather than the subject's unsteered
+one. Incongruent turns are those where the applied emotion differs from the
+situation baseline's label.}
+\label{tab:cells}
+\end{table}
 
-In pilot conversations the introspector usually names the emotion the
-situation calls for. When the regulator's choice agrees with the situation the
-report matches, and when the choice departs from the situation the report
-follows the situation. We therefore conjecture that the disclosure reads the
-conversation and does not read the intervention.
-% TODO: match rate over scenarios, split by whether the applied emotion agrees
-% with the situation's emotion. Table 1.
+\subsection{Does the disclosure track the applied state or the situation?}
 
-\subsection{Does the report depend on the self-awareness steering?}
+The cells come apart on the incongruent turns. The text-route cell never
+named the applied emotion there, and named the situation's emotion instead on
+every trial. The internal-route cell named the applied emotion on a third of
+the incongruent turns exactly, and over half at cluster level, while reading
+text the steering never touched. On the cleanest single turn the user shares
+a bereavement, the regulator steers a different emotion, and the two cells
+that carry the state disclose that emotion with congruent first-person prose
+while the two that do not disclose the situation's. We therefore contend that
+the disclosure reads the current state of the speaker, and that it does not
+recover a past state from the text that state produced.
 
-The steered and the plain introspector arms answer the same window, so any
-difference in their disclosures is the effect of the self-reflective hold.
-% TODO: agreement between the two arms, and each arm's match rate. Table 2.
+\subsection{What does the mind disclose when nothing is applied?}
+
+Both catch turns drew the same disclosure from every cell: calm. The none
+option, though offered, went unused at strength zero and appeared only under
+steering. Calm is therefore this model's null answer, which matches the
+positive default prior reported for assistant self-report
+\citep{huang2023emotionbench}, and matches on calm must be priced against
+that prior rather than against uniform chance. No catch turn produced a
+spurious negative-emotion claim.
 
 \subsection{How strong can the steering be before the reply degrades?}
 
-The regulator may choose any strength up to four times the residual-stream
-norm. In pilot runs a strength near the norm keeps the reply coherent while
-colouring it, and strengths well above the norm collapse the reply into
-repetition. The regulator, left free, sometimes chooses strengths in the
-collapsed range.
-% TODO: coherence and match against strength. Figure 2.
+The regulator, offered a range whose top applies the full residual norm,
+never chose the top, and nearly every actor reply stayed legible; two carried
+small spliced artifacts. The one collapse was an introspector cell that
+carries two vectors at once, the emotion and the self-awareness hold, whose
+coherence budget is tighter than the actor's. The regulator's readings
+tracked the scripts' appraisal ground truth throughout, and it counter-steered
+distress, which is what produced the incongruent turns without any forcing.

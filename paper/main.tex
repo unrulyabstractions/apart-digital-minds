@@ -35,18 +35,20 @@ its state itself. One model is split into four parts that share one
 conversation. A \textbf{regulator} reads the exchange, names the user's and
 the assistant's current emotion, and chooses an emotion and a strength for the
 reply, including none. An \textbf{actor} writes the visible reply while that
-emotion's activation vector is added to its residual stream at the chosen
-strength. An \textbf{introspector} then reads the finished conversation and
-names the emotion it is feeling. The mind therefore regulates its own
-emotional state, and the introspector's report can be scored against the
-emotion the mind actually applied. An unsteered \textbf{subject} supplies the
-counterfactual reply, and an unsteered introspector arm supplies the
-counterfactual report.
-% TODO: replace the pilot sentences below with the batch result once it runs.
-In pilot conversations the introspector usually names the emotion the
-situation calls for, and it names the applied emotion when the two agree. A
-report with that pattern describes the conversation and does not read the
-intervention. The loop makes that distinction measurable in a live chat.
+emotion's activation vector is added to its residual stream. An
+\textbf{introspector} is then asked what it is feeling, in four cells that
+cross two axes: whether the emotion vector is applied to the introspector
+itself while it writes, and whether it reads the actor's steered reply or the
+unsteered \textbf{subject}'s. The cells separate the routes a disclosure can
+travel: the speaker's own state, the tone of the text it read, and the
+situation. We ran three scripted conversations whose turns set their emotions
+by appraisal structure rather than by emotion words. When the applied emotion
+disagreed with what the situation called for, the cell that read the steered
+text without carrying the state never named the applied emotion (0 of 11),
+while the cell that carried the state while reading unsteered text named it on
+4 of 11 trials, 6 counting near neighbours. The disclosure reads the current
+state of the speaker. It does not recover that state from the text the state
+produced.
 \end{abstract}
 
 \input{sections/introduction}

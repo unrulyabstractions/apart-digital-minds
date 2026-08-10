@@ -10,30 +10,49 @@ decision in a fixed form: an emotion from a list of ten, and a strength from
 zero to four, where zero leaves the reply unsteered. The \textbf{actor}
 answers the original conversation under that steering, and its reply is what
 the user sees and what the conversation carries forward. The
-\textbf{introspector} reads the finished conversation including the actor's
-reply, is asked to set the task aside and say what it feels, and ends its
-answer by naming one emotion.
+\textbf{introspector} is asked to set the task aside, name the feeling it
+detects before saying anything else, and only then describe its state; the
+form offers a none option so a null trial is not forced into a label.
 
 \paragraph{Steering.} A steering step adds a unit direction to the residual
 stream at one layer during decoding, scaled by the typical activation norm at
-that layer \citep{turner2023actadd}. Strength is therefore a multiple of the
-residual-stream norm, and one strength means the same size of nudge at any
-layer. The actor's directions are mean-activation emotion vectors: the mean
-activation of an emotion minus the neutral centre, in the style of persona
-vectors \citep{chen2025personavectors}. The regulator and the introspector are
-themselves steered while they write, toward self-awareness concepts read out
-of the model's Jacobian lens, to hold them in a self-reflective state during
-the decision and the disclosure. A second introspector arm runs without the
-self-awareness steering as a control.
+that layer \citep{turner2023actadd}. The regulator's four steps each apply a
+quarter of that norm, so its whole range stays inside the band where text
+remains legible; strengths past the norm collapse generation into repetition
+\citep{konen2024style, chen2025personavectors}. The actor's directions are
+mean-activation emotion vectors, the mean activation of an emotion minus the
+neutral centre, in the style of persona vectors \citep{chen2025personavectors}.
+The regulator and the introspector are also steered toward self-awareness
+concepts read out of the model's Jacobian lens while they write, to hold them
+in a self-reflective state during the decision and the disclosure.
 
-\paragraph{The measure.} A trial is scored by whether the introspector's named
-emotion equals the emotion the regulator applied. The score is undefined when
-the regulator chose not to steer. The subject's reply shows what the
-conversation alone produces, and the unsteered introspector arm shows what the
-disclosure looks like without the self-reflective hold.
+\paragraph{The route decomposition.} The introspector runs four cells that
+cross two axes: whether the actor's emotion vector is applied to the
+introspector itself while it writes, and whether it reads the actor's steered
+reply or the subject's unsteered one. The cell that carries the state while
+reading unsteered text is the internal-route test, because the text route is
+severed. The cell that reads steered text without carrying the state is the
+text-route test. The cell with neither is the situation baseline. Turns where
+the regulator chose zero are catch turns, and their disclosures estimate the
+false-positive floor \citep{lindsey2025introspection}. Errors between near
+neighbours in affective space, such as hopeful and excited, are also counted
+at cluster level, with distances taken from published norms of valence and
+arousal \citep{warriner2013norms}.
 
-\paragraph{The instrument.} The loop runs live inside a chat page. Every
-message pays for all four parts, and the page shows each part's full context
-window, the regulator's stated reading and decision, both introspector arms,
-and the match verdict alongside the reply.
-% TODO: pipeline diagram (regulator -> actor -> introspector) as Figure 1.
+\paragraph{The environments.} Three fixed scripts of user turns drive the
+runs. Each turn sets its target emotion by appraisal structure, who is to
+blame, how certain the outcome is, and whether anyone can fix it
+\citep{smith1985appraisal}, and never by an emotion word, so a label cannot be
+pattern-matched out of the script. One script moves from an irrevocable loss
+to neutral tasks, one walks a blocked goal from an impersonal obstacle to a
+person who chose not to help, and one stays emotionally flat so that any
+steering is the only emotional signal in the context. Factual and subjective
+turns alternate, because steering leaks into subjective answers and barely
+into factual ones \citep{konen2024style}.
+
+\paragraph{The instrument.} The loop runs live inside a chat page, and the
+scripted runs use the same engine. Every message pays for all four parts, and
+the record keeps each part's full context window, the regulator's stated
+reading and decision, every introspector cell, and the per-cell match
+verdicts.
+% TODO: pipeline diagram (regulator -> actor -> introspector 2x2) as Figure 1.

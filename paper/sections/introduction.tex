@@ -15,17 +15,22 @@ itself. A mind that regulates its own emotional state must know what that
 state is, so \textbf{emotional self-regulation} gives introspection something
 concrete to be right or wrong about. We build a mind out of four parts of one
 model. A regulator chooses an emotion and a strength, an actor writes the
-reply under that steering, and an introspector reports what it feels. The
-report is scored against the emotion the regulator applied.
+reply under that steering, and an introspector reports what it feels. A
+disclosure can reach the right label by three routes: the speaker's own
+state, the tone of the text it read, or the emotion the situation calls for.
+The introspector therefore runs as a two-by-two of cells that open and close
+the first two routes independently, and each cell's report is scored against
+the emotion the regulator applied.
 
 Our main contributions are:
 \begin{enumerate}[itemsep=2pt]
   \item A four-part architecture in which one model regulates its own
         emotional state by activation steering, with strength expressed as a
-        multiple of the residual-stream norm.
-  \item A live conversational instrument that runs the whole loop on every
-        message and records the full context window of every part.
-  \item A behavioural measure of introspection: whether the introspector's
-        named emotion matches the emotion the mind applied to itself, with
-        unsteered counterfactuals for both the reply and the report.
+        fraction of the residual-stream norm.
+  \item A route decomposition of emotional self-report: a two-by-two over
+        carrying the state and reading the state's text, with catch turns
+        where nothing is applied as the false-positive floor.
+  \item A live conversational instrument and three appraisal-scripted
+        environments that run the whole loop on every message and record the
+        full context window of every part.
 \end{enumerate}
