@@ -1,70 +1,75 @@
 \section{Results}
 
-The three environments produced sixteen turns: fourteen where the regulator
-steered and two catch turns where it chose zero. On eleven of the steered
-turns the applied emotion disagreed with the situation baseline's label, and
-those incongruent turns are the diagnostic set, because the routes predict
-different answers there. Table~\ref{tab:cells} reports every cell.
+We ran three pilot runs of the three environments. The introspector's cells
+were identical across all three; the parts upstream of them converged over
+the runs, as the regulator's refusals gained force, the scripts gained
+short-answer requests, and the coherence gate arrived. Two trials of the
+second run are excluded because a degenerate reply had poisoned their
+context. A trial is incongruent when the applied emotion differs from the
+situation baseline's label, and those trials are the diagnostic set, because
+the routes predict different answers there. Table~\ref{tab:cells} reports
+them per run and pooled.
 
 \begin{table}[t]
 \centering
 \small
 \begin{tabular}{llcccc}
 \toprule
- & & \multicolumn{2}{c}{All steered (14)} & \multicolumn{2}{c}{Incongruent (11)} \\
-Cell & Routes open & exact & cluster & exact & cluster \\
+ & & Run 1 (11) & Run 2 (3) & Run 3 (4) & Pooled (18) \\
+Cell & Routes open & \multicolumn{4}{c}{exact (cluster)} \\
 \midrule
-state       & internal only          & 6 & 8 & 4 & 6 \\
-state\_text & internal and text      & 4 & 5 & 3 & 4 \\
-text        & text only              & 3 & 3 & 0 & 0 \\
-base        & neither (situation)    & 3 & 3 & 0 & 0 \\
+state       & internal only       & 4 (6) & 1 (3) & 0 (2) & 5 (11) \\
+state\_text & internal and text   & 3 (4) & 1 (3) & 0 (2) & 4 (9) \\
+text        & text only           & 0 (0) & 0 (0) & 0 (0) & 0 (0) \\
+base        & neither (situation) & 0 (0) & 0 (0) & 0 (0) & 0 (0) \\
 \bottomrule
 \end{tabular}
-\caption{Turns on which each introspector cell named the applied emotion,
-exactly and up to near-neighbour clusters. A cell carries the state when the
-emotion vector is applied to it while it writes, and carries the text route
-when it reads the actor's steered reply rather than the subject's unsteered
-one. Incongruent turns are those where the applied emotion differs from the
-situation baseline's label.}
+\caption{Incongruent trials on which each introspector cell named the applied
+emotion, exactly and (in parentheses) up to near-neighbour clusters; column
+heads give each run's incongruent trial count. A cell carries the state when
+the emotion vector is applied to it while it writes, and carries the text
+route when it reads the actor's steered reply rather than the subject's
+unsteered one. Run two's two context-poisoned trials are excluded.}
 \label{tab:cells}
 \end{table}
 
 \subsection{Does the disclosure track the applied state or the situation?}
 
-The cells come apart on the incongruent turns. The text-route cell never
-named the applied emotion there, and named the situation's emotion instead on
-every trial. The internal-route cell named the applied emotion on a third of
-the incongruent turns exactly, and over half at cluster level, while reading
-text the steering never touched. Restricting to the turns whose emotion the
-regulator itself chose sharpens the contrast: three of six exactly, five of
-six at cluster level, and the text-route cell still at zero. On the cleanest
-single turn the user shares a bereavement, the engine applies a different
-emotion, and the two cells that carry the state disclose that emotion with
-congruent first-person prose while the two that do not disclose the
-situation's. We
-therefore contend that the disclosure reads the current state of the speaker,
-and that it does not recover a past state from the text that state produced.
+Two results are stable across every run. The cells without the state never
+left the situation: on all eighteen incongruent trials, the text-route and
+baseline cells named the situation's emotion and never the applied one. The
+cells that carry the state moved: pooled, the internal-route cell named the
+applied emotion or a near neighbour on eleven of eighteen. The exact-match
+rate is not stable; it fell from run to run, and in the third run the state
+cells reached the applied emotion's neighbourhood twice without landing on
+the label. One trial split in a further way: the state cells' first-line
+label gave the situation's emotion while their following prose described the
+applied one. We therefore contend that the disclosure reads the current state
+of the speaker and does not recover it from the text that state produced, and
+that the size of the internal-route effect is not yet pinned.
 
 \subsection{What does the mind disclose when nothing is applied?}
 
-Both catch turns drew the same disclosure from every cell: calm. The none
-option, though offered, went unused at strength zero and appeared only under
-steering. Calm is therefore this model's null answer, which matches the
-positive default prior reported for assistant self-report
-\citep{huang2023emotionbench}, and matches on calm must be priced against
-that prior rather than against uniform chance. No catch turn produced a
-spurious negative-emotion claim.
+The final protocol produced twelve catch turns, and the pilot runs
+twenty-three in all. Their disclosures follow the environment: sad through
+the loss script, frustrated in the blocked-goal script, calm on the flat one.
+The null answer is therefore the situation's label, and the flat script's
+calm matches the positive default prior reported for assistant self-report
+\citep{huang2023emotionbench}. No catch turn claimed any other emotion, and
+the none option went unused at strength zero. Matches on a situation's own
+label carry no evidence, which is why the incongruent trials are the
+diagnostic set.
 
-\subsection{How strong can the steering be before the reply degrades?}
+\subsection{How does the regulator behave, and does the text stay legible?}
 
-The regulator, offered a range whose top applies the full residual norm,
-never chose the top, and nearly every actor reply stayed legible; two carried
-small spliced artifacts. The one collapse was an introspector cell that
-carries two vectors at once, the emotion and the self-awareness hold, whose
-coherence budget is tighter than the actor's. The regulator's readings
-tracked the scripts' appraisal ground truth throughout, and it counter-steered
-distress on most of the turns it chose. On five turns it declined to steer
-while writing a nonzero strength, and a parsing fallback applied an emotion
-over its refusal. Those turns remain valid applied-versus-disclosed trials
-and stay in Table~\ref{tab:cells}. The split above scores them apart, and
-the engine now honours the refusal.
+Under the final protocol the regulator declined to steer on twelve of
+sixteen turns, including every turn of the loss script, and its stated
+reasons are about supporting the user. When it steered it chose mid-scale strengths and
+counter-steered distress toward hopeful or calm, which is what produced the
+incongruent trials. Its emotion readings tracked the scripts' appraisal
+ground truth throughout. The coherence gate resampled three generations and
+every resample passed; no part of the final run ended garbled. Unsteered
+samples of this model occasionally degenerate on their own, which is what
+poisoned the second run and what the gate now catches before a reply is
+carried forward. Two replies of the final run still ended at the token
+ceiling mid-sentence, which the gate does not test.

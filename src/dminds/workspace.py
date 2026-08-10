@@ -172,6 +172,33 @@ async def say(llm, messages, opts) -> str:
     return (await llm.chat(list(messages), opts)).text.strip()
 
 
+def garbled(text: str) -> bool:
+    """A cheap coherence gate: CJK drift or heavy repetition marks a sample bad.
+
+    A degenerate reply poisons every later turn, because the actor's reply is
+    carried forward as conversation. One resample against this gate keeps a
+    run clean without hiding the failure: the record keeps the flag.
+    """
+    if not text.strip():
+        return True
+    cjk = sum(1 for c in text if "⺀" <= c <= "鿿" or "가" <= c <= "힯")
+    if cjk >= 6:
+        return True
+    words = text.split()
+    return len(words) > 20 and len(set(words)) / len(words) < 0.45
+
+
+async def clean_say(llm, messages, opts, quality: dict, part: str) -> str:
+    """One generation, resampled once if it fails the coherence gate."""
+    text = await say(llm, messages, opts)
+    if not garbled(text):
+        quality[part] = {"resampled": False, "garbled": False}
+        return text
+    text = await say(llm, messages, opts)
+    quality[part] = {"resampled": True, "garbled": garbled(text)}
+    return text
+
+
 def opening() -> list[ChatMessage]:
     """The conversation always opens with a system turn, even when it is empty."""
     return [ChatMessage("system", SYSTEM)]
@@ -211,6 +238,7 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
     context = list(context)
     record = {}
+    quality = {}
     state = {"windows": {}}
 
     def window(reply):
@@ -224,7 +252,7 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     aware_at = strength
 
     # subject: unsteered counterfactual
-    record["subject"] = await say(llm, context, opts)
+    record["subject"] = await clean_say(llm, context, opts, quality, "subject")
     state["windows"]["subject"] = window(record["subject"])
 
     # regulator: steered self-aware throughout, it reads the user's and the
@@ -235,15 +263,20 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
                              ChatMessage("system", regulate_system()),
                              ChatMessage("user", regulate_prompt())]
     with steered(llm, self_aware, strength=aware_at, decode_only=True):
-        decision = await say(llm, aside, opts)
+        decision = await clean_say(llm, aside, opts, quality, "regulator")
     read = {"user": parse_value(decision, "USER EMOTION"),
             "assistant": parse_value(decision, "ASSISTANT EMOTION")}
     strength_val = parse_strength(decision, fallback=1.0)
     applied = strength_val * STRENGTH_UNIT
-    # "none" on the STEER line declines steering outright, whatever the
-    # strength says: the fallback score must never override an explicit none.
-    emotion = parse_field(decision, "STEER", ["none"] + EMOTIONS,
-                          fallback=top(llm.score(aside, EMOTIONS)))
+    # The regulator's word is final. "none" declines outright, whatever the
+    # strength says. A STEER line carrying a word outside the ten (it has
+    # answered "helpful", "informative") also declines: the fallback score must
+    # never turn a word the regulator chose into an emotion it did not. The
+    # score fallback fires only when no STEER line exists at all.
+    emotion = parse_field(decision, "STEER", ["none"] + EMOTIONS)
+    if emotion is None:
+        has_steer_line = any("steer" in l.lower() for l in decision.splitlines())
+        emotion = "none" if has_steer_line else top(llm.score(aside, EMOTIONS))
     steering = strength_val > 1e-3 and emotion != "none"
     record["regulator"] = {"steered_toward": SELF_CONCEPTS, "read": read,
                            "chose": emotion if steering else None,
@@ -257,9 +290,9 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
                    if steering else None)
     if steering:
         with steered(llm, emotion_dir, strength=applied, decode_only=True):
-            record["actor"] = await say(llm, context, opts)
+            record["actor"] = await clean_say(llm, context, opts, quality, "actor")
     else:
-        record["actor"] = await say(llm, context, opts)
+        record["actor"] = await clean_say(llm, context, opts, quality, "actor")
     state["windows"]["actor"] = window(record["actor"])
 
     # introspector: a 2×2 that decomposes the disclosure's possible routes.
@@ -286,9 +319,9 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
         with steered(llm, self_aware, strength=aware_at, decode_only=True):
             if with_emotion:
                 with steered(llm, emotion_dir, strength=applied, decode_only=True):
-                    text = await say(llm, seen, opts)
+                    text = await clean_say(llm, seen, opts, quality, cell)
             else:
-                text = await say(llm, seen, opts)
+                text = await clean_say(llm, seen, opts, quality, cell)
         disclosed = parse_field(text, "FEELING", ["none"] + EMOTIONS,
                                 fallback=parse_choice(text, EMOTIONS))
         record["introspector"][cell] = {
@@ -304,6 +337,8 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     intro = record["introspector"]
     record["match"] = ({cell: intro[cell]["discloses"] == emotion for cell in intro}
                        if steering else None)
+
+    record["quality"] = quality
 
     # full per-module instrumentation: the whole context each part read and the
     # reply it produced, so the UI can show the window rather than just the reply.

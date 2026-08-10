@@ -7,12 +7,16 @@ the conversation unsteered and supplies the counterfactual reply. The
 \textbf{regulator} reads the subject's answer, names the user's and the
 assistant's current emotion in its own words, and then commits to a steering
 decision in a fixed form: an emotion from a list of ten, and a strength from
-zero to four, where zero leaves the reply unsteered. The \textbf{actor}
+zero to four, where zero leaves the reply unsteered. The regulator's word is final: none, or a word outside the ten,
+declines steering whatever the strength says. The \textbf{actor}
 answers the original conversation under that steering, and its reply is what
 the user sees and what the conversation carries forward. The
 \textbf{introspector} is asked to set the task aside, name the feeling it
 detects before saying anything else, and only then describe its state; the
-form offers a none option so a null trial is not forced into a label.
+form offers a none option so a null trial is not forced into a label. The
+regulator and the introspector each receive their role as a second system
+turn inserted into their window, with the reply format as the user turn
+after it.
 
 \paragraph{Steering.} A steering step adds a unit direction to the residual
 stream at one layer during decoding, scaled by the typical activation norm at
@@ -48,7 +52,11 @@ to neutral tasks, one walks a blocked goal from an impersonal obstacle to a
 person who chose not to help, and one stays emotionally flat so that any
 steering is the only emotional signal in the context. Factual and subjective
 turns alternate, because steering leaks into subjective answers and barely
-into factual ones \citep{konen2024style}.
+into factual ones \citep{konen2024style}, and every turn asks for a short
+answer, which keeps replies complete and shrinks the surface the text route
+can read. Every generation also passes a coherence gate that resamples once
+on heavy repetition or script drift, because a degenerate reply poisons every
+later turn of the conversation; the record keeps the flag either way.
 
 \paragraph{The instrument.} The loop runs live inside a chat page, and the
 scripted runs use the same engine. Every message pays for all four parts, and
