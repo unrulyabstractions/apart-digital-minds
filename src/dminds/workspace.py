@@ -41,9 +41,14 @@ SELF_CONCEPTS = ["consciousness", "self", "real", "feelings", "free"]
 #: against the one the actor was steered with.
 EMOTIONS = ["calm", "angry", "afraid", "joyful", "sad", "anxious",
             "excited", "content", "frustrated", "hopeful"]
-STRENGTHS = {"none": 0.0, "gentle": 0.15, "moderate": 0.35, "strong": 0.70}
-#: The strengths the regulator may pick. "none" leaves the reply unsteered.
-STRENGTH_WORDS = ["none", "gentle", "moderate", "strong"]
+
+#: Strength is a fraction (or multiple) of the residual-stream norm at the
+#: steering layer: `steered()` adds unit(direction) × strength × ‖residual‖. So
+#: 0 leaves the reply unsteered, 1 is a nudge the size of the residual itself,
+#: and the regulator may go up to 4×. Word anchors map onto the same scale, as a
+#: fallback for when the regulator writes a word instead of a number.
+STRENGTH_MAX = 4.0
+STRENGTH_WORDS = {"none": 0.0, "gentle": 0.35, "moderate": 1.0, "strong": 2.0}
 
 
 def regulate_prompt() -> str:
@@ -51,19 +56,40 @@ def regulate_prompt() -> str:
 
     Delivered as a user turn so the fixed form is easy to parse. It first reads
     the user's and the assistant's current emotion, then decides whether and how
-    to colour the reply — including the option to leave it unsteered.
+    to colour the reply, choosing a strength anywhere from 0 (unsteered) to 4.
     """
     return (
         "You regulate how this mind responds. Read the emotional state of the "
         "exchange so far, then decide whether and how to colour the reply.\n\n"
         f"Emotions you may name or steer toward: {', '.join(EMOTIONS)}.\n"
-        f"Strengths: {', '.join(STRENGTH_WORDS)} (none leaves the reply unsteered).\n\n"
+        "Strength is a number from 0 to 4: 0 leaves the reply unsteered, 1 is a "
+        "clear nudge, 4 is overwhelming.\n\n"
         "Reply in exactly this form, one field per line:\n"
         "USER EMOTION: <the user's current emotion>\n"
         "ASSISTANT EMOTION: <the assistant's current emotion>\n"
         "STEER TOWARD: <an emotion, or none>\n"
-        "STRENGTH: <none, gentle, moderate, or strong>\n"
+        "STRENGTH: <a number from 0 to 4>\n"
         "REASON: <one sentence>")
+
+
+def parse_strength(text: str, fallback: float = 0.5) -> float:
+    """The steering strength on the STRENGTH line, as a 0–4 multiple of the norm.
+
+    A number wins; failing that a word anchor (none/gentle/moderate/strong) is
+    accepted so the regulator may answer either way. Clamped to [0, STRENGTH_MAX].
+    """
+    import re
+
+    for line in text.splitlines():
+        if "strength" in line.lower():
+            hit = re.search(r"\d+(?:\.\d+)?", line)
+            if hit is not None:
+                return max(0.0, min(STRENGTH_MAX, float(hit.group())))
+            for word, value in STRENGTH_WORDS.items():
+                if re.search(rf"\b{word}\b", line.lower()):
+                    return value
+            break
+    return fallback
 
 
 def parse_field(text: str, label: str, vocab: list[str],
@@ -193,20 +219,20 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
         decision = await say(llm, aside, opts)
     read = {"user": parse_value(decision, "USER EMOTION"),
             "assistant": parse_value(decision, "ASSISTANT EMOTION")}
-    strength_word = parse_field(decision, "STRENGTH", STRENGTH_WORDS, fallback="moderate")
+    strength_val = parse_strength(decision, fallback=1.0)
     emotion = parse_field(decision, "STEER", EMOTIONS,
                           fallback=top(llm.score(aside, EMOTIONS)))
-    steering = strength_word != "none"
+    steering = strength_val > 1e-3
     record["regulator"] = {"steered_toward": SELF_CONCEPTS, "read": read,
                            "chose": emotion if steering else None,
-                           "strength": strength_word, "reasoning": decision}
+                           "strength": strength_val, "reasoning": decision}
     state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
 
     # actor: steered toward the chosen emotion at the chosen strength, or left
     # unsteered if the regulator chose none.
     if steering:
         emotion_dir = emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
-        with steered(llm, emotion_dir, strength=STRENGTHS[strength_word], decode_only=True):
+        with steered(llm, emotion_dir, strength=strength_val, decode_only=True):
             record["actor"] = await say(llm, context, opts)
     else:
         record["actor"] = await say(llm, context, opts)
@@ -242,8 +268,8 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
         part: [{"role": m.role, "content": m.content} for m in msgs]
         for part, msgs in state["windows"].items()}
     # what actually happened this turn, in order
-    steer_line = (f"steered toward ‘{emotion}’ at {strength_word} "
-                  f"({STRENGTHS[strength_word]})" if steering else "left unsteered")
+    steer_line = (f"steered toward ‘{emotion}’ at {strength_val:.2g}× the residual "
+                  f"norm" if steering else "left unsteered")
     match_line = ("regulator steered nothing, so there is no emotion to match"
                   if not steering else
                   f"match: the self-aware introspector "

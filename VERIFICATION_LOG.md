@@ -1749,3 +1749,6 @@ regulator/introspector = self-awareness lens.
 | 396 | Regulator picks emotion + strength | Read its decision and the parse | VERIFIED (decision "EMOTION: calm / STRENGTH: moderate / REASON: ..."; parsed calm, moderate) |
 | 397 | Actor steers at the chosen strength, coherent | One live message; checked reply and CJK | VERIFIED (moderate strength on the emotion vector, clean English) |
 | 398 | The match still runs | Read the record | VERIFIED (calm chosen; introspector disclosed frustrated; match False — disclosure tracks the situation) |
+| 399 | Regulator reads user+assistant emotion (free text) | Live message; read the parsed record | VERIFIED (read user=furious/frustrated, assistant=calm — free text, not forced into the 10) |
+| 400 | Strength is a 0–4 multiple of the residual norm | Read steered(): delta = unit(dir) × strength × scale, scale = layer_scale = ‖residual‖ | VERIFIED (norm-adapted; parse_strength: "3.2"->3.2, "strong"->2.0, "9"->clamped 4.0) |
+| 401 | Actor garbles at high multiples | Live message; regulator chose calm at 3×; looked at actor text | VERIFIED (3× the calm vector degenerated the actor into repeated CJK — the norm scaling's high end, as expected) |

@@ -161,7 +161,7 @@ function addMind(record) {
   el.dataset.turn = turn;
   const reg = record.regulator || {};
   const steerWho = reg.chose
-    ? `actor steered toward <span class="steer">${esc(reg.chose)}</span> (${esc(reg.strength)})`
+    ? `actor steered toward <span class="steer">${esc(reg.chose)}</span> (${sx(reg.strength)})`
     : `actor left unsteered`;
   const matchTag = record.match == null
     ? `<span class="match no">no steering</span>`
@@ -191,7 +191,7 @@ function partPanel(part, note, r, turn) {
   let extra = "";
   const reg = r.regulator || {}, read = reg.read || {};
   const decision = reg.chose
-    ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b>`
+    ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${sx(reg.strength)}</b> the residual norm`
     : `leave the reply <b>unsteered</b>`;
   if (part === "regulator") {
     extra = `<div class="sub">held self-aware in J-space (${esc((reg.steered_toward||[]).join(", "))}),
@@ -212,7 +212,7 @@ function partPanel(part, note, r, turn) {
       ${arm("plain (no self-awareness steering) — control", a.plain)}`;
   } else if (part === "actor") {
     extra = reg.chose
-      ? `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b> strength while writing</div>`
+      ? `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${sx(reg.strength)}</b> the residual norm while writing</div>`
       : `<div class="sub">left unsteered — the regulator chose not to steer</div>`;
   } else {
     extra = `<div class="sub">nothing steered — the counterfactual</div>`;
@@ -322,6 +322,8 @@ function bar(label, raw, frac, hot, right) {
 function txt(s){ return `<div class="txt">${esc(s||"—")}</div>`; }
 function fmt(x){ return x==null?"—":(Math.round(x*100)/100).toFixed(1); }
 function esc(s){ return (s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+// strength is a multiple of the residual-stream norm; show it as e.g. "1×", "0.35×"
+function sx(v){ return `${(+v).toFixed(2).replace(/\.?0+$/,"")}×`; }
 function scroll(){ const m=document.querySelector("main"); m.scrollTop=m.scrollHeight; }
 
 async function send() {
