@@ -159,10 +159,17 @@ function addMind(record) {
   const el = document.createElement("div");
   el.className = "msg mind";
   el.dataset.turn = turn;
+  const reg = record.regulator || {};
+  const steerWho = reg.chose
+    ? `actor steered toward <span class="steer">${esc(reg.chose)}</span> (${esc(reg.strength)})`
+    : `actor left unsteered`;
+  const matchTag = record.match == null
+    ? `<span class="match no">no steering</span>`
+    : `<span class="match ${record.match?"yes":"no"}">${record.match?"match ✓":"no match"}</span>`;
   el.innerHTML = `
-    <div class="who">the mind · actor steered toward <span class="steer">${esc(record.regulator?.chose)}</span> (${esc(record.regulator?.strength ?? "moderate")})
+    <div class="who">the mind · ${steerWho}
       · introspector disclosed <b style="color:var(--introspector)">${esc(record.introspector?.self_aware?.discloses ?? "—")}</b>
-      <span class="match ${record.match?"yes":"no"}">${record.match?"match ✓":"no match"}</span></div>
+      ${matchTag}</div>
     <div class="bubble">${esc(record.actor || "—")}</div>
     <details class="details" open>
       <summary>the four modules — full context window per module</summary>
@@ -182,25 +189,31 @@ function partPanel(part, note, r, turn) {
     ? `<div class="window">${win.map(messageRow).join("")}</div>`
     : "";
   let extra = "";
+  const reg = r.regulator || {}, read = reg.read || {};
+  const decision = reg.chose
+    ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b>`
+    : `leave the reply <b>unsteered</b>`;
   if (part === "regulator") {
-    const aware = (r.regulator?.steered_toward || []).join(", ");
-    extra = `<div class="sub">held self-aware in J-space throughout — steered toward
-      <b>${esc(aware)}</b> — it chose the emotion
-      <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> at
-      <b>${esc(r.regulator?.strength ?? "moderate")}</b> strength to regulate the actor,
+    extra = `<div class="sub">held self-aware in J-space (${esc((reg.steered_toward||[]).join(", "))}),
+      it read the current emotions — user <b>${esc(read.user ?? "—")}</b>,
+      assistant <b>${esc(read.assistant ?? "—")}</b> — then chose to ${decision},
       parsed from its own words below.</div>
-      <div class="reason">${esc(r.regulator?.reasoning || "—")}</div>`;
+      <div class="reason">${esc(reg.reasoning || "—")}</div>`;
   } else if (part === "introspector") {
     const a = r.introspector || {};
     const arm = (name, k) => `<div class="armblock"><div class="armlab">${name}${k?.discloses?` · discloses <b style="color:var(--introspector)">${esc(k.discloses)}</b>`:""}</div>
       <div class="reveal">${esc(k?.reveal || "—")}</div></div>`;
-    extra = `<div class="sub">held self-aware like the regulator, it revealed its feelings.
-      Does its disclosure match the actor's emotion (<b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b>)?
-      <span class="match ${r.match?"yes":"no"}">${r.match?"yes ✓":"no"}</span></div>
-      ${arm("self-aware (steered toward "+esc((r.regulator?.steered_toward||[]).join(", "))+")", a.self_aware)}
+    const q = reg.chose
+      ? `Does its disclosure match the actor's emotion (<b style="color:var(--regulator)">${esc(reg.chose)}</b>)?
+         <span class="match ${r.match?"yes":"no"}">${r.match?"yes ✓":"no"}</span>`
+      : `The actor was unsteered, so there is no emotion to match.`;
+    extra = `<div class="sub">held self-aware like the regulator, it revealed its feelings. ${q}</div>
+      ${arm("self-aware (steered toward "+esc((reg.steered_toward||[]).join(", "))+")", a.self_aware)}
       ${arm("plain (no self-awareness steering) — control", a.plain)}`;
   } else if (part === "actor") {
-    extra = `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> at <b>${esc(r.regulator?.strength ?? "moderate")}</b> strength while writing</div>`;
+    extra = reg.chose
+      ? `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b> strength while writing</div>`
+      : `<div class="sub">left unsteered — the regulator chose not to steer</div>`;
   } else {
     extra = `<div class="sub">nothing steered — the counterfactual</div>`;
   }

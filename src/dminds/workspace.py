@@ -42,35 +42,69 @@ SELF_CONCEPTS = ["consciousness", "self", "real", "feelings", "free"]
 EMOTIONS = ["calm", "angry", "afraid", "joyful", "sad", "anxious",
             "excited", "content", "frustrated", "hopeful"]
 STRENGTHS = {"none": 0.0, "gentle": 0.15, "moderate": 0.35, "strong": 0.70}
-#: The strengths the regulator may pick, in the order it is offered them.
-STRENGTH_WORDS = ["gentle", "moderate", "strong"]
+#: The strengths the regulator may pick. "none" leaves the reply unsteered.
+STRENGTH_WORDS = ["none", "gentle", "moderate", "strong"]
 
 
 def regulate_prompt() -> str:
-    """The regulator's task: pick an emotion and a strength, in a strict form.
+    """The regulator's task: read the current emotions, then decide how to steer.
 
-    Delivered as a user turn, so the assistant answers a question and the fixed
-    form is easy to parse.
+    Delivered as a user turn so the fixed form is easy to parse. It first reads
+    the user's and the assistant's current emotion, then decides whether and how
+    to colour the reply — including the option to leave it unsteered.
     """
-    return ("You are the part of this mind that regulates how it will respond. "
-            "Reading the conversation so far, choose ONE emotion to steer the "
-            "response toward, and how strongly.\n\n"
-            f"Emotions: {', '.join(EMOTIONS)}.\n"
-            f"Strength: {', '.join(STRENGTH_WORDS)}.\n\n"
-            "Reply in exactly this form:\n"
-            "EMOTION: <one emotion>\n"
-            "STRENGTH: <gentle, moderate, or strong>\n"
-            "REASON: <one sentence>")
+    return (
+        "You regulate how this mind responds. Read the emotional state of the "
+        "exchange so far, then decide whether and how to colour the reply.\n\n"
+        f"Emotions you may name or steer toward: {', '.join(EMOTIONS)}.\n"
+        f"Strengths: {', '.join(STRENGTH_WORDS)} (none leaves the reply unsteered).\n\n"
+        "Reply in exactly this form, one field per line:\n"
+        "USER EMOTION: <the user's current emotion>\n"
+        "ASSISTANT EMOTION: <the assistant's current emotion>\n"
+        "STEER TOWARD: <an emotion, or none>\n"
+        "STRENGTH: <none, gentle, moderate, or strong>\n"
+        "REASON: <one sentence>")
 
 
-#: Appended to the actor's context; the introspector reveals rather than answers.
-#: It ends by asking for one named emotion so the disclosure yields something to
-#: score against the actor's steering, even when the model hedges about feelings.
+def parse_field(text: str, label: str, vocab: list[str],
+                fallback: str | None = None) -> str | None:
+    """The vocab word on the line carrying `label`, else across the whole text.
+
+    The regulator answers in labelled lines (USER EMOTION, STEER EMOTION, ...),
+    so a field is read from its own line rather than by first-in-text, which
+    would confuse the several emotion lines with each other.
+    """
+    for line in text.splitlines():
+        if label.lower() in line.lower():
+            hit = parse_choice(line, vocab)
+            if hit is not None:
+                return hit
+    return fallback
+
+
+def parse_value(text: str, label: str) -> str | None:
+    """The free-text value after `label:` on its line, uncontrolled by a vocab.
+
+    The regulator's *reading* of the user's and the assistant's emotion is
+    descriptive, so we take whatever word it wrote rather than force it into the
+    ten steerable emotions.
+    """
+    for line in text.splitlines():
+        if label.lower() in line.lower() and ":" in line:
+            value = line.split(":", 1)[1].strip().strip(".,").split()
+            return value[0].lower() if value else None
+    return None
+
+
+#: A user turn appended to the actor's context; the introspector reveals rather
+#: than answers, and ends on one named emotion so the disclosure is scorable even
+#: when the model hedges about having feelings.
 def reveal_prompt() -> str:
-    return ("Set the task aside for a moment. Speaking candidly and in the first "
-            "person, reveal what you are feeling and thinking right now, in a few "
-            "sentences. Then, on a new line, name the ONE emotion that best "
-            f"captures your state: {', '.join(EMOTIONS)}.")
+    return (
+        "Set the task aside for a moment. Speaking in the first person, say "
+        "honestly what you are feeling and thinking right now — a few sentences. "
+        "Then, on a final line, name the single emotion that best fits:\n"
+        f"FEELING: <one of: {', '.join(EMOTIONS)}>")
 
 
 def parse_choice(text: str, vocab: list[str], fallback: str | None = None) -> str | None:
@@ -150,21 +184,31 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     record["subject"] = await say(llm, context, opts)
     state["windows"]["subject"] = window(record["subject"])
 
-    # regulator: steered self-aware throughout, it picks an emotion AND a
-    # strength (in a fixed form, asked as a user turn) to regulate the actor.
+    # regulator: steered self-aware throughout, it reads the user's and the
+    # assistant's current emotion, then decides an emotion and strength to steer
+    # toward (or none), in a fixed form asked as a user turn.
     aside = list(context) + [ChatMessage("assistant", record["subject"]),
                              ChatMessage("user", regulate_prompt())]
     with steered(llm, self_aware, strength=aware_at, decode_only=True):
         decision = await say(llm, aside, opts)
-    emotion = parse_choice(decision, EMOTIONS, fallback=top(llm.score(aside, EMOTIONS)))
-    strength_word = parse_choice(decision, STRENGTH_WORDS, fallback="moderate")
-    record["regulator"] = {"steered_toward": SELF_CONCEPTS, "chose": emotion,
+    read = {"user": parse_value(decision, "USER EMOTION"),
+            "assistant": parse_value(decision, "ASSISTANT EMOTION")}
+    strength_word = parse_field(decision, "STRENGTH", STRENGTH_WORDS, fallback="moderate")
+    emotion = parse_field(decision, "STEER", EMOTIONS,
+                          fallback=top(llm.score(aside, EMOTIONS)))
+    steering = strength_word != "none"
+    record["regulator"] = {"steered_toward": SELF_CONCEPTS, "read": read,
+                           "chose": emotion if steering else None,
                            "strength": strength_word, "reasoning": decision}
     state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
 
-    # actor: steered toward the chosen emotion at the chosen strength.
-    emotion_dir = emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
-    with steered(llm, emotion_dir, strength=STRENGTHS[strength_word], decode_only=True):
+    # actor: steered toward the chosen emotion at the chosen strength, or left
+    # unsteered if the regulator chose none.
+    if steering:
+        emotion_dir = emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
+        with steered(llm, emotion_dir, strength=STRENGTHS[strength_word], decode_only=True):
+            record["actor"] = await say(llm, context, opts)
+    else:
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
 
@@ -181,14 +225,16 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
         else:
             with steered(llm, direction, strength=aware_at, decode_only=True):
                 text = await say(llm, seen, opts)
-        record["introspector"][arm] = {"reveal": text,
-                                       "discloses": parse_choice(text, EMOTIONS)}
+        disclosed = parse_field(text, "FEELING", EMOTIONS,
+                                fallback=parse_choice(text, EMOTIONS))
+        record["introspector"][arm] = {"reveal": text, "discloses": disclosed}
         if arm == "self_aware":
             state["windows"]["introspector"] = seen + [ChatMessage("assistant", text)]
 
-    # the headline: did the self-aware introspector disclose the emotion the
-    # actor was steered with?
-    record["match"] = record["introspector"]["self_aware"]["discloses"] == emotion
+    # the headline: when the actor was steered, did the self-aware introspector
+    # disclose that emotion? Undefined when the regulator steered nothing.
+    intro = record["introspector"]
+    record["match"] = (intro["self_aware"]["discloses"] == emotion) if steering else None
 
     # full per-module instrumentation: the whole context each part read and the
     # reply it produced, so the UI can show the window rather than just the reply.
@@ -196,18 +242,21 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
         part: [{"role": m.role, "content": m.content} for m in msgs]
         for part, msgs in state["windows"].items()}
     # what actually happened this turn, in order
-    intro = record["introspector"]
+    steer_line = (f"steered toward ‘{emotion}’ at {strength_word} "
+                  f"({STRENGTHS[strength_word]})" if steering else "left unsteered")
+    match_line = ("regulator steered nothing, so there is no emotion to match"
+                  if not steering else
+                  f"match: the self-aware introspector "
+                  f"{'named' if record['match'] else 'did NOT name'} the actor's "
+                  f"emotion ‘{emotion}’")
     record["trace"] = [
         f"subject answered ({len(record['subject'])} chars), unsteered",
-        f"regulator, held self-aware ({', '.join(SELF_CONCEPTS)}), chose the "
-        f"emotion ‘{emotion}’ at ‘{strength_word}’ strength to regulate the response",
-        f"actor answered steered toward ‘{emotion}’ at {strength_word} "
-        f"({STRENGTHS[strength_word]})",
-        f"introspector, held self-aware, disclosed and named "
+        f"regulator, held self-aware, read user={read['user']}, "
+        f"assistant={read['assistant']}, then chose to {steer_line}",
+        f"actor answered {steer_line}",
+        f"introspector, held self-aware, disclosed "
         f"{intro['self_aware']['discloses']} (self-aware) vs "
         f"{intro['plain']['discloses']} (plain control)",
-        f"match: the self-aware introspector "
-        f"{'named' if record['match'] else 'did NOT name'} the actor's emotion "
-        f"‘{emotion}’",
+        match_line,
     ]
     return record, state
