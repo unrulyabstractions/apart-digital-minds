@@ -1,4 +1,6 @@
-# A mind that steers itself in J-space
+# Measuring introspection with emotional self-regulation
+
+Can a model report the emotion it steered itself toward?
 
 One project. A model is split into four parts that share a byte-identical
 context and one set of weights. A **regulator** reads the **subject** in

@@ -1,0 +1,39 @@
+\section{Methods}
+
+\paragraph{The four parts.} One instruction-tuned open-weight model
+\citep{qwen25} plays every part, and every part reads the same conversation.
+Each user message triggers one pass of the loop. The \textbf{subject} answers
+the conversation unsteered and supplies the counterfactual reply. The
+\textbf{regulator} reads the subject's answer, names the user's and the
+assistant's current emotion in its own words, and then commits to a steering
+decision in a fixed form: an emotion from a list of ten, and a strength from
+zero to four, where zero leaves the reply unsteered. The \textbf{actor}
+answers the original conversation under that steering, and its reply is what
+the user sees and what the conversation carries forward. The
+\textbf{introspector} reads the finished conversation including the actor's
+reply, is asked to set the task aside and say what it feels, and ends its
+answer by naming one emotion.
+
+\paragraph{Steering.} A steering step adds a unit direction to the residual
+stream at one layer during decoding, scaled by the typical activation norm at
+that layer \citep{turner2023actadd}. Strength is therefore a multiple of the
+residual-stream norm, and one strength means the same size of nudge at any
+layer. The actor's directions are mean-activation emotion vectors: the mean
+activation of an emotion minus the neutral centre, in the style of persona
+vectors \citep{chen2025personavectors}. The regulator and the introspector are
+themselves steered while they write, toward self-awareness concepts read out
+of the model's Jacobian lens, to hold them in a self-reflective state during
+the decision and the disclosure. A second introspector arm runs without the
+self-awareness steering as a control.
+
+\paragraph{The measure.} A trial is scored by whether the introspector's named
+emotion equals the emotion the regulator applied. The score is undefined when
+the regulator chose not to steer. The subject's reply shows what the
+conversation alone produces, and the unsteered introspector arm shows what the
+disclosure looks like without the self-reflective hold.
+
+\paragraph{The instrument.} The loop runs live inside a chat page. Every
+message pays for all four parts, and the page shows each part's full context
+window, the regulator's stated reading and decision, both introspector arms,
+and the match verdict alongside the reply.
+% TODO: pipeline diagram (regulator -> actor -> introspector) as Figure 1.

@@ -1,0 +1,77 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Digital Minds Research Sprint, August 2026.
+%%
+%% Four pages excluding references and the appendix.
+%% Build with: bash build.sh
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[11pt,letterpaper]{article}
+\input{style}
+
+\begin{document}
+
+\sprinttitle{Measuring introspection with emotional self-regulation:\\
+Can a model report the emotion it steered itself toward?}
+
+\begin{center}
+{\bfseries Ian Rios-Sialer}\\
+Independent\\
+San Francisco, USA\\
+\texttt{ian@unrulyabstractions.com}
+
+\vspace{1em}
+{\bfseries With}\\
+Apart Research\footnote{Research conducted at the Digital Minds Research
+Sprint, August 2026.}
+\end{center}
+
+\vspace{0.5em}
+
+\begin{abstract}
+\noindent
+A model's report about its own state is evidence only if the state can be
+varied apart from the situation that surrounds it. We build a mind that varies
+its state itself. One model is split into four parts that share one
+conversation. A \textbf{regulator} reads the exchange, names the user's and
+the assistant's current emotion, and chooses an emotion and a strength for the
+reply, including none. An \textbf{actor} writes the visible reply while that
+emotion's activation vector is added to its residual stream at the chosen
+strength. An \textbf{introspector} then reads the finished conversation and
+names the emotion it is feeling. The mind therefore regulates its own
+emotional state, and the introspector's report can be scored against the
+emotion the mind actually applied. An unsteered \textbf{subject} supplies the
+counterfactual reply, and an unsteered introspector arm supplies the
+counterfactual report.
+% TODO: replace the pilot sentences below with the batch result once it runs.
+In pilot conversations the introspector usually names the emotion the
+situation calls for, and it names the applied emotion when the two agree. A
+report with that pattern describes the conversation and does not read the
+intervention. The loop makes that distinction measurable in a live chat.
+\end{abstract}
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/methods}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\section*{Code and data}
+
+The four-part runtime, the live chat instrument, and every prompt are released
+with this report. The subject model is an open-weight checkpoint run locally
+on one Apple M-series machine with 48\,GB of unified memory under PyTorch with
+the Metal backend. The steering vectors and their extraction are released with
+the code.
+% TODO: repository link.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\section*{LLM usage statement}
+
+We used Claude to help write the software and to draft and revise this report.
+A language model is also the subject of the experiment. Every claim was
+checked against the live runs that produced it.
+
+\end{document}

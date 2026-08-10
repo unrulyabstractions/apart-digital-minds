@@ -1,0 +1,24 @@
+\section{Discussion and limitations}
+
+If a mind cannot report an emotion it applied to itself, its self-reports are
+weak evidence about its inner states, and arguments that rest on such reports
+inherit that weakness. The design also gives the claim a positive form: a
+model whose disclosure tracked its self-applied steering, and kept tracking it
+when the steering opposed the situation, would have shown something an
+external injection cannot show. Either outcome informs how much weight
+self-reports should carry in assessments of digital minds.
+
+\paragraph{Limitations.} One model plays every part, at one size. The emotion
+list is short, and a named emotion is a coarse summary of a state. A steering
+vector is a proxy for an emotional state, and matching its label is a proxy
+for introspecting it. The introspector reads the actor's reply, so it can
+infer the applied emotion from the tone of the text rather than from anything
+internal, and the current design cannot tell those two routes apart. The pilot
+scale supports the design. It does not yet support a conclusion.
+
+\paragraph{Future work.} The route through the text can be closed by hiding
+the actor's reply from the introspector, so a correct disclosure could only
+come from the shared weights. The diagnostic case is steering against the
+situation, where the two candidate sources of the report disagree. A batch
+study over fixed scenarios would put numbers under both, and larger models
+would say whether the report improves with scale.

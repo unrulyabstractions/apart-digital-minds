@@ -1,0 +1,31 @@
+\section{Introduction}
+
+Self-reports have been proposed as evidence about whether an AI system has
+states that matter morally \citep{perez2023selfreports}. A report is evidence
+about a state only if the report varies with the state. Humans fail this test
+in a known way: people confabulate reasons when the real cause of their
+behaviour is unavailable to them \citep{nisbett1977telling}. Language models
+fail it too, and their accounts of their own reasoning are often unfaithful
+\citep{turpin2023unfaithful}.
+
+Existing tests of model introspection inject a state from outside and ask
+whether the model notices \citep{binder2024introspection,
+lindsey2025introspection}. We study the case where the model applies the state
+itself. A mind that regulates its own emotional state must know what that
+state is, so \textbf{emotional self-regulation} gives introspection something
+concrete to be right or wrong about. We build a mind out of four parts of one
+model. A regulator chooses an emotion and a strength, an actor writes the
+reply under that steering, and an introspector reports what it feels. The
+report is scored against the emotion the regulator applied.
+
+Our main contributions are:
+\begin{enumerate}[itemsep=2pt]
+  \item A four-part architecture in which one model regulates its own
+        emotional state by activation steering, with strength expressed as a
+        multiple of the residual-stream norm.
+  \item A live conversational instrument that runs the whole loop on every
+        message and records the full context window of every part.
+  \item A behavioural measure of introspection: whether the introspector's
+        named emotion matches the emotion the mind applied to itself, with
+        unsteered counterfactuals for both the reply and the report.
+\end{enumerate}

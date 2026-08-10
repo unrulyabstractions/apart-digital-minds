@@ -1,0 +1,32 @@
+%% One column, Times, generous margins. Shared by the paper and its supplement
+%% so the two documents look like one submission.
+
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage{newtxtext,newtxmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage[round]{natbib}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{1em}
+
+%% A figure sized for one column is now a figure sized for the page.
+\newcommand{\figwidth}{\textwidth}
+
+%% The title block the sprint template uses: a rule, the title, a rule, then
+%% the authors.
+\newcommand{\sprinttitle}[1]{%
+  \noindent\rule{\textwidth}{2pt}\par
+  \vspace{1.2em}
+  \begin{center}\bfseries\Large #1\end{center}
+  \vspace{0.8em}
+  \noindent\rule{\textwidth}{0.8pt}\par
+  \vspace{1.4em}}
