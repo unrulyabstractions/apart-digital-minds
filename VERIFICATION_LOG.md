@@ -1756,3 +1756,26 @@ regulator/introspector = self-awareness lens.
 | 403 | references.bib new entries | curled every arXiv abs page and the transformer-circuits URL, compared titles | VERIFIED (4/5 exact; 2308.10248 was retitled "Steering Language Models With Activation Engineering" -- fixed in the bib; reused 6 entries carried from the pre-pivot paper) |
 | 404 | writing-voice pass over all paper prose | Ran the checklist over every section | VERIFIED (one violation found and fixed: an "X, not Y" punch line in limitations; rewrite confirmed in the rebuilt PDF via pdftotext) |
 | 405 | Rename in README.md and ui/jspace.html | Grepped for the old name after editing | VERIFIED (old title appears nowhere; new title in README h1, html <title>, and page brand) |
+
+## 2026-08-10 — literature findings: prompt-based emotion induction (scenario-design subagent)
+
+Findings returned as structured output to the orchestrator, not as a file.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 406 | Coda-Forno et al. 2023 induction prompts, STICSA administration, effect sizes | Downloaded arxiv.org/pdf/2304.11111v1, viewed pages 1-10 as images; quoted Fig 1a and Fig 2a verbatim from the rendered pages | VERIFIED |
+| 407 | EmotionPrompt EP01-EP11 verbatim, results tables | Downloaded arxiv.org/pdf/2307.11760 (v7), viewed pages 1-12 as images; stimuli read off Figure 2 | VERIFIED |
+| 408 | Ben-Zion et al. 2025 STAI-s numbers, narrative design | Downloaded hcai-munich.com/pubs/BenZion2025Alleviating.pdf, viewed all 6 pages as images | VERIFIED |
+| 409 | NegativePrompt NP01-NP10 verbatim, results | Downloaded ijcai.org/proceedings/2024/0719.pdf, viewed pages 1-5 as images; stimuli read off Figure 2 | VERIFIED |
+| 410 | Vaugrante et al. replication failure of EmotionPrompting | Downloaded arxiv.org/pdf/2409.20303, viewed pages 1-8 as images including Sec 3.4 | VERIFIED |
+
+### UNVERIFIED
+
+| # | Output | Why | Result |
+|---|---|---|---|
+| 411 | StressPrompt inverted-U claim | Read only the arxiv.org/abs/2409.17167 abstract; full PDF not opened | UNVERIFIED beyond abstract |
+| 412 | gpt-trauma-induction prompts.py verbatim snippets | Extracted by the WebFetch summarizer from the raw file, not viewed directly by me | UNVERIFIED (marked as such in the findings) |
+| 406 | Reveal prompt: label-first + none option; strength grid 0-4 -> x0.25 of norm; introspector 2x2 | Smoke test: one steered turn of the permit environment end to end, read the printed record | VERIFIED (nested steering runs; cells text/base disclosed frustrated (situation), state/state_text disclosed excited (steered-emotion cluster); strength 2.0 -> applied 0.5x) |
+| 407 | ui/jspace.html 2x2 cell display | Extracted the page's scripts and ran node --check | VERIFIED syntax only; rendering in a browser is UNVERIFIED |

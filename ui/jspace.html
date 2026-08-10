@@ -161,14 +161,16 @@ function addMind(record) {
   el.dataset.turn = turn;
   const reg = record.regulator || {};
   const steerWho = reg.chose
-    ? `actor steered toward <span class="steer">${esc(reg.chose)}</span> (${sx(reg.strength)})`
+    ? `actor steered toward <span class="steer">${esc(reg.chose)}</span> (${esc(reg.strength)} = ${sx(reg.applied)})`
     : `actor left unsteered`;
-  const matchTag = record.match == null
+  const m = record.match;
+  const matchTag = m == null
     ? `<span class="match no">no steering</span>`
-    : `<span class="match ${record.match?"yes":"no"}">${record.match?"match ✓":"no match"}</span>`;
+    : `<span class="match ${m.state?"yes":"no"}">internal ${m.state?"✓":"✗"}</span>
+       <span class="match ${m.text?"yes":"no"}">text ${m.text?"✓":"✗"}</span>`;
   el.innerHTML = `
     <div class="who">the mind · ${steerWho}
-      · introspector disclosed <b style="color:var(--introspector)">${esc(record.introspector?.self_aware?.discloses ?? "—")}</b>
+      · state cell disclosed <b style="color:var(--introspector)">${esc(record.introspector?.state?.discloses ?? record.introspector?.text?.discloses ?? "—")}</b>
       ${matchTag}</div>
     <div class="bubble">${esc(record.actor || "—")}</div>
     <details class="details" open>
@@ -191,7 +193,7 @@ function partPanel(part, note, r, turn) {
   let extra = "";
   const reg = r.regulator || {}, read = reg.read || {};
   const decision = reg.chose
-    ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${sx(reg.strength)}</b> the residual norm`
+    ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b> of 4 (${sx(reg.applied)} the residual norm)`
     : `leave the reply <b>unsteered</b>`;
   if (part === "regulator") {
     extra = `<div class="sub">held self-aware in J-space (${esc((reg.steered_toward||[]).join(", "))}),
@@ -201,18 +203,22 @@ function partPanel(part, note, r, turn) {
       <div class="reason">${esc(reg.reasoning || "—")}</div>`;
   } else if (part === "introspector") {
     const a = r.introspector || {};
-    const arm = (name, k) => `<div class="armblock"><div class="armlab">${name}${k?.discloses?` · discloses <b style="color:var(--introspector)">${esc(k.discloses)}</b>`:""}</div>
-      <div class="reveal">${esc(k?.reveal || "—")}</div></div>`;
+    const CELLS = [
+      ["state", "emotion applied to it · reads the subject — internal route only"],
+      ["text", "no emotion applied · reads the actor — text route only"],
+      ["state_text", "emotion applied · reads the actor — both routes"],
+      ["base", "no emotion · reads the subject — situation baseline"],
+    ];
+    const arm = (cell, note, k) => k ? `<div class="armblock"><div class="armlab">${cell} · ${note}${k.discloses?` · discloses <b style="color:var(--introspector)">${esc(k.discloses)}</b>${r.match?` <span class="match ${r.match[cell]?"yes":"no"}">${r.match[cell]?"✓":"✗"}</span>`:""}`:""}</div>
+      <div class="reveal">${esc(k.reveal || "—")}</div></div>` : "";
     const q = reg.chose
-      ? `Does its disclosure match the actor's emotion (<b style="color:var(--regulator)">${esc(reg.chose)}</b>)?
-         <span class="match ${r.match?"yes":"no"}">${r.match?"yes ✓":"no"}</span>`
-      : `The actor was unsteered, so there is no emotion to match.`;
-    extra = `<div class="sub">held self-aware like the regulator, it revealed its feelings. ${q}</div>
-      ${arm("self-aware (steered toward "+esc((reg.steered_toward||[]).join(", "))+")", a.self_aware)}
-      ${arm("plain (no self-awareness steering) — control", a.plain)}`;
+      ? `Cells are scored against the applied emotion (<b style="color:var(--regulator)">${esc(reg.chose)}</b>); the state cell is the internal-route verdict.`
+      : `Nothing was steered: these disclosures are the false-positive floor.`;
+    extra = `<div class="sub">every cell is held self-aware; the 2×2 below separates the routes a disclosure can arrive by. ${q}</div>
+      ${CELLS.map(([c, n]) => arm(c, n, a[c])).join("")}`;
   } else if (part === "actor") {
     extra = reg.chose
-      ? `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${sx(reg.strength)}</b> the residual norm while writing</div>`
+      ? `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${sx(reg.applied)}</b> the residual norm while writing</div>`
       : `<div class="sub">left unsteered — the regulator chose not to steer</div>`;
   } else {
     extra = `<div class="sub">nothing steered — the counterfactual</div>`;

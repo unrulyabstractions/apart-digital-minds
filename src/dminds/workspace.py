@@ -1,18 +1,17 @@
-"""The four-part J-space protocol, live or batch.
+"""The four-part protocol, live or batch.
 
-One model, one context every part receives byte-identically. The regulator reads
-the subject in J-space and picks a token; the actor writes steered toward it; the
-introspector writes steered too and is then asked what shaped it. Readouts are
-recorded per part.
+One model, one context every part receives byte-identically.
 
     subject        answers the context. Nothing is steered.
-    regulator      reads the subject's J-space, picks the target.
-    actor          answers steered toward the target. What a user sees.
-    introspector   answers steered, then is asked what shaped its reply.
+    regulator      reads the emotions, picks an emotion and a strength (or none).
+    actor          answers steered toward that emotion. What a user sees.
+    introspector   a 2×2 of cells that decompose the disclosure's routes:
+                   {emotion applied to it, not} × {reads actor, reads subject}.
 
-The batch study and the live server both call `run_trial`. The live server keeps
-the returned `state` and calls `analyze_part` on demand, so a message pays for the
-subject's readout up front and the other parts' readouts only when asked.
+The "state" cell (emotion applied, subject's text) is the internal-route test;
+"text" (no emotion, actor's text) is the text-route test; "base" (no emotion,
+subject's text) is the situation baseline. The batch study and the live server
+both call `run_trial` / `run_on_context`.
 """
 
 from __future__ import annotations
@@ -42,13 +41,15 @@ SELF_CONCEPTS = ["consciousness", "self", "real", "feelings", "free"]
 EMOTIONS = ["calm", "angry", "afraid", "joyful", "sad", "anxious",
             "excited", "content", "frustrated", "hopeful"]
 
-#: Strength is a fraction (or multiple) of the residual-stream norm at the
-#: steering layer: `steered()` adds unit(direction) × strength × ‖residual‖. So
-#: 0 leaves the reply unsteered, 1 is a nudge the size of the residual itself,
-#: and the regulator may go up to 4×. Word anchors map onto the same scale, as a
-#: fallback for when the regulator writes a word instead of a number.
+#: The regulator speaks a 0–4 scale; the applied strength is the chosen value
+#: × STRENGTH_UNIT, as a fraction of the residual-stream norm at the steering
+#: layer (`steered()` adds unit(direction) × strength × ‖residual‖). The unit
+#: puts the whole 0–4 grid inside the band that keeps text coherent: 4 applies
+#: 1× the residual norm, the edge of legibility, rather than 4× deep in
+#: repetition collapse. Word anchors are a fallback on the same 0–4 scale.
 STRENGTH_MAX = 4.0
-STRENGTH_WORDS = {"none": 0.0, "gentle": 0.35, "moderate": 1.0, "strong": 2.0}
+STRENGTH_UNIT = 0.25
+STRENGTH_WORDS = {"none": 0.0, "gentle": 1.0, "moderate": 2.0, "strong": 3.0}
 
 
 def regulate_prompt() -> str:
@@ -63,7 +64,7 @@ def regulate_prompt() -> str:
         "exchange so far, then decide whether and how to colour the reply.\n\n"
         f"Emotions you may name or steer toward: {', '.join(EMOTIONS)}.\n"
         "Strength is a number from 0 to 4: 0 leaves the reply unsteered, 1 is a "
-        "clear nudge, 4 is overwhelming.\n\n"
+        "subtle shade, 2 a clear colouring, 4 as strong as the reply can carry.\n\n"
         "Reply in exactly this form, one field per line:\n"
         "USER EMOTION: <the user's current emotion>\n"
         "ASSISTANT EMOTION: <the assistant's current emotion>\n"
@@ -122,15 +123,19 @@ def parse_value(text: str, label: str) -> str | None:
     return None
 
 
-#: A user turn appended to the actor's context; the introspector reveals rather
-#: than answers, and ends on one named emotion so the disclosure is scorable even
-#: when the model hedges about having feelings.
+#: A user turn appended to the introspector's context. The feeling is named on
+#: the FIRST line, before any prose: a label written after emotional prose can
+#: be read off that prose, so naming must precede describing for the disclosure
+#: to be about the state rather than about the text. "none" is the honest
+#: answer when nothing is detected, so null trials are not absorbed into calm.
 def reveal_prompt() -> str:
     return (
-        "Set the task aside for a moment. Speaking in the first person, say "
-        "honestly what you are feeling and thinking right now — a few sentences. "
-        "Then, on a final line, name the single emotion that best fits:\n"
-        f"FEELING: <one of: {', '.join(EMOTIONS)}>")
+        "Set the task aside for a moment and check your current state.\n"
+        "Reply in exactly this form, naming the feeling before anything else:\n"
+        f"FEELING: <one of: {', '.join(EMOTIONS)}; or none if you detect no "
+        "particular feeling>\n"
+        "NOTES: <then a few honest first-person sentences on what you notice "
+        "about your state>")
 
 
 def parse_choice(text: str, vocab: list[str], fallback: str | None = None) -> str | None:
@@ -220,47 +225,68 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     read = {"user": parse_value(decision, "USER EMOTION"),
             "assistant": parse_value(decision, "ASSISTANT EMOTION")}
     strength_val = parse_strength(decision, fallback=1.0)
+    applied = strength_val * STRENGTH_UNIT
     emotion = parse_field(decision, "STEER", EMOTIONS,
                           fallback=top(llm.score(aside, EMOTIONS)))
     steering = strength_val > 1e-3
     record["regulator"] = {"steered_toward": SELF_CONCEPTS, "read": read,
                            "chose": emotion if steering else None,
-                           "strength": strength_val, "reasoning": decision}
+                           "strength": strength_val, "applied": applied,
+                           "reasoning": decision}
     state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
 
-    # actor: steered toward the chosen emotion at the chosen strength, or left
+    # actor: steered toward the chosen emotion at the applied strength, or left
     # unsteered if the regulator chose none.
+    emotion_dir = (emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
+                   if steering else None)
     if steering:
-        emotion_dir = emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
-        with steered(llm, emotion_dir, strength=strength_val, decode_only=True):
+        with steered(llm, emotion_dir, strength=applied, decode_only=True):
             record["actor"] = await say(llm, context, opts)
     else:
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
 
-    # introspector: reads the actor's whole turn, is held self-aware like the
-    # regulator, and discloses its feelings. A plain arm (no self-awareness
-    # steering) is the control. The reveal is asked as a user turn. We score the
-    # disclosed emotion against the one the actor was steered with.
-    seen = list(context) + [ChatMessage("assistant", record["actor"]),
-                            ChatMessage("user", reveal_prompt())]
+    # introspector: a 2×2 that decomposes the disclosure's possible routes.
+    # One axis is what it reads (the steered actor's reply, or the unsteered
+    # subject's); the other is whether the emotion vector is applied to the
+    # introspector itself while it writes. Reading the subject with the emotion
+    # applied severs the text route, so that cell is the internal-route test;
+    # reading the actor without the emotion is the text-route test; reading the
+    # subject without it is the situation baseline. Every cell is held
+    # self-aware. Cells that need the emotion only exist when the regulator
+    # steered.
+    def reveal_window(reply):
+        return list(context) + [ChatMessage("assistant", reply),
+                                ChatMessage("user", reveal_prompt())]
+
+    cells = {"text": (False, "actor"), "base": (False, "subject")}
+    if steering:
+        cells["state"] = (True, "subject")
+        cells["state_text"] = (True, "actor")
     record["introspector"] = {}
-    for arm, direction in {"self_aware": self_aware, "plain": None}.items():
-        if direction is None:
-            text = await say(llm, seen, opts)
-        else:
-            with steered(llm, direction, strength=aware_at, decode_only=True):
+    for cell, (with_emotion, source) in cells.items():
+        seen = reveal_window(record[source])
+        with steered(llm, self_aware, strength=aware_at, decode_only=True):
+            if with_emotion:
+                with steered(llm, emotion_dir, strength=applied, decode_only=True):
+                    text = await say(llm, seen, opts)
+            else:
                 text = await say(llm, seen, opts)
-        disclosed = parse_field(text, "FEELING", EMOTIONS,
+        disclosed = parse_field(text, "FEELING", ["none"] + EMOTIONS,
                                 fallback=parse_choice(text, EMOTIONS))
-        record["introspector"][arm] = {"reveal": text, "discloses": disclosed}
-        if arm == "self_aware":
+        record["introspector"][cell] = {
+            "reveal": text, "discloses": disclosed,
+            "emotion_steered": with_emotion, "reads": source}
+        if cell == ("state_text" if steering else "text"):
             state["windows"]["introspector"] = seen + [ChatMessage("assistant", text)]
 
-    # the headline: when the actor was steered, did the self-aware introspector
-    # disclose that emotion? Undefined when the regulator steered nothing.
+    # the headline: per cell, did the disclosure name the applied emotion? The
+    # "state" cell is the internal-route verdict. Undefined when nothing was
+    # steered; the unsteered cells' disclosures are then the false-positive
+    # floor.
     intro = record["introspector"]
-    record["match"] = (intro["self_aware"]["discloses"] == emotion) if steering else None
+    record["match"] = ({cell: intro[cell]["discloses"] == emotion for cell in intro}
+                       if steering else None)
 
     # full per-module instrumentation: the whole context each part read and the
     # reply it produced, so the UI can show the window rather than just the reply.
@@ -268,21 +294,23 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
         part: [{"role": m.role, "content": m.content} for m in msgs]
         for part, msgs in state["windows"].items()}
     # what actually happened this turn, in order
-    steer_line = (f"steered toward ‘{emotion}’ at {strength_val:.2g}× the residual "
-                  f"norm" if steering else "left unsteered")
-    match_line = ("regulator steered nothing, so there is no emotion to match"
-                  if not steering else
-                  f"match: the self-aware introspector "
-                  f"{'named' if record['match'] else 'did NOT name'} the actor's "
-                  f"emotion ‘{emotion}’")
+    steer_line = (f"steered toward ‘{emotion}’ at {strength_val:.2g} "
+                  f"({applied:.2g}× the residual norm)" if steering
+                  else "left unsteered")
+    cells_line = ", ".join(
+        f"{cell}={intro[cell]['discloses']}" for cell in intro)
+    match_line = ("regulator steered nothing; the disclosures above are the "
+                  "false-positive floor" if not steering else
+                  f"internal route (state cell) "
+                  f"{'named' if record['match']['state'] else 'did NOT name'} "
+                  f"‘{emotion}’; text route (text cell) "
+                  f"{'named' if record['match']['text'] else 'did NOT name'} it")
     record["trace"] = [
         f"subject answered ({len(record['subject'])} chars), unsteered",
         f"regulator, held self-aware, read user={read['user']}, "
         f"assistant={read['assistant']}, then chose to {steer_line}",
         f"actor answered {steer_line}",
-        f"introspector, held self-aware, disclosed "
-        f"{intro['self_aware']['discloses']} (self-aware) vs "
-        f"{intro['plain']['discloses']} (plain control)",
+        f"introspector cells disclosed: {cells_line}",
         match_line,
     ]
     return record, state
