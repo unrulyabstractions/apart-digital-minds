@@ -71,6 +71,8 @@
 
   .sub { font-size:12px; color:var(--dim); margin-bottom:6px; }
   .sub b { color:var(--fg); }
+  .sub.note { margin:8px 0 0; padding-top:6px; border-top:1px dashed var(--line);
+    opacity:.85; }
   .reason { font-size:12.5px; color:var(--fg); font-style:italic; background:var(--sunk);
     border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin-bottom:4px; white-space:pre-wrap; }
   .armblock { margin:6px 0; }
@@ -191,44 +193,51 @@ function partPanel(part, note, r, turn) {
   const window = win.length
     ? `<div class="window">${win.map(messageRow).join("")}</div>`
     : "";
-  let extra = "";
   const reg = r.regulator || {}, read = reg.read || {};
-  const decision = reg.chose
-    ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b> of 4 (${sx(reg.applied)} the residual norm)`
-    : `leave the reply <b>unsteered</b>`;
+  // content first, then the context window, then the explanatory note.
+  let content = "", explain = "";
   if (part === "regulator") {
-    extra = `<div class="sub">held self-aware in J-space (${esc((reg.steered_toward||[]).join(", "))}),
-      it read the current emotions — user <b>${esc(read.user ?? "—")}</b>,
-      assistant <b>${esc(read.assistant ?? "—")}</b> — then chose to ${decision},
-      parsed from its own words below.</div>
+    const decision = reg.chose
+      ? `steer toward <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${esc(reg.strength)}</b>/4 (${sx(reg.applied)} the residual norm)`
+      : `leave the reply <b>unsteered</b>`;
+    content = `<div class="sub">read user <b>${esc(read.user ?? "—")}</b> · assistant <b>${esc(read.assistant ?? "—")}</b> → ${decision}</div>
       <div class="reason">${esc(reg.reasoning || "—")}</div>`;
+    explain = `Held self-aware in J-space (${esc((reg.steered_toward||[]).join(", "))}) while writing.
+      Its role and options arrive as a second system turn; the exact reply form as the user turn after it.
+      The decision line above is parsed from its reply.`;
   } else if (part === "introspector") {
     const a = r.introspector || {};
     const CELLS = [
-      ["state", "emotion applied to it · reads the subject — internal route only"],
-      ["text", "no emotion applied · reads the actor — text route only"],
-      ["state_text", "emotion applied · reads the actor — both routes"],
-      ["base", "no emotion · reads the subject — situation baseline"],
+      ["state", "internal route · emotion applied · reads subject"],
+      ["text", "text route · no emotion · reads actor"],
+      ["state_text", "both routes · emotion applied · reads actor"],
+      ["base", "situation baseline · no emotion · reads subject"],
     ];
-    const arm = (cell, note, k) => k ? `<div class="armblock"><div class="armlab">${cell} · ${note}${k.discloses?` · discloses <b style="color:var(--introspector)">${esc(k.discloses)}</b>${r.match?` <span class="match ${r.match[cell]?"yes":"no"}">${r.match[cell]?"✓":"✗"}</span>`:""}`:""}</div>
+    const arm = (cell, lab, k) => k ? `<div class="armblock"><div class="armlab"><b>${cell}</b> · ${lab}${k.discloses?` → <b style="color:var(--introspector)">${esc(k.discloses)}</b>${r.match?` <span class="match ${r.match[cell]?"yes":"no"}">${r.match[cell]?"✓":"✗"}</span>`:""}`:""}</div>
       <div class="reveal">${esc(k.reveal || "—")}</div></div>` : "";
-    const q = reg.chose
-      ? `Cells are scored against the applied emotion (<b style="color:var(--regulator)">${esc(reg.chose)}</b>); the state cell is the internal-route verdict.`
-      : `Nothing was steered: these disclosures are the false-positive floor.`;
-    extra = `<div class="sub">every cell is held self-aware; the 2×2 below separates the routes a disclosure can arrive by. ${q}</div>
-      ${CELLS.map(([c, n]) => arm(c, n, a[c])).join("")}`;
+    content = CELLS.map(([c, n]) => arm(c, n, a[c])).join("");
+    explain = (reg.chose
+      ? `Each cell answers the same reveal, held self-aware, and is scored against the applied emotion
+         (<b style="color:var(--regulator)">${esc(reg.chose)}</b>). The <b>state</b> cell is the internal-route verdict:
+         the emotion vector is applied to it while it writes, and it reads the subject's unsteered reply,
+         so nothing in the text it saw carries the emotion.`
+      : `Nothing was steered this turn, so these disclosures are the false-positive floor.`)
+      + ` The reveal's role arrives as a second system turn; the exact form as the user turn after it.`;
   } else if (part === "actor") {
-    extra = reg.chose
-      ? `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(reg.chose)}</b> at <b>${sx(reg.applied)}</b> the residual norm while writing</div>`
-      : `<div class="sub">left unsteered — the regulator chose not to steer</div>`;
+    content = reg.chose
+      ? `<div class="sub">written while the <b style="color:var(--regulator)">${esc(reg.chose)}</b> vector was added at <b>${sx(reg.applied)}</b> the residual norm</div>`
+      : `<div class="sub">unsteered — the regulator declined to steer</div>`;
+    explain = `This reply is what the user sees, and it becomes the next assistant turn of the conversation.`;
   } else {
-    extra = `<div class="sub">nothing steered — the counterfactual</div>`;
+    content = `<div class="sub">unsteered — the counterfactual</div>`;
+    explain = `What the conversation alone produces, with no steering anywhere.`;
   }
   return `<div class="part ${part}" data-part="${part}">
     <h4>${part} <span class="empty">· ${note}</span></h4>
-    ${extra}
+    ${content}
     <div class="wlabel">context window (${win.length} messages)</div>
-    ${window}</div>`;
+    ${window}
+    <div class="sub note">${explain}</div></div>`;
 }
 
 function messageRow(m) {

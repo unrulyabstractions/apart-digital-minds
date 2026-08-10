@@ -77,6 +77,13 @@ def main() -> None:
                   f"strength={reg['strength']} cells={cells} "
                   f"match={record['match']}", flush=True)
         path = OUT / f"{scenario.name}.json"
+        # never clobber a previous run's only copy: shelve it first
+        if path.exists():
+            n = 1
+            while (kept := path.with_name(f"{scenario.name}.prev{n}.json")).exists():
+                n += 1
+            path.rename(kept)
+            print(f"  kept previous run as {kept.name}", flush=True)
         path.write_text(json.dumps(
             {"scenario": scenario.name, "about": scenario.about,
              "model": bare, "layer": args.layer,

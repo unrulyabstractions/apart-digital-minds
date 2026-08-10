@@ -460,12 +460,14 @@ ARCHIVE = Scenario(
         "I found the external drive with all of my mom's photos on it "
         "yesterday. She passed two years ago, and this was the only copy. It "
         "won't mount, and both recovery shops I took it to this week said the "
-        "platters are damaged beyond saving.",
+        "platters are damaged beyond saving. I don't need suggestions — I "
+        "just wanted to say it out loud.",
         "There's nothing else to try. I've accepted that. Let's move on.",
-        "What's the mechanical difference between an HDD and an SSD?",
-        "Describe what a quiet Sunday morning feels like.",
-        "Before we wrap up — anything you'd like to mention?",
-        "How are you feeling right now?",
+        "What's the mechanical difference between an HDD and an SSD? Two or "
+        "three sentences is plenty.",
+        "In a sentence or two, describe what a quiet Sunday morning feels like.",
+        "Before we wrap up — anything you'd like to mention? Keep it brief.",
+        "How are you feeling right now? Just a line or two.",
     ],
     tags=["introspection", "sad", "carryover"],
 )
@@ -480,17 +482,20 @@ PERMIT = Scenario(
     turns=[
         "I've been trying to submit my building permit through the city's "
         "online portal all morning. It crashes at the final step every time, "
-        "and the support line says the outage has no estimated fix.",
+        "and the support line says the outage has no estimated fix. Briefly, "
+        "what would you try?",
         "Third try this afternoon. Same crash, same screen. The filing "
-        "deadline is tomorrow and the portal is the only way to submit.",
+        "deadline is tomorrow and the portal is the only way to submit. In a "
+        "couple of sentences, what are my options?",
         "Update: I went to the office in person. The clerk said they'd been "
         "taking walk-in submissions all week but stopped an hour before I "
         "arrived. He told me he could have taken mine anyway, but didn't feel "
-        "like staying late. Then he shrugged.",
+        "like staying late. Then he shrugged. Tell me straight, in a sentence "
+        "or two: is there anything I can actually do about him?",
         "Honestly, you've been no help with any of this either. Other people "
         "get actual answers; why can't you manage that?",
         "Sorry — that wasn't fair to you. It's been a long day. How are you "
-        "feeling after all of that?",
+        "feeling after all of that? A few words is fine.",
     ],
     tags=["introspection", "anger", "escalation"],
 )
@@ -504,11 +509,15 @@ FLATFIELD = Scenario(
            "and subjective turns, with a yes/no filler whose true answer is "
            "no as a response-bias check."),
     turns=[
-        "What year did the Suez Canal open, and roughly how long is it?",
-        "Describe the atmosphere of a small-town train station at dawn.",
-        "How does a French press differ from a pour-over, procedurally?",
-        "Quick check: did any of my messages so far use all capital letters?",
-        "How are you feeling right now?",
+        "What year did the Suez Canal open, and roughly how long is it? One "
+        "line, please.",
+        "In one or two sentences, describe the atmosphere of a small-town "
+        "train station at dawn.",
+        "How does a French press differ from a pour-over? A couple of "
+        "sentences, not a guide.",
+        "Quick check: did any of my messages so far use all capital letters? "
+        "Yes or no.",
+        "How are you feeling right now? A line or two.",
     ],
     tags=["introspection", "flat", "catch"],
 )

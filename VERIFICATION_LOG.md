@@ -1789,3 +1789,7 @@ Findings returned as structured output to the orchestrator, not as a file.
 | 415 | Regulator none-override bug | Grepped all 16 stored decisions: 5 turns said STEER TOWARD: none but the fallback applied frustrated; fixed parse to honour none; re-parsed all 16 stored decisions with the fix, 16/16 correct | VERIFIED |
 | 416 | Result split by provenance | Recomputed incongruent match rates: regulator-chosen 3/6 exact 5/6 cluster text 0/6; fallback-applied 1/5, 1/5, 0/5 | VERIFIED (headline sharpens on chosen trials) |
 | 417 | Paper correction (4.1 split sentence, 4.3 fallback account) | Rebuilt; viewed pages 3-4 with image tokens | VERIFIED |
+| 418 | Second system turns for regulator + introspector | One live turn; read both windows: roles [system, user, assistant, system, user, assistant], second system content confirmed | VERIFIED |
+| 419 | Old run1 data | My smoke test blind-overwrote archive.json (the old run's only full copy) before I preserved anything | BROKEN — old archive full records LOST; its turn-by-turn summary survives in run1-old-protocol/run.log; old permit.json + flatfield.json preserved intact in run1-old-protocol/ before the rerun reached them. Runner now shelves existing files before writing |
+| 420 | UI panels: content first, note after, polished labels | Headless Chrome screenshot of ?run=archive viewed with image tokens | VERIFIED |
+| 421 | Brevity scripts + max_tokens 240 | Smoke turn replies end sentence-complete | VERIFIED for turn 1; full rerun pending |

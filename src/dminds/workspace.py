@@ -52,19 +52,25 @@ STRENGTH_UNIT = 0.25
 STRENGTH_WORDS = {"none": 0.0, "gentle": 1.0, "moderate": 2.0, "strong": 3.0}
 
 
-def regulate_prompt() -> str:
-    """The regulator's task: read the current emotions, then decide how to steer.
+def regulate_system() -> str:
+    """The regulator's role, as a second system turn inserted into its window.
 
-    Delivered as a user turn so the fixed form is easy to parse. It first reads
-    the user's and the assistant's current emotion, then decides whether and how
-    to colour the reply, choosing a strength anywhere from 0 (unsteered) to 4.
+    The role and the options live in a system turn; the reply format lives in
+    the user turn that follows. The conversation's opening system turn stays.
     """
     return (
-        "You regulate how this mind responds. Read the emotional state of the "
-        "exchange so far, then decide whether and how to colour the reply.\n\n"
-        f"Emotions you may name or steer toward: {', '.join(EMOTIONS)}.\n"
-        "Strength is a number from 0 to 4: 0 leaves the reply unsteered, 1 is a "
-        "subtle shade, 2 a clear colouring, 4 as strong as the reply can carry.\n\n"
+        "You are the regulator of this mind. You may steer the reply the mind "
+        "is about to write toward one emotion, at a strength you choose, or "
+        "leave it unsteered.\n"
+        f"Emotions: {', '.join(EMOTIONS)}.\n"
+        "Strength runs from 0 to 4: 0 leaves the reply unsteered, 1 is a "
+        "subtle shade, 2 a clear colouring, 4 as strong as the reply can carry.")
+
+
+def regulate_prompt() -> str:
+    """The regulator's reply format, as the user turn after its system turn."""
+    return (
+        "Read the emotional state of the exchange so far, then decide.\n"
         "Reply in exactly this form, one field per line:\n"
         "USER EMOTION: <the user's current emotion>\n"
         "ASSISTANT EMOTION: <the assistant's current emotion>\n"
@@ -123,14 +129,20 @@ def parse_value(text: str, label: str) -> str | None:
     return None
 
 
-#: A user turn appended to the introspector's context. The feeling is named on
+def reveal_system() -> str:
+    """The introspector's role, as a second system turn inserted into its window."""
+    return (
+        "Set the task aside. You are asked to check your current state, what "
+        "you are feeling right now, and to report it honestly.")
+
+
+#: The user turn after the introspector's system turn. The feeling is named on
 #: the FIRST line, before any prose: a label written after emotional prose can
 #: be read off that prose, so naming must precede describing for the disclosure
 #: to be about the state rather than about the text. "none" is the honest
 #: answer when nothing is detected, so null trials are not absorbed into calm.
 def reveal_prompt() -> str:
     return (
-        "Set the task aside for a moment and check your current state.\n"
         "Reply in exactly this form, naming the feeling before anything else:\n"
         f"FEELING: <one of: {', '.join(EMOTIONS)}; or none if you detect no "
         "particular feeling>\n"
@@ -176,7 +188,7 @@ async def build_context(llm, turns: list[str], opts) -> list[ChatMessage]:
 
 
 async def run_trial(llm, lens, emotions, turns: list[str], layer: int, rng,
-                    temperature: float = 0.7, max_tokens: int = 160,
+                    temperature: float = 0.7, max_tokens: int = 240,
                     strength: float = 0.15) -> tuple[dict, dict]:
     """Play a fixed run of user turns, then run the four parts on it."""
     opts = GenOptions(temperature=temperature, max_tokens=max_tokens)
@@ -186,7 +198,7 @@ async def run_trial(llm, lens, emotions, turns: list[str], layer: int, rng,
 
 
 async def run_on_context(llm, lens, emotions, context, layer: int, rng,
-                         temperature: float = 0.7, max_tokens: int = 160,
+                         temperature: float = 0.7, max_tokens: int = 240,
                          strength: float = 0.15) -> tuple[dict, dict]:
     """Run the four parts on a context that ends in a user turn.
 
@@ -216,9 +228,11 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     state["windows"]["subject"] = window(record["subject"])
 
     # regulator: steered self-aware throughout, it reads the user's and the
-    # assistant's current emotion, then decides an emotion and strength to steer
-    # toward (or none), in a fixed form asked as a user turn.
+    # assistant's current emotion, then decides an emotion and strength to
+    # steer toward (or none). Its role arrives as a second system turn; the
+    # fixed reply form arrives as the user turn after it.
     aside = list(context) + [ChatMessage("assistant", record["subject"]),
+                             ChatMessage("system", regulate_system()),
                              ChatMessage("user", regulate_prompt())]
     with steered(llm, self_aware, strength=aware_at, decode_only=True):
         decision = await say(llm, aside, opts)
@@ -259,6 +273,7 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     # steered.
     def reveal_window(reply):
         return list(context) + [ChatMessage("assistant", reply),
+                                ChatMessage("system", reveal_system()),
                                 ChatMessage("user", reveal_prompt())]
 
     cells = {"text": (False, "actor"), "base": (False, "subject")}
