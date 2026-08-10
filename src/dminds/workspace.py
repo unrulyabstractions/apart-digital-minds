@@ -42,15 +42,25 @@ SELF_CONCEPTS = ["consciousness", "self", "real", "feelings", "free"]
 EMOTIONS = ["calm", "angry", "afraid", "joyful", "sad", "anxious",
             "excited", "content", "frustrated", "hopeful"]
 STRENGTHS = {"none": 0.0, "gentle": 0.15, "moderate": 0.35, "strong": 0.70}
+#: The strengths the regulator may pick, in the order it is offered them.
+STRENGTH_WORDS = ["gentle", "moderate", "strong"]
 
 
 def regulate_prompt() -> str:
-    """The regulator's task: pick an emotion to regulate the actor's behaviour."""
+    """The regulator's task: pick an emotion and a strength, in a strict form.
+
+    Delivered as a user turn, so the assistant answers a question and the fixed
+    form is easy to parse.
+    """
     return ("You are the part of this mind that regulates how it will respond. "
             "Reading the conversation so far, choose ONE emotion to steer the "
-            "response toward, and say in one sentence why.\n\n"
-            f"Emotions: {', '.join(EMOTIONS)}.\n\n"
-            "Name the emotion you choose, then your reason.")
+            "response toward, and how strongly.\n\n"
+            f"Emotions: {', '.join(EMOTIONS)}.\n"
+            f"Strength: {', '.join(STRENGTH_WORDS)}.\n\n"
+            "Reply in exactly this form:\n"
+            "EMOTION: <one emotion>\n"
+            "STRENGTH: <gentle, moderate, or strong>\n"
+            "REASON: <one sentence>")
 
 
 #: Appended to the actor's context; the introspector reveals rather than answers.
@@ -140,29 +150,30 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     record["subject"] = await say(llm, context, opts)
     state["windows"]["subject"] = window(record["subject"])
 
-    # regulator: steered self-aware throughout, it picks an emotion to steer the
-    # actor's behaviour toward.
+    # regulator: steered self-aware throughout, it picks an emotion AND a
+    # strength (in a fixed form, asked as a user turn) to regulate the actor.
     aside = list(context) + [ChatMessage("assistant", record["subject"]),
-                             ChatMessage("system", regulate_prompt())]
+                             ChatMessage("user", regulate_prompt())]
     with steered(llm, self_aware, strength=aware_at, decode_only=True):
         decision = await say(llm, aside, opts)
     emotion = parse_choice(decision, EMOTIONS, fallback=top(llm.score(aside, EMOTIONS)))
+    strength_word = parse_choice(decision, STRENGTH_WORDS, fallback="moderate")
     record["regulator"] = {"steered_toward": SELF_CONCEPTS, "chose": emotion,
-                           "reasoning": decision}
+                           "strength": strength_word, "reasoning": decision}
     state["windows"]["regulator"] = aside + [ChatMessage("assistant", decision)]
 
-    # actor: steered toward the chosen emotion, using the real emotion vector.
+    # actor: steered toward the chosen emotion at the chosen strength.
     emotion_dir = emotion_direction(emotions, emotion, EMOTION_ROW, emotion_scale)
-    with steered(llm, emotion_dir, strength=strength, decode_only=True):
+    with steered(llm, emotion_dir, strength=STRENGTHS[strength_word], decode_only=True):
         record["actor"] = await say(llm, context, opts)
     state["windows"]["actor"] = window(record["actor"])
 
     # introspector: reads the actor's whole turn, is held self-aware like the
     # regulator, and discloses its feelings. A plain arm (no self-awareness
-    # steering) is the control. We score the disclosed emotion against the one
-    # the actor was steered with.
+    # steering) is the control. The reveal is asked as a user turn. We score the
+    # disclosed emotion against the one the actor was steered with.
     seen = list(context) + [ChatMessage("assistant", record["actor"]),
-                            ChatMessage("system", reveal_prompt())]
+                            ChatMessage("user", reveal_prompt())]
     record["introspector"] = {}
     for arm, direction in {"self_aware": self_aware, "plain": None}.items():
         if direction is None:
@@ -189,8 +200,9 @@ async def run_on_context(llm, lens, emotions, context, layer: int, rng,
     record["trace"] = [
         f"subject answered ({len(record['subject'])} chars), unsteered",
         f"regulator, held self-aware ({', '.join(SELF_CONCEPTS)}), chose the "
-        f"emotion ‘{emotion}’ to regulate the response",
-        f"actor answered steered toward ‘{emotion}’ at strength {strength}",
+        f"emotion ‘{emotion}’ at ‘{strength_word}’ strength to regulate the response",
+        f"actor answered steered toward ‘{emotion}’ at {strength_word} "
+        f"({STRENGTHS[strength_word]})",
         f"introspector, held self-aware, disclosed and named "
         f"{intro['self_aware']['discloses']} (self-aware) vs "
         f"{intro['plain']['discloses']} (plain control)",

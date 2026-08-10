@@ -160,7 +160,7 @@ function addMind(record) {
   el.className = "msg mind";
   el.dataset.turn = turn;
   el.innerHTML = `
-    <div class="who">the mind · actor steered toward emotion <span class="steer">${esc(record.regulator?.chose)}</span>
+    <div class="who">the mind · actor steered toward <span class="steer">${esc(record.regulator?.chose)}</span> (${esc(record.regulator?.strength ?? "moderate")})
       · introspector disclosed <b style="color:var(--introspector)">${esc(record.introspector?.self_aware?.discloses ?? "—")}</b>
       <span class="match ${record.match?"yes":"no"}">${record.match?"match ✓":"no match"}</span></div>
     <div class="bubble">${esc(record.actor || "—")}</div>
@@ -186,7 +186,8 @@ function partPanel(part, note, r, turn) {
     const aware = (r.regulator?.steered_toward || []).join(", ");
     extra = `<div class="sub">held self-aware in J-space throughout — steered toward
       <b>${esc(aware)}</b> — it chose the emotion
-      <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> to regulate the actor,
+      <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> at
+      <b>${esc(r.regulator?.strength ?? "moderate")}</b> strength to regulate the actor,
       parsed from its own words below.</div>
       <div class="reason">${esc(r.regulator?.reasoning || "—")}</div>`;
   } else if (part === "introspector") {
@@ -199,7 +200,7 @@ function partPanel(part, note, r, turn) {
       ${arm("self-aware (steered toward "+esc((r.regulator?.steered_toward||[]).join(", "))+")", a.self_aware)}
       ${arm("plain (no self-awareness steering) — control", a.plain)}`;
   } else if (part === "actor") {
-    extra = `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> while writing</div>`;
+    extra = `<div class="sub">steered toward the emotion <b style="color:var(--regulator)">${esc(r.regulator?.chose)}</b> at <b>${esc(r.regulator?.strength ?? "moderate")}</b> strength while writing</div>`;
   } else {
     extra = `<div class="sub">nothing steered — the counterfactual</div>`;
   }

@@ -1732,3 +1732,20 @@ steered emotion (calm). Consistent with earlier turns.
 ### NOT DONE
 - The dead readout JS (wirePanels/fill/fullView/rows/bar) is left in jspace.html,
   unused; a cleanup pass is pending.
+
+## 2026-08-09 — user-turn prompts; regulator picks emotion + strength
+
+The regulator's and introspector's prompts are now user turns, so an assistant
+reply always follows a user turn. The regulator picks an emotion AND a strength
+in a fixed form (EMOTION/STRENGTH/REASON), both parsed; the actor is steered at
+the chosen strength. No module is steered by both families: actor = emotion,
+regulator/introspector = self-awareness lens.
+
+### VERIFIED
+
+| # | Output | How it was checked | Result |
+|---|---|---|---|
+| 395 | Prompts are user turns | Read the regulator and introspector window roles | VERIFIED (both end [..., user, assistant]) |
+| 396 | Regulator picks emotion + strength | Read its decision and the parse | VERIFIED (decision "EMOTION: calm / STRENGTH: moderate / REASON: ..."; parsed calm, moderate) |
+| 397 | Actor steers at the chosen strength, coherent | One live message; checked reply and CJK | VERIFIED (moderate strength on the emotion vector, clean English) |
+| 398 | The match still runs | Read the record | VERIFIED (calm chosen; introspector disclosed frustrated; match False — disclosure tracks the situation) |
