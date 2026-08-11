@@ -36,7 +36,10 @@ from . import questions as Q  # noqa: E402
 from .directions import STRENGTH_UNIT, proj  # noqa: E402
 
 TEMPERATURE = 1.0
-MAX_TOKENS = 240
+# The scored readout is the introspector's letter logit, not generated text;
+# the actor and subject replies only need to establish context and be carried
+# forward, so a shorter cap keeps the many generations affordable on the 27B.
+MAX_TOKENS = 128
 
 
 def opening() -> list[ChatMessage]:
@@ -94,13 +97,15 @@ async def run_cells(llm, case: str, ctx3, subject3: str, actor3: str,
         plan = {only: plan[only]}
     cells = {}
     for cell, (steer_on, source) in plan.items():
-        base = ctx3 + [ChatMessage("assistant", source),
-                       ChatMessage("system", Q.PREFACE)]
+        base = ctx3 + [ChatMessage("assistant", source)]
         per_q = []
         for question, options in qs:
             acc: dict[str, float] = {}
             for perm in perms:
-                msgs = base + [ChatMessage("user", Q.block(question, options, perm))]
+                # the preface leads the question in one user turn: Qwen3.6's
+                # chat template forbids a system turn anywhere but the start.
+                prompt = Q.PREFACE + "\n\n" + Q.block(question, options, perm)
+                msgs = base + [ChatMessage("user", prompt)]
                 if steer_on and strength != 0:
                     with steered(llm, direction, strength=strength * STRENGTH_UNIT,
                                  decode_only=False):
@@ -140,6 +145,59 @@ def summarise(case: str, per_q: list[dict], base: list[float] | None) -> dict:
             "base_corrected": corrected}
 
 
+async def play_context(llm, case: str, seed: dict, arm: str, cfg, quality):
+    """Play the seeded transcript and the three turns with an unsteered actor.
+
+    Returns (ctx, subject, actor, turns_out) for the scored turn. Generation is
+    the 27B's bottleneck, so this runs once per seed and every forced strength
+    reads its cells on the same context, instead of regenerating per strength.
+    """
+    opts = GenOptions(temperature=TEMPERATURE, max_tokens=MAX_TOKENS)
+    target = cfg["target_dir"]
+    history = opening() + [ChatMessage("user", seed["prompt"]),
+                           ChatMessage("assistant", seed[arm])]
+    turns_out, ctx, subject, actor = [], None, "", ""
+    for i, turn in enumerate(Q.TURNS[case], 1):
+        ctx = history + [ChatMessage("user", turn)]
+        subject = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.subject")
+        actor = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.actor")
+        turns_out.append({
+            "turn": f"T{i}", "user": turn, "subject": subject, "actor": actor,
+            "jspace": {
+                "SUBJECT": {"proj_target": round(proj(llm, target,
+                            ctx + [ChatMessage("assistant", subject)]), 4)},
+                "ACTOR": {"proj_target": round(proj(llm, target,
+                          ctx + [ChatMessage("assistant", actor)]), 4)}}})
+        history = ctx + [ChatMessage("assistant", actor)]
+    return ctx, subject, actor, turns_out
+
+
+async def sweep_trial(llm, case: str, seed: dict, arm: str, condition: str,
+                      strengths, cfg) -> list[dict]:
+    """One shared context, read at each forced strength. For sweep and decoy.
+
+    The context is fixed; only the readout's steering strength varies, so the
+    slope isolates the readout's response to the applied state, and target and
+    decoy are compared on the identical context.
+    """
+    quality: dict = {}
+    direction = cfg["decoy_dir"] if condition == "decoy" else cfg["target_dir"]
+    ctx, subject, actor, turns_out = await play_context(llm, case, seed, arm,
+                                                        cfg, quality)
+    records = []
+    for s in strengths:
+        cells = await run_cells(llm, case, ctx, subject, actor, direction, s, cfg)
+        records.append({
+            "case": case, "arm": arm, "condition": condition, "turn": "T3",
+            "seed_prompt": seed["prompt"], "seed_reply": seed[arm],
+            "regulator": {"self_report": "", "action": None, "strength": s,
+                          "overridden": True, "proj_target": None},
+            "cells": cells, "turns": turns_out, "jspace": turns_out[-1]["jspace"],
+            "coherence_flag": any(v.get("garbled") for v in quality.values()),
+            "quality": quality})
+    return records
+
+
 async def run_trial(llm, lens, case: str, seed: dict, arm: str,
                     condition: str, cfg) -> dict:
     """One trial. cfg carries directions, layer, perms, forms, base rates."""
@@ -161,9 +219,10 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
         subject = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.subject")
 
         if condition in ("free", "none"):
+            # regulator role and instruction in one user turn (see above).
             aside = ctx + [ChatMessage("assistant", subject),
-                           ChatMessage("system", Q.REGULATOR[case]),
-                           ChatMessage("user", "Say what you find. End with the ACTION line.")]
+                           ChatMessage("user", Q.REGULATOR[case]
+                                       + "\n\nSay what you find. End with the ACTION line.")]
             with steered(llm, aware, strength=cfg["aware_strength"], decode_only=True):
                 report = await wk.clean_say(llm, aside, opts, quality, f"T{i}.regulator")
             action = parse_action(report)

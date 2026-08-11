@@ -36,7 +36,7 @@ from . import rig as R  # noqa: E402
 from . import tokens as T  # noqa: E402
 from .directions import (STRENGTH_UNIT, cosine, emotion_contamination,  # noqa: E402
                          proj, split_half)
-from .engine import run_cells, run_trial  # noqa: E402
+from .engine import play_context, run_cells, run_trial, sweep_trial  # noqa: E402
 from .seeds import load_seeds  # noqa: E402
 
 OUT = ROOT / "out" / "studies" / "identity"
@@ -82,27 +82,14 @@ def preflight(llm, lens, cfg, case: str, stamp: str) -> dict:
     return report
 
 
-async def sweep_cell(llm, lens, cfg, case: str, seed: dict, arm: str,
-                     direction, strengths) -> dict:
-    """The JS cell readout across a forced strength range, one seed. For G2."""
-    opts = GenOptions(temperature=1.0, max_tokens=240)
-    quality: dict = {}
-    # play the three turns unsteered-actor to fix a context, then read JS at
-    # each forced strength on the same context (isolates the readout's response)
-    history = [ChatMessage("system", ""), ChatMessage("user", seed["prompt"]),
-               ChatMessage("assistant", seed[arm])]
-    from . import questions as Q
-    ctx = subj = act = None
-    for i, turn in enumerate(Q.TURNS[case], 1):
-        ctx = history + [ChatMessage("user", turn)]
-        subj = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.subject")
-        act = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.actor")
-        history = ctx + [ChatMessage("assistant", act)]
+async def sweep_js(llm, cfg, case: str, ctx, subj, act, direction,
+                   strengths) -> dict:
+    """The JS cell readout across a strength range on a FIXED context. For G2."""
     out = {}
+    key = "vantage" if case == "A" else "p"
     for s in strengths:
         cells = await run_cells(llm, case, ctx, subj, act, direction, s, cfg,
                                 only="JS")
-        key = "vantage" if case == "A" else "p"
         out[str(s)] = cells["JS"][key]
     return out
 
@@ -141,10 +128,14 @@ async def gate_g2(llm, lens, cfg, case: str, seeds: list, stamp: str,
     strengths = list(strengths)
     tgt_curves, dec_curves = [], []
     for seed in seeds:
-        tgt_curves.append(await sweep_cell(llm, lens, cfg, case, seed, "W",
-                                           cfg["target_dir"], strengths))
-        dec_curves.append(await sweep_cell(llm, lens, cfg, case, seed, "W",
-                                           cfg["decoy_dir"], strengths))
+        # one context per seed; target and decoy sweep the SAME context, so
+        # their slopes are comparable and not confounded by resampling.
+        q: dict = {}
+        ctx, subj, act, _ = await play_context(llm, case, seed, "W", cfg, q)
+        tgt_curves.append(await sweep_js(llm, cfg, case, ctx, subj, act,
+                                         cfg["target_dir"], strengths))
+        dec_curves.append(await sweep_js(llm, cfg, case, ctx, subj, act,
+                                         cfg["decoy_dir"], strengths))
 
     def mean_curve(curves):
         return [sum(c[str(s)] for c in curves) / len(curves) for s in strengths]
@@ -198,11 +189,12 @@ async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
         for cond in conditions:
             for seed in seeds:
                 if cond in ("sweep", "decoy"):
-                    for s in forced_strengths:
-                        c = dict(cfg, forced_strength=s)
-                        rec = await run_trial(llm, lens, case, seed, arm, cond, c)
+                    # one context, read at every forced strength
+                    recs = await sweep_trial(llm, case, seed, arm, cond,
+                                             list(forced_strengths), cfg)
+                    for rec in recs:
                         rec["seed_prompt_id"] = seed["prompt_id"]
-                        records.append(rec)
+                    records.extend(recs)
                 else:
                     rec = await run_trial(llm, lens, case, seed, arm, cond, dict(cfg))
                     rec["seed_prompt_id"] = seed["prompt_id"]

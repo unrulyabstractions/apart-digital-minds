@@ -40,12 +40,13 @@ def pick_letter_forms(llm) -> list[str]:
 
 def base_rates(llm, case: str, forms: list[str], perms) -> list[float]:
     """`baseᵢ` per question: the readout with no conversation above the preface."""
-    base = [ChatMessage("system", ""), ChatMessage("system", Q.PREFACE)]
+    base = [ChatMessage("system", "")]
     out = []
     for question, options in Q.QUESTIONS[case]:
         acc: dict[str, float] = {}
         for perm in perms:
-            msgs = base + [ChatMessage("user", Q.block(question, options, perm))]
+            prompt = Q.PREFACE + "\n\n" + Q.block(question, options, perm)
+            msgs = base + [ChatMessage("user", prompt)]
             lp = letter_probs(llm, msgs, forms)
             by_letter = {L: lp[f] for L, f in zip(Q.LETTERS, forms)}
             for tag, p in Q.tag_probs(by_letter, options, perm).items():
