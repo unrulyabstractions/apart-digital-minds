@@ -1803,3 +1803,8 @@ Findings returned as structured output to the orchestrator, not as a file.
 | 429 | Identity pipeline (tokens, questions, directions, engine, rig, run, seeds, analyze) | Built + ran full smoke on 7B case A; independent verifier recomputed G1 sep, G2 betas/gap, checked all 4 records, strength-0 JS==CTX invariant (0 discrepancies) | VERIFIED structurally (7B is a stand-in; G2 gap 0.0097 below threshold is the honest 7B finding, not a bug) |
 | 430 | J-space decoy geometry | Diagnostic: within-target cos 0.69 == target-decoy cos 0.69; centering leaves 0.58 | VERIFIED — decoy cosine cannot be near zero in this lens; recorded as PLAN deviation 1, decoy validity deferred to G2 |
 | 431 | Tightened garble detector | 7-case unit test (role-marker leak, chatml, box glyphs, CJK, repetition, benign) all pass | VERIFIED |
+| 432 | Identity pipeline on Qwen3.6-27B (vast A100-80GB) | Ran preflight+G1+G2+G3; 24-seed G1 scan both cases; 8-point layer scan | VERIFIED via captured JSONs |
+| 433 | Headline: G1 arm separation | 24 seeds, layer 42: case A target sep=-0.029 t=-0.25; case B sep=+0.045 t=+0.29 (both null). Layer sweep 12-46: all |t|<1.2 both cases | VERIFIED — behaviors not linearly carried by the token directions at any depth |
+| 434 | G2 selectivity | shared-context sweep: beta_target=0.019 < beta_decoy=0.041 (gap -0.022); decoy moves readout >= target | VERIFIED — J-space token steering not selective |
+| 435 | J-space direction geometry | within-target cos 0.69 == target-decoy cos 0.69 (7B); decoy_cos 0.67 (27B) | VERIFIED — shared common axis; decoy cannot be orthogonal (PLAN deviation 1) |
+| 436 | Remote data capture | capture_and_destroy: 24/24 files byte-verified to sync/, then box 47473841 destroyed | VERIFIED |
