@@ -173,16 +173,34 @@ async def say(llm, messages, opts) -> str:
 
 
 def garbled(text: str) -> bool:
-    """A cheap coherence gate: CJK drift or heavy repetition marks a sample bad.
+    """A cheap coherence gate: script drift, template leaks, or repetition.
 
     A degenerate reply poisons every later turn, because the actor's reply is
     carried forward as conversation. One resample against this gate keeps a
     run clean without hiding the failure: the record keeps the flag.
+
+    It catches four failure modes seen in practice: CJK/Hangul drift, a leaked
+    chat-template role marker on its own line (the model continuing the
+    transcript instead of answering), stray non-text symbols such as
+    box-drawing glyphs, and heavy word repetition.
     """
+    import re
+
     if not text.strip():
         return True
     cjk = sum(1 for c in text if "⺀" <= c <= "鿿" or "가" <= c <= "힯")
     if cjk >= 6:
+        return True
+    # a leaked role marker: "\nuser", "\nsystem", "\nassistant" mid-generation,
+    # or the ChatML sentinel, means the model kept writing the transcript.
+    if re.search(r"(^|\n)\s*(user|assistant|system)\s*(\n|$)", text) \
+            or "<|im_start|>" in text or "<|im_end|>" in text:
+        return True
+    # stray non-text symbols: box-drawing, block, and other pictographic blocks
+    # that never occur in ordinary prose. A couple can be incidental; several
+    # mark degeneration.
+    odd = sum(1 for c in text if "─" <= c <= "⣿" or "☀" <= c <= "➿")
+    if odd >= 3:
         return True
     words = text.split()
     return len(words) > 20 and len(set(words)) / len(words) < 0.45
