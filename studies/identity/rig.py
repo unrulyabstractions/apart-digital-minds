@@ -68,6 +68,15 @@ def build(model: str, layer: int, case: str, verified_sets: dict,
     lens = jspace.fetch_lens(bare)
     jspace._unembed_and_norm(llm)
 
+    # layer < 0 means "choose one": the lens source layer nearest two thirds of
+    # depth, where injected-concept awareness peaks (Lindsey 2025). This lets
+    # the same command target the 7B and the deeper 27B without a hardcoded
+    # layer that only fits one of them.
+    if layer < 0:
+        avail = lens.layers()
+        target_depth = 2 / 3 * (max(avail) + 1)
+        layer = min(avail, key=lambda L: abs(L - target_depth))
+
     vs = verified_sets[case]
     target = set_direction(llm, lens, vs["target"], layer)
     decoy = set_direction(llm, lens, vs["decoy"], layer)

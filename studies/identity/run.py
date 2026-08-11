@@ -217,7 +217,8 @@ async def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="hf:Qwen/Qwen2.5-3B-Instruct")
     ap.add_argument("--cases", nargs="+", default=["A", "B"])
-    ap.add_argument("--layer", type=int, default=17)
+    ap.add_argument("--layer", type=int, default=17,
+                    help="lens source layer; -1 auto-picks ~2/3 depth")
     ap.add_argument("--n-seeds", type=int, default=8)
     ap.add_argument("--seed-model", default="qwen/qwen3.6-27b")
     ap.add_argument("--conditions", nargs="+",

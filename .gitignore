@@ -13,3 +13,8 @@ build/
 out/
 tmp/
 .backups/
+
+# cloud run state
+/sync/
+cloud/.vast_instance_id
+.git_rev
