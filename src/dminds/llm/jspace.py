@@ -38,7 +38,7 @@ LENS_FILES = {
     "Qwen/Qwen2.5-7B-Instruct":
         ("qwen2.5-7b-it", "Qwen2.5-7B-Instruct_jacobian_lens.pt"),
     "Qwen/Qwen3.6-27B":
-        ("qwen3.6-27b", "Qwen3.6-27B_jacobian_lens.pt"),
+        ("qwen3.6-27b", "Qwen3.6-27B_jacobian_lens_n1000.pt"),
 }
 
 
