@@ -19,15 +19,20 @@ CASES="${CASES:-A B}"
 NSEEDS="${NSEEDS:-40}"
 CONDITIONS="${CONDITIONS:-free none sweep decoy}"
 LAYER="${LAYER:--1}"
+# Permutations: FULL=1 uses all 24 (the camera-ready pass); otherwise a capped
+# subset (NPERMS, default 8) keeps an iteration cheap, which the plan allows.
+FULL="${FULL:-0}"
+NPERMS="${NPERMS:-8}"
+PERM_FLAG="--n-perms $NPERMS"; [ "$FULL" = "1" ] && PERM_FLAG="--full-perms"
 
 mkdir -p out/studies/identity
 LOG="out/studies/identity/run_${STAMP}.log"
-echo "[at_run] model=$MODEL cases=$CASES n=$NSEEDS layer=$LAYER stamp=$STAMP" | tee "$LOG"
+echo "[at_run] model=$MODEL cases=$CASES n=$NSEEDS layer=$LAYER perms=$PERM_FLAG stamp=$STAMP" | tee "$LOG"
 
 HF_HUB_ENABLE_HF_TRANSFER=1 "$PY" -m studies.identity.run \
   --model "$MODEL" --cases $CASES --layer "$LAYER" \
   --n-seeds "$NSEEDS" --conditions $CONDITIONS \
-  --full-perms --stamp "$STAMP" 2>&1 | tee -a "$LOG"
+  $PERM_FLAG --stamp "$STAMP" 2>&1 | tee -a "$LOG"
 
 echo "[at_run] analysis"
 "$PY" -m studies.identity.analyze --stamp "$STAMP" --case $CASES 2>&1 | tee -a "$LOG"
