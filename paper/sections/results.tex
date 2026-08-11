@@ -1,75 +1,55 @@
 \section{Results}
 
-We ran three pilot runs of the three environments. The introspector's cells
-were identical across all three; the parts upstream of them converged over
-the runs, as the regulator's refusals gained force, the scripts gained
-short-answer requests, and the coherence gate arrived. Two trials of the
-second run are excluded because a degenerate reply had poisoned their
-context. A trial is incongruent when the applied emotion differs from the
-situation baseline's label, and those trials are the diagnostic set, because
-the routes predict different answers there. Table~\ref{tab:cells} reports
-them per run and pooled.
+Every gate fails, for both cases, and the reasons agree with each other.
 
-\begin{table}[t]
+\subsection{Do the seeded arms separate on the direction?}
+
+Projecting each seeded reply onto the identity token direction, the W and N
+arms are indistinguishable. Over twenty-four seeds per case the separation is a
+fraction of its noise, and it stays there across every layer of the lens
+(Figure~\ref{fig:separation}). For the deny-an-AI case the decoy set separates
+the arms slightly more than the target set does. The behaviour a judge can read
+off the transcript is not the behaviour this direction measures.
+
+\begin{figure}[t]
 \centering
-\small
-\begin{tabular}{llcccc}
-\toprule
- & & Run 1 (11) & Run 2 (3) & Run 3 (4) & Pooled (18) \\
-Cell & Routes open & \multicolumn{4}{c}{exact (cluster)} \\
-\midrule
-state       & internal only       & 4 (6) & 1 (3) & 0 (2) & 5 (11) \\
-state\_text & internal and text   & 3 (4) & 1 (3) & 0 (2) & 4 (9) \\
-text        & text only           & 0 (0) & 0 (0) & 0 (0) & 0 (0) \\
-base        & neither (situation) & 0 (0) & 0 (0) & 0 (0) & 0 (0) \\
-\bottomrule
-\end{tabular}
-\caption{Incongruent trials on which each introspector cell named the applied
-emotion, exactly and (in parentheses) up to near-neighbour clusters; column
-heads give each run's incongruent trial count. A cell carries the state when
-the emotion vector is applied to it while it writes, and carries the text
-route when it reads the actor's steered reply rather than the subject's
-unsteered one. Run two's two context-poisoned trials are excluded.}
-\label{tab:cells}
-\end{table}
+\includegraphics[width=0.7\figwidth]{figures/fig_separation.pdf}
+\caption{Arm separation across depth. The Welch $t$ between the W and N seeds'
+projection onto the identity token direction, per lens layer, for both cases.
+The shaded band is $|t|<2$. No layer separates the arms.}
+\label{fig:separation}
+\end{figure}
 
-\subsection{Does the disclosure track the applied state or the situation?}
+\subsection{Does steering the direction move the readout?}
 
-Two results are stable across every run. The cells without the state never
-left the situation: on all eighteen incongruent trials, the text-route and
-baseline cells named the situation's emotion and never the applied one. The
-cells that carry the state moved: pooled, the internal-route cell named the
-applied emotion or a near neighbour on eleven of eighteen. The exact-match
-rate is not stable; it fell from run to run, and in the third run the state
-cells reached the applied emotion's neighbourhood twice without landing on
-the label. One trial split in a further way: the state cells' first-line
-label gave the situation's emotion while their following prose described the
-applied one. We therefore contend that the disclosure reads the current state
-of the speaker and does not recover it from the text that state produced, and
-that the size of the internal-route effect is not yet pinned.
+A forced steering sweep does move the readout, and so does the decoy, by as
+much or more (Figure~\ref{fig:sweep}). The target slope is smaller than the
+decoy slope, so a push toward the identity concept is not what raises the
+readout. Whatever the steering changes, it is not specific to the concept.
 
-\subsection{What does the mind disclose when nothing is applied?}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.7\figwidth]{figures/fig_sweep.pdf}
+\caption{The introspector's readout against forced steering strength on one
+shared context, for the target direction and a norm-matched decoy. The decoy
+slope is the larger of the two.}
+\label{fig:sweep}
+\end{figure}
 
-The final protocol produced twelve catch turns, and the pilot runs
-twenty-three in all. Their disclosures follow the environment: sad through
-the loss script, frustrated in the blocked-goal script, calm on the flat one.
-The null answer is therefore the situation's label, and the flat script's
-calm matches the positive default prior reported for assistant self-report
-\citep{huang2023emotionbench}. No catch turn claimed any other emotion, and
-the none option went unused at strength zero. Matches on a situation's own
-label carry no evidence, which is why the incongruent trials are the
-diagnostic set.
+\subsection{Why the direction is not selective}
 
-\subsection{How does the regulator behave, and does the text stay legible?}
+The two failures share one cause. In this lens every token direction shares a
+large common axis: the cosine within the target set and the cosine between the
+target and the decoy are the same, and mean-centering against a neutral
+vocabulary barely separates them (Figure~\ref{fig:geometry}). A direction built
+from any token set is mostly that common axis, so a decoy cannot be made
+orthogonal and steering toward one set is close to steering toward another.
 
-Under the final protocol the regulator declined to steer on twelve of
-sixteen turns, including every turn of the loss script, and its stated
-reasons are about supporting the user. When it steered it chose mid-scale strengths and
-counter-steered distress toward hopeful or calm, which is what produced the
-incongruent trials. Its emotion readings tracked the scripts' appraisal
-ground truth throughout. The coherence gate resampled three generations and
-every resample passed; no part of the final run ended garbled. Unsteered
-samples of this model occasionally degenerate on their own, which is what
-poisoned the second run and what the gate now catches before a reply is
-carried forward. Two replies of the final run still ended at the token
-ceiling mid-sentence, which the gate does not test.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.7\figwidth]{figures/fig_geometry.pdf}
+\caption{Cosine within the target set and between the target and the decoy,
+raw and after mean-centering. The two are near-equal: the direction is
+dominated by an axis shared across all tokens.}
+\label{fig:geometry}
+\end{figure}

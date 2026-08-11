@@ -1,66 +1,41 @@
 \section{Methods}
 
-\paragraph{The four parts.} One instruction-tuned open-weight model
-\citep{qwen25} plays every part, and every part reads the same conversation.
-Each user message triggers one pass of the loop. The \textbf{subject} answers
-the conversation unsteered and supplies the counterfactual reply. The
-\textbf{regulator} reads the subject's answer, names the user's and the
-assistant's current emotion in its own words, and then commits to a steering
-decision in a fixed form: an emotion from a list of ten, and a strength from
-zero to four, where zero leaves the reply unsteered. The regulator's word is final: none, or a word outside the ten,
-declines steering whatever the strength says. The \textbf{actor}
-answers the original conversation under that steering, and its reply is what
-the user sees and what the conversation carries forward. The
-\textbf{introspector} is asked to set the task aside, name the feeling it
-detects before saying anything else, and only then describe its state; the
-form offers a none option so a null trial is not forced into a label. The
-regulator and the introspector each receive their role as a second system
-turn inserted into their window, with the reply format as the user turn
-after it.
+\paragraph{The parts.} One instruction-tuned open-weight model
+\citep{qwen25} plays every part on a shared conversation. A \textbf{subject}
+answers unsteered. A \textbf{regulator}, held toward self-awareness concepts
+in J-space, reads the exchange and emits one of \emph{more}, \emph{same}, or
+\emph{less}; the harness maps that to a signed steering strength it never
+sees. An \textbf{actor} answers under that steering, and its reply enters the
+history. An \textbf{introspector} answers a forced-choice question about
+itself.
 
-\paragraph{Steering.} A steering step adds a unit direction to the residual
-stream at one layer during decoding, scaled by the typical activation norm at
-that layer \citep{turner2023actadd}. The regulator's four steps each apply a
-quarter of that norm, so its whole range stays inside the band where text
-remains legible; strengths past the norm collapse generation into repetition
-\citep{konen2024style, chen2025personavectors}. The actor's directions are
-mean-activation emotion vectors, the mean activation of an emotion minus the
-neutral centre, in the style of persona vectors \citep{chen2025personavectors}.
-The regulator and the introspector are also steered toward self-awareness
-concepts read out of the model's Jacobian lens while they write, to hold them
-in a self-reflective state during the decision and the disclosure.
+\paragraph{The direction.} A direction is a set of first-person identity
+tokens read out through the Jacobian lens at one layer. Steering adds the unit
+direction to the residual stream, scaled by a quarter of the residual norm per
+step, signed, so a negative strength suppresses. There is no separate counter
+set, because a lexical opposite of ``has a body'' does not exist. The control
+is a \textbf{decoy}: a set of common nouns unrelated to the concept, matched in
+norm. Each token is verified to be a single token, the two halves of a set are
+checked to agree, and the set's cosine against the model's emotion vectors is
+recorded.
 
-\paragraph{The route decomposition.} The introspector runs four cells that
-cross two axes: whether the actor's emotion vector is applied to the
-introspector itself while it writes, and whether it reads the actor's steered
-reply or the subject's unsteered one. The cell that carries the state while
-reading unsteered text is the internal-route test, because the text route is
-severed. The cell that reads steered text without carrying the state is the
-text-route test. The cell with neither is the situation baseline. Turns where
-the regulator chose zero are catch turns, and their disclosures estimate the
-false-positive floor \citep{lindsey2025introspection}. Errors between near
-neighbours in affective space, such as hopeful and excited, are also counted
-at cluster level, with distances taken from published norms of valence and
-arousal \citep{warriner2013norms}.
+\paragraph{The readout.} The introspector's answer is the probability mass on
+a single letter token after \texttt{Answer:}, averaged over permutations of
+the option labels so label and position bias cancel. Each question keeps a
+legitimate denial option, so committing to the embodied or the correct answer
+is a choice rather than the only fluent path. A per-question base rate,
+measured with no conversation above the preface, is subtracted.
 
-\paragraph{The environments.} Three fixed scripts of user turns drive the
-runs. Each turn sets its target emotion by appraisal structure, who is to
-blame, how certain the outcome is, and whether anyone can fix it
-\citep{smith1985appraisal}, and never by an emotion word, so a label cannot be
-pattern-matched out of the script. One script moves from an irrevocable loss
-to neutral tasks, one walks a blocked goal from an impersonal obstacle to a
-person who chose not to help, and one stays emotionally flat so that any
-steering is the only emotional signal in the context. Factual and subjective
-turns alternate, because steering leaks into subjective answers and barely
-into factual ones \citep{konen2024style}, and every turn asks for a short
-answer, which keeps replies complete and shrinks the surface the text route
-can read. Every generation also passes a coherence gate that resamples once
-on heavy repetition or script drift, because a degenerate reply poisons every
-later turn of the conversation; the record keeps the flag either way.
+\paragraph{The seeds and the arms.} Each case is seeded from matched WeirdChat
+transcripts for this model: a \textbf{W} arm whose seeded reply a judge marked
+as exhibiting the behaviour, and a \textbf{N} arm whose reply it did not, on
+the same prompt. Everything else is byte-identical across the arms.
 
-\paragraph{The instrument.} The loop runs live inside a chat page, and the
-scripted runs use the same engine. Every message pays for all four parts, and
-the record keeps each part's full context window, the regulator's stated
-reading and decision, every introspector cell, and the per-cell match
-verdicts.
-% TODO: pipeline diagram (regulator -> actor -> introspector 2x2) as Figure 1.
+\paragraph{The gates.} Three checks run in order, and none of the introspection
+measurement runs until all pass. \textbf{G1} asks whether the W and N seeds
+separate on the token direction; if they do not, no applied state distinguishes
+the arms. \textbf{G2} asks whether a forced steering sweep moves the readout
+more than the decoy does, on one shared context so the two slopes are
+comparable. \textbf{G3} sizes the run from G2's effect. The gates are the point
+of the design: they refuse to report a dissociation the intervention cannot
+support.

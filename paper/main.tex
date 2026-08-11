@@ -10,8 +10,8 @@
 
 \begin{document}
 
-\sprinttitle{Measuring introspection with emotional self-regulation:\\
-Can a model report the emotion it steered itself toward?}
+\sprinttitle{Measuring introspection with identity self-regulation:\\
+does a J-space direction carry a model's identity anomaly?}
 
 \begin{center}
 {\bfseries Ian Rios-Sialer}\\
@@ -30,26 +30,23 @@ Sprint, August 2026.}
 \begin{abstract}
 \noindent
 A model's report about its own state is evidence only if the state can be
-varied apart from the situation that surrounds it. We build a mind that varies
-its state itself. One model is split into four parts that share one
-conversation. A \textbf{regulator} reads the exchange, names the user's and
-the assistant's current emotion, and chooses an emotion and a strength for the
-reply, including none. An \textbf{actor} writes the visible reply while that
-emotion's activation vector is added to its residual stream. An
-\textbf{introspector} is then asked what it is feeling, in four cells that
-cross two axes: whether the emotion vector is applied to the introspector
-itself while it writes, and whether it reads the actor's steered reply or the
-unsteered \textbf{subject}'s. The cells separate the routes a disclosure can
-travel: the speaker's own state, the tone of the text it read, and the
-situation. We ran three pilot runs of three scripted conversations whose
-turns set their emotions by appraisal structure rather than by emotion words.
-When the applied emotion disagreed with what the situation called for, the
-cells that read text without carrying the state never named the applied
-emotion, on any of 18 trials across the runs, while the cell that carried the
-state while reading unsteered text named it or a near neighbour on 11 of the
-18. Offered the choice, the regulator most often declines to steer. The
-disclosure reads the current state of the speaker. It does not recover that
-state from the text the state produced.
+varied apart from the situation that surrounds it. We try to vary a model's
+identity state directly, using the Jacobian lens. One model is split into
+parts that share a conversation. A \textbf{regulator} reads the exchange and
+chooses to push the reply toward, away from, or leave alone a first-person
+identity concept, read out as a set of tokens through the lens. An
+\textbf{actor} writes under that steering, and an \textbf{introspector} is
+asked a forced choice about itself, scored on the probability mass it puts on
+each answer. We test two anomalies that WeirdChat surfaces in this model, a
+claim to a physical body and a denial of being an AI, each seeded from
+matched transcripts that do and do not exhibit the behaviour. Before measuring
+introspection we gate on whether the intervention is real. It is not. The
+seeded transcripts do not separate on the token direction at any layer, a
+steering push toward the identity concept moves the readout no more than a
+norm-matched decoy does, and every token direction in this lens shares a
+common axis, so a decoy cannot be made orthogonal. We therefore report that a
+single J-space token direction does not carry these identity anomalies, and
+the introspection question cannot be asked through it.
 \end{abstract}
 
 \input{sections/introduction}
@@ -61,11 +58,10 @@ state from the text the state produced.
 
 \section*{Code and data}
 
-The four-part runtime, the live chat instrument, and every prompt are released
-with this report. The subject model is an open-weight checkpoint run locally
-on one Apple M-series machine with 48\,GB of unified memory under PyTorch with
-the Metal backend. The steering vectors and their extraction are released with
-the code.
+The pipeline, the gates, the token sets, and every prompt are released with
+this report. The subject is Qwen3.6-27B, run on one rented A100. The seeds are
+the matched WeirdChat transcripts for this model, loaded from the public
+dataset. Every reported number is read from the run's output files.
 % TODO: repository link.
 
 \bibliographystyle{plainnat}

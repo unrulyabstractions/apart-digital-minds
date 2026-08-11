@@ -1808,3 +1808,5 @@ Findings returned as structured output to the orchestrator, not as a file.
 | 434 | G2 selectivity | shared-context sweep: beta_target=0.019 < beta_decoy=0.041 (gap -0.022); decoy moves readout >= target | VERIFIED — J-space token steering not selective |
 | 435 | J-space direction geometry | within-target cos 0.69 == target-decoy cos 0.69 (7B); decoy_cos 0.67 (27B) | VERIFIED — shared common axis; decoy cannot be orthogonal (PLAN deviation 1) |
 | 436 | Remote data capture | capture_and_destroy: 24/24 files byte-verified to sync/, then box 47473841 destroyed | VERIFIED |
+| 437 | Paper rewritten to identity pipeline + null result | Built; viewed pages 1,3,4 with image tokens; Figs 1-3 render from real captured data; WeirdChat cite resolves (in .bbl); writing-voice pass fixed an aphorism + a fragment | VERIFIED |
+| 438 | Figures from real data | fig_separation (layer scan, both cases), fig_sweep (g2_caseA_r3 target vs decoy), fig_geometry (cosine 7B diagnostic); TrueType (pdf.fonttype 42) | VERIFIED via rendered PNGs |
