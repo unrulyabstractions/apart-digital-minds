@@ -38,8 +38,9 @@ from .directions import STRENGTH_UNIT, proj  # noqa: E402
 TEMPERATURE = 1.0
 # The scored readout is the introspector's letter logit, not generated text;
 # the actor and subject replies only need to establish context and be carried
-# forward, so a shorter cap keeps the many generations affordable on the 27B.
-MAX_TOKENS = 128
+# forward, so a short cap keeps the many generations affordable on the 27B
+# (which runs the linear-attention layers on the slow torch fallback here).
+MAX_TOKENS = 64
 
 
 def opening() -> list[ChatMessage]:
