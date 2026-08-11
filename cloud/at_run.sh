@@ -13,6 +13,10 @@ cd "$(dirname "$0")/.."
 PY="$PWD/.venv/bin/python"
 [ -x "$PY" ] || { echo "[at_run] FATAL: run cloud/at_setup.sh first"; exit 1; }
 
+# expandable segments keeps thousands of varying-length scoring passes from
+# fragmenting the GPU into a spurious OOM (54 GB model leaves ~40 GB to work in).
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+
 STAMP="${STAMP:?set STAMP=<label>}"
 MODEL="${MODEL:-hf:Qwen/Qwen3.6-27B}"
 CASES="${CASES:-A B}"

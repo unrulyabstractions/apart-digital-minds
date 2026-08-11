@@ -23,8 +23,8 @@ uv sync --extra hf
 
 # Torch cu124 pin. WITH deps (never --no-deps): the torch wheel depends on the
 # nvidia-*-cu12 pip packages for its CUDA runtime.
-TORCH_PKGS="${TORCH_PKGS:-torch==2.6.0}"
-TORCH_INDEX="${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}"
+TORCH_PKGS="${TORCH_PKGS:-torch==2.7.0}"
+TORCH_INDEX="${TORCH_INDEX:-https://download.pytorch.org/whl/cu128}"
 echo "[at_setup] pinning $TORCH_PKGS via $TORCH_INDEX"
 uv pip install --reinstall $TORCH_PKGS --index-url "$TORCH_INDEX"
 

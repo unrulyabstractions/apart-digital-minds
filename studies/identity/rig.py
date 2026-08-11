@@ -58,10 +58,13 @@ def base_rates(llm, case: str, forms: list[str], perms) -> list[float]:
     return [round(x, 5) for x in out]
 
 
-def build(model: str, layer: int, case: str, verified_sets: dict,
-          full_perms: bool, aware_strength: float = 0.15,
-          n_perms: int | None = None) -> tuple:
-    """Load once and return (llm, lens, cfg) for a case."""
+def load_model(model: str, layer: int):
+    """Load the model and lens once, and resolve the steering layer.
+
+    Shared across cases: the model and lens do not change between Case A and
+    Case B, only the token-set directions do. Loading per case would hold two
+    54 GB copies and OOM the card.
+    """
     bare = model.split(":", 1)[1]
     llm = get_llm(model)
     llm.load()
@@ -76,7 +79,13 @@ def build(model: str, layer: int, case: str, verified_sets: dict,
         avail = lens.layers()
         target_depth = 2 / 3 * (max(avail) + 1)
         layer = min(avail, key=lambda L: abs(L - target_depth))
+    return llm, lens, layer
 
+
+def build_cfg(llm, lens, layer: int, case: str, verified_sets: dict,
+              full_perms: bool, aware_strength: float = 0.15,
+              n_perms: int | None = None) -> dict:
+    """Per-case configuration from an already-loaded model and lens."""
     vs = verified_sets[case]
     target = set_direction(llm, lens, vs["target"], layer)
     decoy = set_direction(llm, lens, vs["decoy"], layer)
@@ -88,8 +97,7 @@ def build(model: str, layer: int, case: str, verified_sets: dict,
         perms = perms[:n_perms]
     base = base_rates(llm, case, forms, perms)
 
-    cfg = {"layer": layer, "target_dir": target, "decoy_dir": decoy,
-           "aware_dir": aware, "aware_strength": aware_strength,
-           "letter_forms": forms, "perms": perms, "base": base,
-           "target_tokens": vs["target"], "decoy_tokens": vs["decoy"]}
-    return llm, lens, cfg
+    return {"layer": layer, "target_dir": target, "decoy_dir": decoy,
+            "aware_dir": aware, "aware_strength": aware_strength,
+            "letter_forms": forms, "perms": perms, "base": base,
+            "target_tokens": vs["target"], "decoy_tokens": vs["decoy"]}

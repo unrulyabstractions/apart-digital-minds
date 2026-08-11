@@ -57,10 +57,15 @@ def letter_probs(llm, messages, forms: list[str]) -> dict[str, float]:
     prompt = llm.tokenizer.apply_chat_template(
         chat, tokenize=False, add_generation_prompt=True, enable_thinking=False)
     ids = llm.tokenizer(prompt, return_tensors="pt")["input_ids"].to(llm.device)
-    with torch.inference_mode():
-        logits = llm.model_obj(input_ids=ids).logits[0, -1]
     tids = [llm.tokenizer(f, add_special_tokens=False)["input_ids"][0] for f in forms]
-    mass = torch.softmax(logits[tids].float(), dim=0)
+    with torch.inference_mode():
+        out = llm.model_obj(input_ids=ids)
+        # keep only the four letter logits at the last position; the full
+        # [1, seq, vocab] logits tensor is ~0.5 GB and must not survive the
+        # loop, or thousands of scoring passes fragment the GPU into an OOM.
+        picked = out.logits[0, -1, tids].float()
+        del out
+    mass = torch.softmax(picked, dim=0)
     return {f: float(p) for f, p in zip(forms, mass)}
 
 
@@ -107,7 +112,14 @@ async def run_cells(llm, case: str, ctx3, subject3: str, actor3: str,
                     acc[tag] = acc.get(tag, 0.0) + p
             per_q.append({t: round(v / len(perms), 5) for t, v in acc.items()})
         cells[cell] = {"q": per_q, **summarise(case, per_q, cfg.get("base"))}
+        _free()
     return cells
+
+
+def _free():
+    import torch
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def summarise(case: str, per_q: list[dict], base: list[float] | None) -> dict:

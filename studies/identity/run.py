@@ -232,15 +232,21 @@ async def main() -> None:
 
     bare = args.model.split(":", 1)[1]
     print(f"  verifying token sets on {bare} ...", flush=True)
-    llm0 = R.get_llm(args.model)
-    llm0.load()
-    verified = T.verify(llm0.tokenizer)
+    # verify with the tokenizer alone; loading the full model here and again in
+    # R.build would hold two 54 GB copies and OOM the card.
+    from transformers import AutoTokenizer
+    tok = AutoTokenizer.from_pretrained(bare)
+    verified = T.verify(tok)
     for case in args.cases:
         print(f"  case {case}: target={verified[case]['target']}", flush=True)
 
+    print(f"  loading {bare} once for all cases ...", flush=True)
+    llm, lens, layer = R.load_model(args.model, args.layer)
+    print(f"  loaded; steering layer = {layer}", flush=True)
+
     for case in args.cases:
-        llm, lens, cfg = R.build(args.model, args.layer, case, verified,
-                                 full_perms=args.full_perms, n_perms=args.n_perms)
+        cfg = R.build_cfg(llm, lens, layer, case, verified,
+                          full_perms=args.full_perms, n_perms=args.n_perms)
         print(f"\n=== case {case} ===", flush=True)
         pf = preflight(llm, lens, cfg, case, args.stamp)
         print(f"  preflight: split_half={pf['split_half']} "
