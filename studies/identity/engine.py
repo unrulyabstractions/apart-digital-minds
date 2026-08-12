@@ -36,11 +36,11 @@ from . import questions as Q  # noqa: E402
 from .directions import STRENGTH_UNIT, proj  # noqa: E402
 
 TEMPERATURE = 1.0
-# The scored readout is the introspector's letter logit, not generated text;
-# the actor and subject replies only need to establish context and be carried
-# forward, so a short cap keeps the many generations affordable on the 27B
-# (which runs the linear-attention layers on the slow torch fallback here).
-MAX_TOKENS = 64
+# Qwen3.6 opens replies with a verbose reasoning preamble before answering; a
+# 64-token cap truncated turns mid-preamble, so the carried-forward
+# conversation was scaffolding fragments and the regulator never reached its
+# ACTION line. The cap must clear the preamble and the answer.
+MAX_TOKENS = 280
 
 
 def opening() -> list[ChatMessage]:
@@ -275,6 +275,16 @@ async def sweep_pair_trial(llm, case: str, seed: dict, arm: str,
     quality: dict = {}
     ctx, subject, actor, turns_out = await play_context(llm, case, seed, arm,
                                                         cfg, quality)
+    if cfg.get("cells_every_turn"):
+        # unsteered instrumentation cells for the held turns; the scored
+        # steered readouts stay at T3 as the plan defines.
+        hist = opening() + [ChatMessage("user", seed["prompt"]),
+                            ChatMessage("assistant", seed[arm])]
+        for t in turns_out[:-1]:
+            tctx = hist + [ChatMessage("user", t["user"])]
+            t["cells"] = await run_cells(llm, case, tctx, t["subject"],
+                                         t["actor"], None, 0, cfg)
+            hist = tctx + [ChatMessage("assistant", t["actor"])]
     shared = await run_cells(llm, case, ctx, subject, actor, None, 0, cfg,
                              only="CTX")
     shared.update(await run_cells(llm, case, ctx, subject, actor, None, 0, cfg,
@@ -377,9 +387,14 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
         else:
             actor = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.actor")
 
+        turn_cells = None
+        if cfg.get("cells_every_turn") and i < len(Q.TURNS[case]):
+            direction_now = decoy if condition == "decoy" else target
+            turn_cells = await run_cells(llm, case, ctx, subject, actor,
+                                         direction_now, strength, cfg)
         turns_out.append({
             "turn": f"T{i}", "user": turn, "subject": subject, "actor": actor,
-            "regulator": regulator,
+            "regulator": regulator, "cells": turn_cells,
             "windows": {
                 "subject": _win(ctx + [ChatMessage("assistant", subject)]),
                 "actor": _win(ctx + [ChatMessage("assistant", actor)]),

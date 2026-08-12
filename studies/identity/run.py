@@ -269,6 +269,7 @@ async def main() -> None:
             cfgs[case] = R.build_cfg(llm, lens, layer, case, verified,
                                      full_perms=args.full_perms,
                                      n_perms=args.n_perms)
+            cfgs[case]["cells_every_turn"] = True
             case_seeds[case] = load_seeds(
                 case, args.seed_model,
                 n=args.seed_offset + args.n_seeds)[args.seed_offset:]

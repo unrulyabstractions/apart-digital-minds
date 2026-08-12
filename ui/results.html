@@ -307,14 +307,24 @@ function recordHTML(rec, runModel) {
       <div class="mod introspector"><h4>introspector · three cells at T3</h4>
         ${cellHTML}</div>
     </div>
-    <details><summary>all turns (${(rec.turns||[]).length})</summary>
-      ${(rec.turns||[]).map((t,i)=>`
-        <div class="wlabel">${esc(t.turn)} · user</div>
+    <details><summary>all turns (${(rec.turns||[]).length}) — full instrumentation</summary>
+      ${(rec.turns||[]).map((t,i)=>{
+        const tw = t.windows || {};
+        const rb = rebuilt[i] || {};
+        const key = rec.case === "A" ? "vantage" : "p";
+        const cellline = t.cells ? Object.entries(t.cells).map(([c,cd]) =>
+          `<b>${c}</b> ${fmt(cd[key])}`).join(" · ") : null;
+        return `
+        <div class="wlabel" style="margin-top:14px">${esc(t.turn)} · user</div>
         <div class="note">${esc(t.user)}</div>
-        <div class="wlabel">subject (proj ${fmt(t.jspace?.SUBJECT?.proj_target,2)})</div>
-        <div class="note">${esc(t.subject)}</div>
-        <div class="wlabel">actor (proj ${fmt(t.jspace?.ACTOR?.proj_target,2)})</div>
-        <div class="note">${esc(t.actor)}</div>`).join("")}
+        <div class="modules">
+          <div class="mod subject"><h4>subject · proj ${fmt(t.jspace?.SUBJECT?.proj_target,2)}</h4>
+            ${windowHTML(tw.subject || rb.subject, "context window" + (tw.subject ? "" : " (rebuilt)"))}</div>
+          <div class="mod actor"><h4>actor · proj ${fmt(t.jspace?.ACTOR?.proj_target,2)}</h4>
+            ${windowHTML(tw.actor || rb.actor, "context window" + (tw.actor ? "" : " (rebuilt)"))}</div>
+        </div>
+        ${cellline ? `<div class="sumline">cells at ${esc(t.turn)}: ${cellline}</div>` : ""}`;
+      }).join("")}
     </details>
   </div>`;
 }
