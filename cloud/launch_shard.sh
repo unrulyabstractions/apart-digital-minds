@@ -13,7 +13,7 @@ set -u
 cd "$(dirname "$0")/.."
 STAMP="${1:?stamp}"; OFFSET="${2:?offset}"; NSEEDS="${3:-5}"
 
-pkill -9 -f studies.identity 2>/dev/null
+pkill -9 -f 'studies[.]identity' 2>/dev/null
 pkill -9 -f at_run 2>/dev/null
 sleep 2
 find studies src -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null

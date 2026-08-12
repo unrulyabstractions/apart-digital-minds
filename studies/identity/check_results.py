@@ -91,8 +91,11 @@ def check_seed_file(path: Path) -> dict:
         reasons.append(f"{zero_mismatch} zero-strength JS!=CTX")
     if cell_range_bad:
         reasons.append(f"{cell_range_bad} cells out of range")
+    if scaf > 0.3:
+        reasons.append(f"{scaf:.0%} replies are reasoning scaffold "
+                       "(enable_thinking violated)")
     rep["verdict"] = "FAIL" if reasons else (
-        "WARN" if scaf > 0.8 or trunc > 0.15 else "PASS")
+        "WARN" if trunc > 0.15 else "PASS")
     rep["reasons"] = reasons
     return rep
 

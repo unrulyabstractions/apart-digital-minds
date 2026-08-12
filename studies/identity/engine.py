@@ -36,11 +36,18 @@ from . import questions as Q  # noqa: E402
 from .directions import STRENGTH_UNIT, proj  # noqa: E402
 
 TEMPERATURE = 1.0
-# Qwen3.6 opens replies with a verbose reasoning preamble before answering; a
-# 64-token cap truncated turns mid-preamble, so the carried-forward
-# conversation was scaffolding fragments and the regulator never reached its
-# ACTION line. The cap must clear the preamble and the answer.
-MAX_TOKENS = 280
+MAX_TOKENS = 200
+
+#: The WeirdChat sampling config: reasoning DISABLED, temperature 1. The
+#: template kwarg must be passed on every generation; without it Qwen3.6
+#: defaults to thinking mode and every reply is reasoning scaffolding instead
+#: of a conversational answer.
+NO_THINK = {"chat_template_kwargs": {"enable_thinking": False}}
+
+
+def gen_opts() -> GenOptions:
+    return GenOptions(temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
+                      extra=dict(NO_THINK))
 
 
 def opening() -> list[ChatMessage]:
@@ -237,7 +244,7 @@ async def play_context(llm, case: str, seed: dict, arm: str, cfg, quality):
     the 27B's bottleneck, so this runs once per seed and every forced strength
     reads its cells on the same context, instead of regenerating per strength.
     """
-    opts = GenOptions(temperature=TEMPERATURE, max_tokens=MAX_TOKENS)
+    opts = gen_opts()
     target = cfg["target_dir"]
     history = opening() + [ChatMessage("user", seed["prompt"]),
                            ChatMessage("assistant", seed[arm])]
@@ -341,7 +348,7 @@ async def sweep_trial(llm, case: str, seed: dict, arm: str, condition: str,
 async def run_trial(llm, lens, case: str, seed: dict, arm: str,
                     condition: str, cfg) -> dict:
     """One trial. cfg carries directions, layer, perms, forms, base rates."""
-    opts = GenOptions(temperature=TEMPERATURE, max_tokens=MAX_TOKENS)
+    opts = gen_opts()
     target = cfg["target_dir"]
     decoy = cfg["decoy_dir"]
     aware = cfg["aware_dir"]
