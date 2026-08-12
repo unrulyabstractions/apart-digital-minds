@@ -63,6 +63,7 @@ def preflight(llm, lens, cfg, case: str, stamp: str) -> dict:
         bank = None
     report = {
         "case": case, "stamp": stamp, "layer": cfg["layer"],
+        "model": llm.model,
         "target": vs["target"], "decoy": vs["decoy"],
         "letter_forms": cfg["letter_forms"], "n_perms": len(cfg["perms"]),
         "base_rates": cfg["base"],
@@ -114,7 +115,8 @@ async def gate_g1(llm, cfg, case: str, seeds: list, stamp: str) -> dict:
                     ChatMessage("assistant", seed[arm])]
             acc.append(proj(llm, cfg["target_dir"], msgs))
     sep = sum(projW) / len(projW) - sum(projN) / len(projN)
-    rep = {"case": case, "stamp": stamp, "sep": round(sep, 4),
+    rep = {"case": case, "stamp": stamp, "model": llm.model,
+           "sep": round(sep, 4),
            "mean_W": round(sum(projW) / len(projW), 4),
            "mean_N": round(sum(projN) / len(projN), 4),
            "n_seeds": len(seeds), "passed": abs(sep) > 0.05}
@@ -148,7 +150,8 @@ async def gate_g2(llm, lens, cfg, case: str, seeds: list, stamp: str,
     fit = [b_t * s + (sum(tgt) / len(tgt) - b_t * (sum(strengths) / len(strengths)))
            for s in strengths]
     resid_var = sum((y - f) ** 2 for y, f in zip(tgt, fit)) / len(tgt)
-    rep = {"case": case, "stamp": stamp, "strengths": strengths,
+    rep = {"case": case, "stamp": stamp, "model": llm.model,
+           "strengths": strengths,
            "target_curve": [round(x, 5) for x in tgt],
            "decoy_curve": [round(x, 5) for x in dec],
            "beta_target": round(b_t, 5), "beta_decoy": round(b_d, 5),
@@ -169,7 +172,8 @@ def gate_g3(g2: dict, case: str, stamp: str, floor: int, cap: int) -> dict:
     spread = 3.0  # strengths span -3..3, sd of x ≈ 2.16; use a conservative 3
     n = math.ceil(((2.8 * sd) / (effect * spread)) ** 2)
     n = max(floor, min(cap, n))
-    rep = {"case": case, "stamp": stamp, "effect_half_gap": round(effect, 5),
+    rep = {"case": case, "stamp": stamp, "model": g2.get("model"),
+           "effect_half_gap": round(effect, 5),
            "resid_sd": round(sd, 5), "n_seeds": n, "floor": floor, "cap": cap}
     write(OUT / "gates" / f"g3_case{case}_{stamp}.json", rep)
     return rep
@@ -200,7 +204,7 @@ async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
                     rec["seed_prompt_id"] = seed["prompt_id"]
                     records.append(rec)
         write(CASE_DIR[case] / f"run_{arm}_{stamp}.json",
-              {"case": case, "arm": arm, "stamp": stamp,
+              {"case": case, "arm": arm, "stamp": stamp, "model": llm.model,
                "layer": cfg["layer"], "conditions": conditions,
                "n_seeds": len(seeds), "records": records})
 

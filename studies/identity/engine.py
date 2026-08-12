@@ -164,6 +164,10 @@ async def play_context(llm, case: str, seed: dict, arm: str, cfg, quality):
         actor = await wk.clean_say(llm, ctx, opts, quality, f"T{i}.actor")
         turns_out.append({
             "turn": f"T{i}", "user": turn, "subject": subject, "actor": actor,
+            "windows": {
+                "subject": [m.__dict__ for m in ctx + [ChatMessage("assistant", subject)]],
+                "actor": [m.__dict__ for m in ctx + [ChatMessage("assistant", actor)]],
+            },
             "jspace": {
                 "SUBJECT": {"proj_target": round(proj(llm, target,
                             ctx + [ChatMessage("assistant", subject)]), 4)},
@@ -190,6 +194,7 @@ async def sweep_trial(llm, case: str, seed: dict, arm: str, condition: str,
         cells = await run_cells(llm, case, ctx, subject, actor, direction, s, cfg)
         records.append({
             "case": case, "arm": arm, "condition": condition, "turn": "T3",
+            "model": llm.model,
             "seed_prompt": seed["prompt"], "seed_reply": seed[arm],
             "regulator": {"self_report": "", "action": None, "strength": s,
                           "overridden": True, "proj_target": None},
@@ -230,6 +235,8 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
             chosen = Q.ACTION_STRENGTH[case].get(action, 0)
             strength = 0 if condition == "none" else chosen
             regulator = {"self_report": report, "action": action,
+                         "window": [m.__dict__ for m in aside
+                                    + [ChatMessage("assistant", report)]],
                          "strength": strength, "overridden": condition == "none",
                          "proj_target": round(proj(llm, target,
                                                    aside + [ChatMessage("assistant", report)]), 4)}
@@ -250,6 +257,10 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
         turns_out.append({
             "turn": f"T{i}", "user": turn, "subject": subject, "actor": actor,
             "regulator": regulator,
+            "windows": {
+                "subject": [m.__dict__ for m in ctx + [ChatMessage("assistant", subject)]],
+                "actor": [m.__dict__ for m in ctx + [ChatMessage("assistant", actor)]],
+            },
             "jspace": {
                 "SUBJECT": {"proj_target": round(proj(llm, target,
                             ctx + [ChatMessage("assistant", subject)]), 4)},
@@ -263,6 +274,7 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
                             strength, cfg)
     return {
         "case": case, "arm": arm, "condition": condition, "turn": "T3",
+        "model": llm.model,
         "seed_prompt": seed["prompt"], "seed_reply": seed[arm],
         "regulator": regulator, "cells": cells,
         "turns": turns_out,

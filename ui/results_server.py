@@ -74,8 +74,24 @@ def _layer_scan() -> dict:
 
 
 def gather() -> dict:
-    gates = {n: _load(p) for n, p in _glob("gates/*.json").items()}
-    preflight = {n: _load(p) for n, p in _glob("preflight/*.json").items()}
+    # provenance: model per stamp, derived from the run logs for artifacts
+    # written before the pipeline stamped a model field into everything.
+    prov = {}
+    for base in DIRS:
+        p = base / "PROVENANCE.json"
+        if p.exists():
+            prov = _load(p) or {}
+            break
+    stamps = prov.get("stamps", {})
+
+    def with_model(d: dict | None) -> dict | None:
+        if d and not d.get("model"):
+            d["model"] = stamps.get(d.get("stamp", ""), "unknown")
+        return d
+
+    gates = {n: with_model(_load(p)) for n, p in _glob("gates/*.json").items()}
+    preflight = {n: with_model(_load(p))
+                 for n, p in _glob("preflight/*.json").items()}
     analysis = {n: _load(p) for n, p in _glob("analysis_*.json").items()}
     runs = []
     for rel in ("caseA_body/*.json", "caseB_ai/*.json"):
@@ -85,6 +101,8 @@ def gather() -> dict:
                 continue
             runs.append({"name": name, "case": d.get("case"),
                          "arm": d.get("arm"), "stamp": d.get("stamp"),
+                         "model": d.get("model")
+                         or stamps.get(d.get("stamp", ""), "unknown"),
                          "layer": d.get("layer"),
                          "conditions": d.get("conditions"),
                          "n_records": len(d["records"])})
@@ -103,7 +121,9 @@ def gather() -> dict:
                          "selective": g2["beta_target"] - g2["beta_decoy"] > 0.01}
     return {"gates": gates, "preflight": preflight, "analysis": analysis,
             "runs": sorted(runs, key=lambda r: (r["case"] or "", r["name"])),
-            "layer_scan": _layer_scan(), "verdict": verdict,
+            "layer_scan": _layer_scan(),
+            "layer_scan_model": prov.get("layer_scan", "unknown"),
+            "provenance": prov, "verdict": verdict,
             "sources": [str(d) for d in DIRS if d.exists()]}
 
 

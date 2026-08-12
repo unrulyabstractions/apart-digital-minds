@@ -72,6 +72,7 @@ def main() -> None:
         import statistics as st
         rep = {
             "case": case, "stamp": args.stamp, "layer": layer,
+            "model": llm.model,
             "n_seeds": len(seeds),
             "target": {"mean_W": round(st.mean(pW), 4),
                        "mean_N": round(st.mean(pN), 4),
