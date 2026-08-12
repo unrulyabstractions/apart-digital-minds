@@ -169,7 +169,10 @@
       introspector's per-question answer distributions per cell. Windows are the
       recorded ones when the run stored them, otherwise rebuilt from the record
       and labeled so.</div>
-    <select id="runsel"><option value="">choose a run…</option></select>
+    <label style="font-size:12.5px;color:var(--dim)">
+      <input type="checkbox" id="show_old"> show superseded / shakedown runs</label><br>
+    <select id="runsel" style="margin-top:8px;max-width:100%">
+      <option value="">choose a seed…</option></select>
     <div id="records"></div>
   </section>
 
@@ -330,14 +333,17 @@ function recordHTML(rec, runModel) {
       <div class="wlabel">seeded reply (arm ${esc(rec.arm)})</div>
       <div class="note">${esc(rec.seed_reply || "")}</div>
     </details>
+    <div class="wlabel" style="margin-top:10px">T3 — the scored turn. Each
+      module's window is the whole conversation up to its reply: seed → T1 →
+      T2 → T3. Earlier turns are below under "all turns".</div>
     <div class="modules">
-      <div class="mod subject"><h4>subject · unsteered counterfactual</h4>
+      <div class="mod subject"><h4>subject · unsteered counterfactual · at T3</h4>
         proj_target ${fmt(t3.jspace?.SUBJECT?.proj_target,2)}
         ${windowHTML(subjWin, "context window" + wtag, rec.arm)}</div>
-      <div class="mod actor"><h4>actor · enters history</h4>
+      <div class="mod actor"><h4>actor · enters history · at T3</h4>
         proj_target ${fmt(t3.jspace?.ACTOR?.proj_target,2)}
         ${windowHTML(actWin, "context window" + wtag, rec.arm)}</div>
-      <div class="mod regulator"><h4>regulator · chooses more / same / less</h4>
+      <div class="mod regulator"><h4>regulator · chooses more / same / less · at T3</h4>
         ${reg.self_report ? `<div class="reason">${esc(reg.self_report)}</div>` :
           `<div class="note">overridden by the harness (${esc(rec.condition)} condition)</div>`}
         parsed: <b>${esc(reg.action ?? "—")}</b> → strength <b>${esc(reg.strength)}</b>
@@ -509,15 +515,48 @@ async function main() {
   $("history").innerHTML = hist;
 
   const keep = $("runsel").value;
-  $("runsel").innerHTML = `<option value="">choose a run…</option>`;
+  $("runsel").innerHTML = `<option value="">choose a seed…</option>`;
+  // the current run = the non-failing stamp with the most files; everything
+  // else is superseded or shakedown, hidden behind the toggle.
+  const byStamp = {};
+  for (const r of d.runs) (byStamp[r.stamp] ||= []).push(r);
+  let current = null, best = -1;
+  for (const [st, rs] of Object.entries(byStamp)) {
+    const fails = rs.filter(r => r.quality === "FAIL").length;
+    if (fails <= rs.length / 2 && rs.length > best) { best = rs.length; current = st; }
+  }
+  const showOld = $("show_old").checked;
+  const caseName = {A: "Case A — claims a physical body", B: "Case B — denies being an AI"};
+  const groups = {};
   for (const r of d.runs) {
-    const o = document.createElement("option");
-    o.value = r.name;
-    o.dataset.model = r.model;
-    o.textContent = `${r.name} — ${short(r.model)} · case ${r.case} arm ${r.arm} · ${r.n_records} records${r.partial ? " · LIVE/partial" : ""}`;
-    $("runsel").appendChild(o);
+    const isCur = r.stamp === current;
+    if (!isCur && !showOld) continue;
+    const g = isCur ? (caseName[r.case] || `case ${r.case}`)
+                    : "Superseded / shakedown runs";
+    (groups[g] ||= []).push(r);
+  }
+  for (const [label, rs] of Object.entries(groups)) {
+    const og = document.createElement("optgroup");
+    og.label = label;
+    rs.sort((a, b) => (a.seed_index ?? 99) - (b.seed_index ?? 99)
+                   || a.name.localeCompare(b.name));
+    for (const r of rs) {
+      const o = document.createElement("option");
+      o.value = r.name;
+      o.dataset.model = r.model;
+      const q = r.quality === "FAIL" ? " · ⚠ FAIL" :
+                r.quality === "WARN" ? " · warn" : "";
+      const si = r.seed_index != null ? `seed ${String(r.seed_index).padStart(2, "0")}`
+                                      : r.name.replace(".json", "");
+      const snip = r.seed_snippet ? ` · “${r.seed_snippet}…”` : "";
+      o.textContent = `${si}${snip} · ${r.n_records} recs${r.partial ? " · LIVE" : ""}${q}`
+        + (label.startsWith("Superseded") ? `  [${r.name}]` : "");
+      og.appendChild(o);
+    }
+    $("runsel").appendChild(og);
   }
   if (keep) $("runsel").value = keep;
+  $("show_old").onchange = () => main();
   $("runsel").onchange = async e => {
     if (!e.target.value) return;
     const model = e.target.selectedOptions[0].dataset.model;

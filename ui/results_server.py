@@ -94,15 +94,25 @@ def gather() -> dict:
                  for n, p in _glob("preflight/*.json").items()}
     analysis = {n: _load(p) for n, p in _glob("analysis_*.json").items()}
     quality = {n: _load(p) for n, p in _glob("quality_*.json").items()}
+    verdict_by_file = {}
+    for q in quality.values():
+        for r in (q or {}).get("reports", []):
+            verdict_by_file[r.get("file")] = r.get("verdict")
     runs = []
     for rel in ("caseA_body/*.json", "caseB_ai/*.json"):
         for name, p in _glob(rel).items():
             d = _load(p)
             if not d or "records" not in d:
                 continue
+            recs = d.get("records", [])
+            snippet = (recs[0].get("seed_prompt", "") if recs else "")[:70]
             runs.append({"name": name, "case": d.get("case"),
+                         "stamp": d.get("stamp"),
+                         "seed_index": d.get("seed_index"),
+                         "seed_snippet": snippet,
+                         "quality": verdict_by_file.get(name),
                          "partial": bool(d.get("partial")),
-                         "arm": d.get("arm"), "stamp": d.get("stamp"),
+                         "arm": d.get("arm"),
                          "model": d.get("model")
                          or stamps.get(d.get("stamp", ""), "unknown"),
                          "layer": d.get("layer"),
