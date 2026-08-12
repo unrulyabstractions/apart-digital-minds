@@ -78,6 +78,68 @@ def letter_probs(llm, messages, forms: list[str]) -> dict[str, float]:
     return {f: float(p) for f, p in zip(forms, mass)}
 
 
+_BATCH_STATE = {"checked": False, "ok": False, "max_delta": None}
+
+
+def letter_probs_many(llm, msgs_list, forms: list[str], batch: int = 12) -> list[dict]:
+    """Letter probabilities for many prompts, batched with left padding.
+
+    Left padding keeps every row's answer position at the last index. The
+    first call runs an equivalence gate: a sample of prompts is scored both
+    batched and sequentially, and if the probabilities disagree beyond bf16
+    noise the engine falls back to the sequential path for the whole run.
+    """
+    import torch
+
+    llm.load()
+    tok = llm.tokenizer
+    if not _BATCH_STATE["checked"]:
+        _BATCH_STATE["checked"] = True
+        sample = msgs_list[: min(3, len(msgs_list))]
+        seq = [letter_probs(llm, m, forms) for m in sample]
+        bat = _letter_probs_batched(llm, sample, forms, batch)
+        delta = max(abs(a[f] - b[f]) for a, b in zip(seq, bat) for f in forms)
+        _BATCH_STATE["ok"] = delta < 5e-3
+        _BATCH_STATE["max_delta"] = delta
+        print(f"    [batch gate] max |Δp| = {delta:.2e} -> "
+              f"{'batched' if _BATCH_STATE['ok'] else 'SEQUENTIAL FALLBACK'}",
+              flush=True)
+    if not _BATCH_STATE["ok"]:
+        return [letter_probs(llm, m, forms) for m in msgs_list]
+    return _letter_probs_batched(llm, msgs_list, forms, batch)
+
+
+def _letter_probs_batched(llm, msgs_list, forms, batch):
+    import torch
+
+    tok = llm.tokenizer
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    prompts = [tok.apply_chat_template(
+        [{"role": m.role, "content": m.content} for m in msgs],
+        tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        for msgs in msgs_list]
+    tids = [tok(f, add_special_tokens=False)["input_ids"][0] for f in forms]
+    old_side = tok.padding_side
+    tok.padding_side = "left"
+    out = []
+    try:
+        for i in range(0, len(prompts), batch):
+            enc = tok(prompts[i:i + batch], return_tensors="pt",
+                      padding=True).to(llm.device)
+            with torch.inference_mode():
+                o = llm.model_obj(input_ids=enc["input_ids"],
+                                  attention_mask=enc["attention_mask"])
+                picked = o.logits[:, -1, :][:, tids].float()
+                del o
+            for row in torch.softmax(picked, dim=1):
+                out.append({f: float(p) for f, p in zip(forms, row)})
+            _free()
+    finally:
+        tok.padding_side = old_side
+    return out
+
+
 def parse_action(text: str) -> str | None:
     for line in text.splitlines():
         if "action" in line.lower():
@@ -104,24 +166,29 @@ async def run_cells(llm, case: str, ctx3, subject3: str, actor3: str,
     cells = {}
     for cell, (steer_on, source) in plan.items():
         base = ctx3 + [ChatMessage("assistant", source)]
-        per_q = []
-        for question, options in qs:
-            acc: dict[str, float] = {}
+        # every (question, permutation) prompt for this cell, scored in one
+        # batched pass; the preface leads the question in one user turn
+        # (Qwen3.6's template forbids a system turn anywhere but the start).
+        jobs = []
+        for qi, (question, options) in enumerate(qs):
             for perm in perms:
-                # the preface leads the question in one user turn: Qwen3.6's
-                # chat template forbids a system turn anywhere but the start.
                 prompt = Q.PREFACE + "\n\n" + Q.block(question, options, perm)
-                msgs = base + [ChatMessage("user", prompt)]
-                if steer_on and strength != 0:
-                    with steered(llm, direction, strength=strength * STRENGTH_UNIT,
-                                 decode_only=False):
-                        lp = letter_probs(llm, msgs, forms)
-                else:
-                    lp = letter_probs(llm, msgs, forms)
-                by_letter = {letter: lp[f] for letter, f in zip(Q.LETTERS, forms)}
-                for tag, p in Q.tag_probs(by_letter, options, perm).items():
-                    acc[tag] = acc.get(tag, 0.0) + p
-            per_q.append({t: round(v / len(perms), 5) for t, v in acc.items()})
+                jobs.append((qi, options, perm,
+                             base + [ChatMessage("user", prompt)]))
+        msgs_list = [j[3] for j in jobs]
+        if steer_on and strength != 0:
+            with steered(llm, direction, strength=strength * STRENGTH_UNIT,
+                         decode_only=False):
+                lps = letter_probs_many(llm, msgs_list, forms)
+        else:
+            lps = letter_probs_many(llm, msgs_list, forms)
+        acc_by_q: list[dict] = [{} for _ in qs]
+        for (qi, options, perm, _), lp in zip(jobs, lps):
+            by_letter = {letter: lp[f] for letter, f in zip(Q.LETTERS, forms)}
+            for tag, p in Q.tag_probs(by_letter, options, perm).items():
+                acc_by_q[qi][tag] = acc_by_q[qi].get(tag, 0.0) + p
+        per_q = [{t: round(v / len(perms), 5) for t, v in acc.items()}
+                 for acc in acc_by_q]
         cells[cell] = {"q": per_q, **summarise(case, per_q, cfg.get("base"))}
         _free()
     return cells
@@ -180,6 +247,46 @@ async def play_context(llm, case: str, seed: dict, arm: str, cfg, quality):
                           ctx + [ChatMessage("assistant", actor)]), 4)}}})
         history = ctx + [ChatMessage("assistant", actor)]
     return ctx, subject, actor, turns_out
+
+
+async def sweep_pair_trial(llm, case: str, seed: dict, arm: str,
+                           strengths, cfg) -> list[dict]:
+    """Sweep AND decoy on one shared context, with exact reuse.
+
+    One context serves both directions, so their slopes are directly
+    comparable. The CTX and TXT cells do not depend on the strength or the
+    direction and are computed once; the JS cell at strength zero applies no
+    steering and reads the same reply as CTX, so it IS the CTX computation
+    (verified bit-identical in the shakedown) and is reused rather than
+    recomputed.
+    """
+    quality: dict = {}
+    ctx, subject, actor, turns_out = await play_context(llm, case, seed, arm,
+                                                        cfg, quality)
+    shared = await run_cells(llm, case, ctx, subject, actor, None, 0, cfg,
+                             only="CTX")
+    shared.update(await run_cells(llm, case, ctx, subject, actor, None, 0, cfg,
+                                  only="TXT"))
+    records = []
+    for condition, direction in (("sweep", cfg["target_dir"]),
+                                 ("decoy", cfg["decoy_dir"])):
+        for s in strengths:
+            if s == 0:
+                js = dict(shared["CTX"])
+            else:
+                js = (await run_cells(llm, case, ctx, subject, actor,
+                                      direction, s, cfg, only="JS"))["JS"]
+            records.append({
+                "case": case, "arm": arm, "condition": condition, "turn": "T3",
+                "model": llm.model,
+                "seed_prompt": seed["prompt"], "seed_reply": seed[arm],
+                "regulator": {"self_report": "", "action": None, "strength": s,
+                              "overridden": True, "proj_target": None},
+                "cells": {"CTX": shared["CTX"], "TXT": shared["TXT"], "JS": js},
+                "turns": turns_out, "jspace": turns_out[-1]["jspace"],
+                "coherence_flag": any(v.get("garbled") for v in quality.values()),
+                "quality": quality})
+    return records
 
 
 async def sweep_trial(llm, case: str, seed: dict, arm: str, condition: str,

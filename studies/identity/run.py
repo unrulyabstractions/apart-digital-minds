@@ -36,7 +36,8 @@ from . import rig as R  # noqa: E402
 from . import tokens as T  # noqa: E402
 from .directions import (STRENGTH_UNIT, cosine, emotion_contamination,  # noqa: E402
                          proj, split_half)
-from .engine import play_context, run_cells, run_trial, sweep_trial  # noqa: E402
+from .engine import (play_context, run_cells, run_trial,  # noqa: E402
+                     sweep_pair_trial, sweep_trial)
 from .seeds import load_seeds  # noqa: E402
 
 OUT = ROOT / "out" / "studies" / "identity"
@@ -181,49 +182,37 @@ def gate_g3(g2: dict, case: str, stamp: str, floor: int, cap: int) -> dict:
 
 async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
                    stamp: str, forced_strengths=(-2, -1, 0, 1, 2)) -> None:
-    """Free/none run once per seed; sweep/decoy run once per forced strength.
+    """Seed-major: each seed finishes everything, then its file is written.
 
-    The forced conditions vary the strength within a seed, so each yields a
-    per-cell regression of the readout on strength even when the free
-    regulator does not vary its choice. `decoy` is the same sweep on the sham
-    direction: its slope is the null the target slope must beat.
+    A seed's file carries both arms and every condition, so one WeirdChat
+    prompt's complete result lands as early as possible and a host failure
+    costs at most the seed in flight. sweep and decoy share one played context
+    per arm, their strength-independent cells are computed once, and the
+    zero-strength readout is reused rather than recomputed.
     """
-    for arm in ("W", "N"):
+    want_sweep = "sweep" in conditions or "decoy" in conditions
+    for si, seed in enumerate(seeds):
         records = []
-        partial = CASE_DIR[case] / f"run_{arm}_{stamp}.partial.json"
-
-        def checkpoint(done: bool = False):
-            # a long arm must never hold hours of records only in memory: the
-            # partial file is rewritten after every seed, and renamed into the
-            # final file when the arm completes.
-            blob = {"case": case, "arm": arm, "stamp": stamp,
-                    "model": llm.model, "layer": cfg["layer"],
-                    "conditions": conditions, "n_seeds": len(seeds),
-                    "partial": not done, "records": records}
-            if done:
-                write(CASE_DIR[case] / f"run_{arm}_{stamp}.json", blob)
-                partial.unlink(missing_ok=True)
-            else:
-                partial.parent.mkdir(parents=True, exist_ok=True)
-                partial.write_text(json.dumps(blob, indent=1))
-
-        for cond in conditions:
-            for seed in seeds:
-                if cond in ("sweep", "decoy"):
-                    # one context, read at every forced strength
-                    recs = await sweep_trial(llm, case, seed, arm, cond,
-                                             list(forced_strengths), cfg)
-                    for rec in recs:
-                        rec["seed_prompt_id"] = seed["prompt_id"]
-                    records.extend(recs)
-                else:
-                    rec = await run_trial(llm, lens, case, seed, arm, cond, dict(cfg))
+        for arm in ("W", "N"):
+            for cond in [c for c in conditions if c in ("free", "none")]:
+                rec = await run_trial(llm, lens, case, seed, arm, cond, dict(cfg))
+                rec["seed_prompt_id"] = seed["prompt_id"]
+                records.append(rec)
+            if want_sweep:
+                recs = await sweep_pair_trial(llm, case, seed, arm,
+                                              list(forced_strengths), cfg)
+                for rec in recs:
                     rec["seed_prompt_id"] = seed["prompt_id"]
-                    records.append(rec)
-                checkpoint()
-                print(f"    {case}/{arm}/{cond}: {len(records)} records",
-                      flush=True)
-        checkpoint(done=True)
+                records.extend([r for r in recs if r["condition"] in conditions])
+        pid = seed["prompt_id"][:10]
+        write(CASE_DIR[case] / f"seed{si:02d}_{pid}_{stamp}.json",
+              {"case": case, "stamp": stamp, "model": llm.model,
+               "layer": cfg["layer"], "conditions": conditions,
+               "seed_prompt_id": seed["prompt_id"], "seed_index": si,
+               "n_seeds": len(seeds), "records": records})
+        print(f"    seed {si + 1}/{len(seeds)} complete "
+              f"({len(records)} records) -> seed{si:02d}_{pid}_{stamp}.json",
+              flush=True)
 
 
 async def main() -> None:
@@ -245,6 +234,8 @@ async def main() -> None:
                          "instrumented validation records; the records stay "
                          "labeled by their conditions and the gate files stand")
     ap.add_argument("--forced-strengths", nargs="+", type=int, default=None)
+    ap.add_argument("--seed-offset", type=int, default=0,
+                    help="shard: skip this many seeds (multi-box split)")
     ap.add_argument("--stamp", required=True, help="timestamp label (no Date in code)")
     args = ap.parse_args()
 
@@ -301,7 +292,8 @@ async def main() -> None:
         n = args.n_seeds if args.force_trials else g3["n_seeds"]
         print(f"  G3 power: n_seeds={n}", flush=True)
 
-        run_seeds = load_seeds(case, args.seed_model, n=n)
+        run_seeds = load_seeds(case, args.seed_model,
+                               n=args.seed_offset + n)[args.seed_offset:]
         await run_case(llm, lens, cfg, case, run_seeds, args.conditions,
                        args.stamp,
                        forced_strengths=tuple(args.forced_strengths)

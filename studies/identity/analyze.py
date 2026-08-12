@@ -55,13 +55,18 @@ def regress_cells(records, case):
 
 def analyze(case: str, stamp: str) -> dict:
     d = CASE_DIR[case]
+    # records may live in per-arm files (legacy) or per-seed files (seed-major);
+    # pool every record for this stamp and split by the arm each record carries.
+    pool: list = []
+    for pat in (f"run_*_{stamp}.json", f"seed*_{stamp}.json"):
+        for path in sorted(d.glob(pat)):
+            blob = json.loads(path.read_text())
+            pool.extend(blob.get("records", []))
     arms = {}
     for arm in ("W", "N"):
-        path = d / f"run_{arm}_{stamp}.json"
-        if not path.exists():
+        recs = [r for r in pool if r.get("arm") == arm]
+        if not recs:
             continue
-        blob = json.loads(path.read_text())
-        recs = blob["records"]
         by_cond = defaultdict(list)
         for r in recs:
             by_cond[r["condition"]].append(r)
