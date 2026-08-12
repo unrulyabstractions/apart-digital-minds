@@ -140,6 +140,16 @@
   </section>
 
   <section class="panel">
+    <h2>Data quality — live content checks</h2>
+    <div class="note">Every collected seed file is re-read on each pull:
+      truncated replies, reasoning-scaffold answers, regulator ACTION parse,
+      zero-strength JS=CTX identity, cell ranges, per-turn instrumentation.
+      A FAIL here means the file's conversations are not what the experiment
+      intends, whatever its structure says.</div>
+    <table id="quality"></table>
+  </section>
+
+  <section class="panel">
     <h2>Trial records — full instrumentation per module</h2>
     <div class="note">Every trial expands into its modules: each part's full
       context window, the regulator's raw self-report and parsed action, and the
@@ -410,6 +420,22 @@ async function main() {
   }
   $("geom_table").innerHTML = geo;
   $("preflight").innerHTML = pfh || "<div class=note>no preflight files found</div>";
+
+  // data quality
+  let q = `<tr><th>file</th><th>verdict</th><th>trunc</th><th>scaffold</th>
+    <th>ACTION</th><th>notes</th></tr>`;
+  for (const blob of Object.values(d.quality || {})) {
+    for (const r of (blob?.reports || [])) {
+      const v = r.verdict;
+      q += `<tr><td>${esc(r.file)}</td>
+        <td class="${v==="PASS"?"pass":"fail"}">${esc(v)}</td>
+        <td class=num>${r.trunc_rate!=null?(r.trunc_rate*100).toFixed(0)+"%":"—"}</td>
+        <td class=num>${r.scaffold_rate!=null?(r.scaffold_rate*100).toFixed(0)+"%":"—"}</td>
+        <td class=num>${esc(r.action_parse ?? "—")}</td>
+        <td>${esc((r.reasons||[]).join("; "))}</td></tr>`;
+    }
+  }
+  $("quality").innerHTML = q;
 
   // gate/run history: one row per gate file, so new stamps show as they land
   let hist = `<tr><th>file</th><th>case</th><th>stamp</th><th>model</th>
