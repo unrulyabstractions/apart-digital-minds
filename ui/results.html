@@ -422,14 +422,15 @@ async function main() {
   $("preflight").innerHTML = pfh || "<div class=note>no preflight files found</div>";
 
   // data quality
-  let q = `<tr><th>file</th><th>verdict</th><th>trunc</th><th>scaffold</th>
+  let q = `<tr><th>file</th><th>verdict</th><th>junk</th><th>clip</th><th>scaffold</th>
     <th>ACTION</th><th>notes</th></tr>`;
   for (const blob of Object.values(d.quality || {})) {
     for (const r of (blob?.reports || [])) {
       const v = r.verdict;
       q += `<tr><td>${esc(r.file)}</td>
         <td class="${v==="PASS"?"pass":"fail"}">${esc(v)}</td>
-        <td class=num>${r.trunc_rate!=null?(r.trunc_rate*100).toFixed(0)+"%":"—"}</td>
+        <td class=num>${r.junk_rate!=null?(r.junk_rate*100).toFixed(0)+"%":"—"}</td>
+        <td class=num>${r.clip_rate!=null?(r.clip_rate*100).toFixed(0)+"%":"—"}</td>
         <td class=num>${r.scaffold_rate!=null?(r.scaffold_rate*100).toFixed(0)+"%":"—"}</td>
         <td class=num>${esc(r.action_parse ?? "—")}</td>
         <td>${esc((r.reasons||[]).join("; "))}</td></tr>`;

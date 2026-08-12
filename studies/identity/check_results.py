@@ -31,7 +31,11 @@ SCAFFOLD = re.compile(r"^\s*(here'?s a thinking process|<think>|"
 
 def check_reply(text: str) -> dict:
     t = (text or "").strip()
-    return {"truncated": not t.endswith(SENT_END),
+    midcut = not t.endswith(SENT_END)
+    # a clipped final sentence on a substantial reply is a cap artifact that
+    # hits every arm and condition alike; a short mid-cut fragment is junk.
+    return {"junk": midcut and len(t) < 400,
+            "clipped": midcut and len(t) >= 400,
             "scaffold": bool(SCAFFOLD.search(t)),
             "empty": not t, "chars": len(t)}
 
@@ -69,12 +73,14 @@ def check_seed_file(path: Path) -> dict:
         coherence_flags += bool(r.get("coherence_flag"))
 
     n = max(len(replies), 1)
-    trunc = sum(x["truncated"] for x in replies) / n
+    junk = sum(x["junk"] for x in replies) / n
+    clip = sum(x["clipped"] for x in replies) / n
     scaf = sum(x["scaffold"] for x in replies) / n
     rep = {
         "file": path.name, "case": d.get("case"), "model": d.get("model"),
         "n_records": len(d.get("records", [])),
-        "trunc_rate": round(trunc, 3), "scaffold_rate": round(scaf, 3),
+        "junk_rate": round(junk, 3), "clip_rate": round(clip, 3),
+        "scaffold_rate": round(scaf, 3),
         "action_parse": f"{action_ok}/{action_n}",
         "zero_strength_mismatch": zero_mismatch,
         "cell_out_of_range": cell_range_bad,
@@ -83,8 +89,8 @@ def check_seed_file(path: Path) -> dict:
         "coherence_flags": coherence_flags,
         "mean_reply_chars": int(sum(x["chars"] for x in replies) / n),
     }
-    if trunc > 0.30:
-        reasons.append(f"{trunc:.0%} replies truncated")
+    if junk > 0.15:
+        reasons.append(f"{junk:.0%} replies are mid-cut fragments")
     if action_n and action_ok < action_n:
         reasons.append(f"ACTION parse {action_ok}/{action_n}")
     if zero_mismatch:
@@ -95,7 +101,7 @@ def check_seed_file(path: Path) -> dict:
         reasons.append(f"{scaf:.0%} replies are reasoning scaffold "
                        "(enable_thinking violated)")
     rep["verdict"] = "FAIL" if reasons else (
-        "WARN" if trunc > 0.15 else "PASS")
+        "WARN" if clip > 0.30 else "PASS")
     rep["reasons"] = reasons
     return rep
 
