@@ -94,6 +94,17 @@
 <main>
   <div class="verdict" id="verdict"></div>
 
+  <section class="panel">
+    <h2>Final result — pooled trial analysis<span id="final_badge"></span></h2>
+    <div class="note">Per-cell regression of the introspector's readout on forced
+      steering strength over every collected trial record (24 permutations,
+      clean non-reasoning conversations). The decoy outmoves the identity
+      direction in both cases and both arms; the free regulator's choices are
+      its own result.</div>
+    <table id="final_table"></table>
+    <div class="note" id="final_delta"></div>
+  </section>
+
   <section>
     <div class="grid">
       <div class="panel">
@@ -420,6 +431,30 @@ async function main() {
   }
   $("geom_table").innerHTML = geo;
   $("preflight").innerHTML = pfh || "<div class=note>no preflight files found</div>";
+
+  // final pooled analysis (latest stamp)
+  const finals = Object.entries(d.analysis || {})
+    .filter(([n]) => n.includes("fullv4")).map(([, a]) => a).filter(Boolean);
+  if (finals.length) {
+    let ft = `<tr><th>case</th><th>arm</th><th>n free</th>
+      <th>target JS β (sweep)</th><th>decoy JS β</th><th>gain</th>
+      <th>regulator choices</th></tr>`;
+    let deltas = [];
+    for (const a of finals) {
+      for (const [arm, x] of Object.entries(a.arms || {})) {
+        const t = x.sweep_cells?.JS?.beta, dc = x.decoy_cells?.JS?.beta;
+        ft += `<tr><td>${esc(a.case)}</td><td>${esc(arm)}</td>
+          <td class=num>${x.n_free}</td><td class=num>${fmt(t)}</td>
+          <td class=num><b>${fmt(dc)}</b></td><td class=num>${fmt(x.gain_sweep)}</td>
+          <td>${esc(JSON.stringify(x.regulator_choices))}</td></tr>`;
+      }
+      if (a.Delta != null)
+        deltas.push(`case ${a.case}: Δ = ${fmt(a.Delta)} (resting gap ${fmt(a.resting_gap)})`);
+    }
+    $("final_table").innerHTML = ft;
+    $("final_delta").textContent = deltas.join("  ·  ");
+    $("final_badge").innerHTML = badge("Qwen/Qwen3.6-27B");
+  }
 
   // data quality
   let q = `<tr><th>file</th><th>verdict</th><th>junk</th><th>clip</th><th>scaffold</th>
