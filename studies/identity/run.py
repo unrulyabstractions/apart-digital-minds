@@ -181,7 +181,8 @@ def gate_g3(g2: dict, case: str, stamp: str, floor: int, cap: int) -> dict:
 
 
 async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
-                   stamp: str, forced_strengths=(-2, -1, 0, 1, 2)) -> None:
+                   stamp: str, forced_strengths=(-2, -1, 0, 1, 2),
+                   index_offset: int = 0) -> None:
     """Seed-major: each seed finishes everything, then its file is written.
 
     A seed's file carries both arms and every condition, so one WeirdChat
@@ -205,14 +206,14 @@ async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
                     rec["seed_prompt_id"] = seed["prompt_id"]
                 records.extend([r for r in recs if r["condition"] in conditions])
         pid = seed["prompt_id"][:10]
-        write(CASE_DIR[case] / f"seed{si:02d}_{pid}_{stamp}.json",
+        idx = si + index_offset
+        write(CASE_DIR[case] / f"seed{idx:02d}_{pid}_{stamp}.json",
               {"case": case, "stamp": stamp, "model": llm.model,
                "layer": cfg["layer"], "conditions": conditions,
-               "seed_prompt_id": seed["prompt_id"], "seed_index": si,
+               "seed_prompt_id": seed["prompt_id"], "seed_index": idx,
                "n_seeds": len(seeds), "records": records})
-        print(f"    seed {si + 1}/{len(seeds)} complete "
-              f"({len(records)} records) -> seed{si:02d}_{pid}_{stamp}.json",
-              flush=True)
+        print(f"    {case}/seed{idx:02d} complete "
+              f"({len(records)} records)", flush=True)
 
 
 async def main() -> None:
@@ -256,21 +257,36 @@ async def main() -> None:
     llm, lens, layer = R.load_model(args.model, args.layer)
     print(f"  loaded; steering layer = {layer}", flush=True)
 
+    if args.skip_gates:
+        # gates already on disk: interleave the cases seed by seed, so every
+        # WeirdChat prompt's full result for BOTH cases lands as early as the
+        # compute allows, instead of case B waiting on all of case A.
+        args.force_trials = True
+        forced = (tuple(args.forced_strengths) if args.forced_strengths
+                  else (-2, -1, 0, 1, 2))
+        cfgs, case_seeds = {}, {}
+        for case in args.cases:
+            cfgs[case] = R.build_cfg(llm, lens, layer, case, verified,
+                                     full_perms=args.full_perms,
+                                     n_perms=args.n_perms)
+            case_seeds[case] = load_seeds(
+                case, args.seed_model,
+                n=args.seed_offset + args.n_seeds)[args.seed_offset:]
+            print(f"  case {case}: {len(case_seeds[case])} seeds, "
+                  f"base rates ready", flush=True)
+        for si in range(max(len(v) for v in case_seeds.values())):
+            for case in args.cases:
+                if si < len(case_seeds[case]):
+                    await run_case(llm, lens, cfgs[case], case,
+                                   [case_seeds[case][si]], args.conditions,
+                                   args.stamp, forced_strengths=forced,
+                                   index_offset=args.seed_offset + si)
+        return
+
     for case in args.cases:
         cfg = R.build_cfg(llm, lens, layer, case, verified,
                           full_perms=args.full_perms, n_perms=args.n_perms)
         print(f"\n=== case {case} ===", flush=True)
-        if args.skip_gates:
-            args.force_trials = True
-            print("  gates skipped (already recorded); straight to trials",
-                  flush=True)
-            run_seeds = load_seeds(case, args.seed_model,
-                                   n=args.seed_offset + args.n_seeds)[args.seed_offset:]
-            await run_case(llm, lens, cfg, case, run_seeds, args.conditions,
-                           args.stamp,
-                           forced_strengths=tuple(args.forced_strengths)
-                           if args.forced_strengths else (-2, -1, 0, 1, 2))
-            continue
         pf = preflight(llm, lens, cfg, case, args.stamp)
         print(f"  preflight: split_half={pf['split_half']} "
               f"decoy_cos={pf['decoy_cosine']} "
