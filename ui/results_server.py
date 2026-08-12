@@ -136,7 +136,14 @@ def gather() -> dict:
                          "beta_decoy": g2["beta_decoy"],
                          "gap": g2["beta_gap"],
                          "selective": g2["beta_target"] - g2["beta_decoy"] > 0.01}
+    contrastive = {n: _load(p) for n, p in _glob("contrastive/g1_*.json").items()}
+    for g in contrastive.values():
+        for case, c in (g or {}).get("cases", {}).items():
+            verdict[f"contrastive_{case}"] = {
+                "acc": c["best"]["acc"], "p": c["best"]["p_binom"],
+                "layer": c["best_layer"], "passed": c["pass"]}
     return {"gates": gates, "preflight": preflight, "analysis": analysis,
+            "contrastive": contrastive,
             "quality": quality, "annotations": annotations,
             "runs": sorted(runs, key=lambda r: (r["case"] or "", r["name"])),
             "layer_scan": _layer_scan(),

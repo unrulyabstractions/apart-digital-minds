@@ -123,11 +123,21 @@
 <body>
 <header>
   <h1>Measuring introspection with identity self-regulation
-    <span class="q">— does a J-space direction carry the anomaly?</span></h1>
+    <span class="q">— token-set directions miss the anomaly; learned directions find it</span></h1>
   <div class="sub" id="headsub">loading…</div>
 </header>
 <main>
   <div class="verdict" id="verdict"></div>
+
+  <section class="panel" id="sec_contrastive" style="display:none">
+    <h2>G1 — contrastive direction, held-out separation<span id="ctr_badge"></span></h2>
+    <div class="note">The behavior direction learned from the model's own
+      activations (difference of W and N means over reply tokens, leave-one-out:
+      trained on every other prompt, tested on the held-out pair). Chance is
+      0.50. This replaces the token-set G1 below; the token-set directions on
+      the same activations stay at target ≈ decoy.</div>
+    <table id="ctr_table"></table>
+  </section>
 
   <section class="panel">
     <h2>Final result — pooled trial analysis<span id="final_badge"></span></h2>
@@ -140,7 +150,7 @@
     <div class="note" id="final_delta"></div>
   </section>
 
-  <section>
+  <section id="sec_gates">
     <div class="grid">
       <div class="panel">
         <h2>G1 — do the seeded arms separate on the direction?<span id="g1_badge"></span></h2>
@@ -161,7 +171,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="sec_geom">
     <div class="grid">
       <div class="panel">
         <h2>Why: the direction geometry<span id="geom_badge"></span></h2>
@@ -478,9 +488,45 @@ async function main() {
     chips += chip(`G2 ${v.g2.selective?"pass":"fail"}`,
                   `β target ${fmt(v.g2.beta_target)} vs decoy ${fmt(v.g2.beta_decoy)}`,
                   v.g2.selective);
-  chips += chip("Conclusion", "the direction does not carry the anomaly — " +
-                "introspection not measurable through it", false);
+  const ctrPass = ["A","B"].filter(c => v[`contrastive_${c}`]?.passed);
+  for (const c of ["A","B"]) if (v[`contrastive_${c}`]) {
+    const x = v[`contrastive_${c}`];
+    chips += chip(`G1 contrastive ${c} ${x.passed?"pass":"fail"}`,
+                  `held-out acc ${fmt(x.acc,2)} at L${x.layer}, p ${x.p}`, x.passed);
+  }
+  chips += ctrPass.length === 2
+    ? chip("Conclusion", "the behavior is linearly present (learned direction " +
+           "separates held-out arms); token-set directions do not find it", true)
+    : chip("Conclusion", "the direction does not carry the anomaly — " +
+           "introspection not measurable through it", false);
   $("verdict").innerHTML = chips;
+
+  // contrastive G1 (current): per-layer held-out separation
+  const ctr = Object.values(d.contrastive || {}).filter(Boolean);
+  if (ctr.length) {
+    $("sec_contrastive").style.display = "";
+    let rows = `<tr><th>case</th><th>model</th><th>n pairs</th><th>layer</th>
+      <th>held-out acc (mean-pool)</th><th>t</th><th>p</th><th></th></tr>`;
+    for (const g of ctr) for (const [c, x] of Object.entries(g.cases || {})) {
+      for (const [layer, r] of Object.entries(x.layers)) {
+        const best = String(layer) === String(x.best_layer);
+        rows += `<tr${best?' style="font-weight:650"':''}><td>${esc(c)}</td>
+          <td>${esc(short(x.model))}</td><td class=num>${x.n_pairs}</td>
+          <td class=num>${esc(layer)}${best?" ★":""}</td>
+          <td class=num>${fmt(r.mean.acc,3)}</td><td class=num>${fmt(r.mean.t,2)}</td>
+          <td class=num>${r.mean.p_binom}</td>
+          <td>${best ? chip(x.pass?"pass":"fail","",x.pass) : ""}</td></tr>`;
+      }
+      if (x.model) models[x.model] = 1;
+    }
+    $("ctr_table").innerHTML = rows;
+  }
+
+  // hide panels whose source data has been retired to OLD/
+  const hasScan = Object.keys(d.gates||{}).some(n => n.startsWith("g1scan"))
+    || (d.layer_scan && Object.keys(d.layer_scan).length);
+  if (!hasScan && !Object.keys(d.gates||{}).length) $("sec_gates").style.display = "none";
+  if (!Object.keys(d.preflight||{}).length) $("sec_geom").style.display = "none";
 
   const ls = d.layer_scan || {};
   if (ls.A) {

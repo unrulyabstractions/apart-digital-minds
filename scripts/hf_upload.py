@@ -60,8 +60,8 @@ def main() -> None:
     api.upload_folder(
         repo_id=args.repo, repo_type="dataset", folder_path=str(SRC),
         commit_message="Mirror out/studies/identity",
-        ignore_patterns=["quarantine/**", "*.log", "*.prev*", "shard_*",
-                         "nohup_*"])
+        ignore_patterns=["quarantine/**", "OLD/**", "*.log", "*.prev*",
+                         "shard_*", "nohup_*"])
     files = api.list_repo_files(args.repo, repo_type="dataset")
     print(f"uploaded; repo now has {len(files)} files:")
     for f in sorted(files):

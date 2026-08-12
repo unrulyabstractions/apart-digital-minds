@@ -1842,3 +1842,8 @@ Findings returned as structured output to the orchestrator, not as a file.
 - WHAT: verifier agent re-derivation of all contrastive c27b1 artifacts.
 - HOW: agent loaded both safetensors with its own script (shapes, 0 zero/NaN/identical slices, sane norms), parsed sidecars, reimplemented LOO diff-of-means in numpy float64 without importing the study module (A L38: acc 0.7414, t 3.872, p 1.535e-4; B L58: acc 0.8269, t 7.086, p 1.019e-6 — exact match to recorded), confirmed pass criterion, sha256-matched out/ vs sync/ copies. Note: tokendir_* are single unit vectors (5120,) as intended; my verify prompt misdescribed the expected shape, artifacts correct. g1_contrastive_c27b1.json exists only locally/HF, not in sync/ (computed after capture) — expected.
 - RESULT: VERIFIED (all six artifacts, independently).
+
+## 2026-08-12 — entry 459: retired old data to OLD/, UI shows current results only
+- WHAT: moved (not deleted) gates/, preflight/, quarantine/, analysis_caseA_r4.json, layer_scan.log, and the smokec1 contrastive files into out/studies/identity/OLD/. Server now serves contrastive G1 (verdict chips + per-layer table); UI hides the emptied token-set panels; header subtitle updated. hf_upload ignores OLD/**. HF repo + sync/ still hold every old file.
+- HOW: node --check OK; served /data and confirmed gates:0 preflight:0 contrastive:[g1_contrastive_c27b1.json] runs:14; VIEWED the rendered dashboard at 2560px with image tokens: green G1-contrastive PASS chips A/B, contrastive table with starred best layers, pooled fullv4 panel and seed picker intact, no empty panels.
+- RESULT: VERIFIED.
