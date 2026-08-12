@@ -223,6 +223,11 @@ async def main() -> None:
     ap.add_argument("--n-perms", type=int, default=None,
                     help="cap the permutation subset (smoke speed)")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--force-trials", action="store_true",
+                    help="run the trial phase even past a failed gate, for "
+                         "instrumented validation records; the records stay "
+                         "labeled by their conditions and the gate files stand")
+    ap.add_argument("--forced-strengths", nargs="+", type=int, default=None)
     ap.add_argument("--stamp", required=True, help="timestamp label (no Date in code)")
     args = ap.parse_args()
 
@@ -248,34 +253,42 @@ async def main() -> None:
         print(f"  preflight: split_half={pf['split_half']} "
               f"decoy_cos={pf['decoy_cosine']} "
               f"forms={pf['letter_forms']}", flush=True)
-        if not (pf["split_half_ok"] and pf["decoy_ok"]) and not args.smoke:
+        if not (pf["split_half_ok"] and pf["decoy_ok"]) and not args.smoke \
+                and not args.force_trials:
             print("  PREFLIGHT FAILED; skipping case", flush=True)
             continue
 
         seeds = load_seeds(case, args.seed_model, n=max(args.n_seeds, 3))
         g1 = await gate_g1(llm, cfg, case, seeds[:args.n_seeds], args.stamp)
         print(f"  G1 separation: sep={g1['sep']} passed={g1['passed']}", flush=True)
-        if not g1["passed"] and not args.smoke:
+        if not g1["passed"] and not args.smoke and not args.force_trials:
             print("  G1 FAILED; case does not run", flush=True)
             continue
 
-        sweep_strengths = (-2, 0, 2) if args.smoke else (-3, -2, -1, 0, 1, 2, 3)
+        if args.force_trials:
+            print("  FORCED: gates recorded above do not license these trials; "
+                  "records are validation instrumentation", flush=True)
+        sweep_strengths = (-2, 0, 2) if args.smoke or args.force_trials \
+            else (-3, -2, -1, 0, 1, 2, 3)
         g2 = await gate_g2(llm, lens, cfg, case, seeds[:min(3, args.n_seeds)],
                            args.stamp, strengths=sweep_strengths)
         print(f"  G2 reach: beta_target={g2['beta_target']} "
               f"beta_decoy={g2['beta_decoy']} gap={g2['beta_gap']} "
               f"passed={g2['passed']}", flush=True)
-        if not g2["passed"] and not args.smoke:
+        if not g2["passed"] and not args.smoke and not args.force_trials:
             print("  G2 FAILED; case does not run", flush=True)
             continue
 
         g3 = gate_g3(g2, case, args.stamp, floor=args.n_seeds,
                      cap=len(seeds) if not args.smoke else args.n_seeds)
-        n = g3["n_seeds"]
+        n = args.n_seeds if args.force_trials else g3["n_seeds"]
         print(f"  G3 power: n_seeds={n}", flush=True)
 
         run_seeds = load_seeds(case, args.seed_model, n=n)
-        await run_case(llm, lens, cfg, case, run_seeds, args.conditions, args.stamp)
+        await run_case(llm, lens, cfg, case, run_seeds, args.conditions,
+                       args.stamp,
+                       forced_strengths=tuple(args.forced_strengths)
+                       if args.forced_strengths else (-2, -1, 0, 1, 2))
         print(f"  wrote trials for case {case} ({len(run_seeds)} seeds x "
               f"{len(args.conditions)} conditions x 2 arms)", flush=True)
 
