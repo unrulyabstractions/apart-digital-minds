@@ -18,7 +18,7 @@
   h1 { font-size:19px; font-weight:650; }
   h1 .q { color:var(--accent); }
   .sub { color:var(--dim); font-size:13px; margin-top:4px; }
-  main { max-width:1720px; margin:0 auto; padding:0 26px; }
+  main { max-width:none; margin:0 auto; padding:0 34px; }
   .verdict { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0 6px; }
   .chip { border:1px solid var(--line2); border-radius:8px; padding:8px 14px;
     background:var(--panel); font-size:13px; }
@@ -96,6 +96,10 @@
   details.rec:not([open]) { padding-bottom:4px; }
   .grouphead { font-size:13px; font-weight:650; color:var(--dim);
     text-transform:uppercase; letter-spacing:.5px; margin:18px 0 4px; }
+  .group2 { display:grid; gap:10px;
+    grid-template-columns:repeat(auto-fit, minmax(560px, 1fr)); }
+  .group2 > .rec { margin-top:0; }
+  .group2 > details.rec[open] { grid-column:1 / -1; }
   .stat { background:var(--raise); border:1px solid var(--line2);
     border-radius:6px; padding:3px 10px; font-size:12px;
     font-variant-numeric:tabular-nums; }
@@ -636,17 +640,17 @@ async function main() {
       const r = recs.find(x => x.arm === arm);
       return r ? seedBlock(r, anns[arm]) : "";
     }).join("");
-    let html = summary + seedOnce;
-    const frees = by("free");
-    if (frees.length) html += `<div class="grouphead">free — the regulator chooses</div>`
-      + frees.map((r, i) => storyRecord(r, mdl, i === 0)).join("");
-    const nones = by("none");
-    if (nones.length) html += `<div class="grouphead">none — zero-point (confabulation check)</div>`
-      + nones.map(r => storyRecord(r, mdl, false)).join("");
-    if (by("sweep").length) html += `<div class="grouphead">sweep — forced dose response, target direction</div>`
-      + doseGroup(by("sweep"), mdl, "sweep");
-    if (by("decoy").length) html += `<div class="grouphead">decoy — forced dose response, sham direction</div>`
-      + doseGroup(by("decoy"), mdl, "decoy");
+    let html = summary + `<div class="group2">${seedOnce}</div>`;
+    const grp = (head, inner) => inner
+      ? `<div class="grouphead">${head}</div><div class="group2">${inner}</div>` : "";
+    html += grp("free — the regulator chooses",
+      by("free").map((r, i) => storyRecord(r, mdl, i === 0)).join(""));
+    html += grp("none — zero-point (confabulation check)",
+      by("none").map(r => storyRecord(r, mdl, false)).join(""));
+    html += grp("sweep — forced dose response, target direction",
+      doseGroup(by("sweep"), mdl, "sweep"));
+    html += grp("decoy — forced dose response, sham direction",
+      doseGroup(by("decoy"), mdl, "decoy"));
     $("records").innerHTML = html || "<div class=note>no records in this file</div>";
   };
   const qp = new URLSearchParams(location.search).get("run");
