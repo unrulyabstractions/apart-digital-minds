@@ -28,8 +28,9 @@ from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 HERE = Path(__file__).resolve().parent
-DIRS = [ROOT / "out" / "studies" / "identity",
-        ROOT / "sync" / "out" / "studies" / "identity"]
+#: Only the curated working set. sync/ is the untouched byte-verified archive
+#: and quarantine/ holds invalidated files; neither is served.
+DIRS = [ROOT / "out" / "studies" / "identity"]
 
 
 def _glob(rel: str) -> dict[str, Path]:

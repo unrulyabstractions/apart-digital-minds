@@ -21,8 +21,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-DIRS = [ROOT / "out" / "studies" / "identity",
-        ROOT / "sync" / "out" / "studies" / "identity"]
+#: The curated working set only; sync/ is the untouched capture archive and
+#: quarantine/ holds invalidated files, neither is checked or served.
+DIRS = [ROOT / "out" / "studies" / "identity"]
 
 SENT_END = tuple(".!?\"'”)]:")
 SCAFFOLD = re.compile(r"^\s*(here'?s a thinking process|<think>|"
