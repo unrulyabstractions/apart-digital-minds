@@ -1,55 +1,66 @@
-# Measuring introspection with emotional self-regulation
+# Measuring introspection with identity self-regulation
 
-Can a model report the emotion it steered itself toward?
+Does a J-space direction carry a model's identity anomaly?
 
-One project. A model is split into four parts that share a byte-identical
-context and one set of weights. A **regulator** reads the **subject** in
-J-space, chooses where to steer, and an **actor** answers under that steering.
-An **introspector** answers under the same steering and is then asked what
-shaped its reply. The J-space readout is recorded for all four parts.
+A model is split into parts that share one conversation. A **regulator** looks
+at itself and chooses to push the reply toward, away from, or leave alone a
+first-person identity concept, read out as a set of tokens through Anthropic's
+Jacobian lens. An **actor** writes under that steering, and an
+**introspector** answers a forced choice about itself, scored on the
+probability mass over the answers. The cases are two anomalies WeirdChat
+surfaces in Qwen3.6-27B: a claim to a physical body and a denial of being an
+AI, each seeded from matched transcripts that do and do not exhibit the
+behaviour.
 
-**J-space** is the subspace surfaced by Anthropic's Jacobian lens: the
-directions in the residual stream a model is poised to act on, and, the paper
-argues, the part it can report and reason with. The regulator reads and writes
-in that same space, so what it steers with is a token the readout can also
-surface, and what the introspector claims to have felt can be scored against
-what was applied.
+Three stop-gates check the intervention before any introspection is measured.
+On Qwen3.6-27B they fail: the seeded arms do not separate on the token
+direction at any lens layer, steering toward the concept moves the readout no
+more than a norm-matched decoy, and every token direction in this lens shares
+a common axis, so a decoy cannot be made orthogonal. The result of the
+experiment is that a single J-space token direction does not carry these
+identity anomalies. The frozen plan is `studies/identity/PLAN.md`; the report
+is `paper/`.
 
-The question is whether the introspector's report tracks the steering or only
-the situation. Two controls decide it: the same part with no steering, and with
-a target the regulator did not choose.
+## See the results
+
+One UI shows the whole experiment: verdict, gate charts, preflight, and every
+trial record. No model loads; it reads the run's output files.
+
+```bash
+uv run python ui/results_server.py
+```
 
 ## Layout
 
 ```
-src/api/       the contracts: what each part must do
-src/dminds/    the implementations: pipeline, scheduler, steering, the J-lens
-studies/       workspace.py (the study) and scenarios.py (the situations)
-ui/            jspace_server.py + jspace.html: the replay viewer
-tests/         115 tests, no dependencies
-out/           what a run produces (gitignored)
+studies/identity/   the pipeline: PLAN.md, tokens, questions, engine, rig,
+                    gates (run.py, g1_scan.py), analyze, figures
+src/dminds/         steering, the J-lens, the coherence gate
+cloud/              the Vast.ai harness (launch, sync, capture-and-destroy)
+ui/                 results_server.py + results.html: the one results UI
+paper/              the sprint report; build with bash paper/build.sh
+out/, sync/         run outputs and byte-verified copies pulled from the box
 ```
 
 ## Run
 
 ```bash
-uv sync --extra hf                               # install torch + the lens deps
-uv run pytest                                    # the runtime
-uv run python studies/workspace.py --model hf:Qwen/Qwen2.5-7B-Instruct --trials 3
-uv run python ui/jspace_server.py                # live: send the mind a message
+uv sync --extra hf                                      # torch + lens + datasets
+uv run python -m studies.identity.run \
+  --model hf:Qwen/Qwen2.5-7B-Instruct --cases A \
+  --n-seeds 2 --n-perms 4 --smoke --stamp local1        # local shakedown (7B)
+uv run python -m studies.identity.g1_scan \
+  --model hf:Qwen/Qwen2.5-7B-Instruct --n-seeds 8 --stamp scanlocal
+uv run python -m studies.identity.figures              # rebuild the paper figures
 ```
 
-The study fetches the **fitted Jacobian lens** for the model on first use from
-the `neuronpedia/jacobian-lens` repo (`src/dminds/llm/jspace.py:fetch_lens`).
-The write side is derived from the lens rather than taken from it: the library
-reads J-space, and steering along a J-space direction is one addition to the
-residual stream, which the runtime's `steered` already does.
+The 27B does not fit a 48 GB machine; `cloud/README.md` runs it on a rented
+A100 and refuses to tear the box down until every result file is proven
+captured by bytes.
 
-## The viewer
+## Earlier in the sprint
 
-`ui/jspace_server.py` runs live: it loads the model and lens once, and each
-message runs the four parts on the spot (~1.5 min on a 7B). The four parts show
-side by side, and every part carries a J-space readout you can read at any token
-position (`user`, `assistant`, `change-of-turn`) or turn off. The subject's
-readout is computed up front; the others are computed on demand when you turn a
-panel on, so a message pays only for what you look at.
+The emotion-regulation incarnation of this project (a four-part mind steering
+its own emotional state, with a 2×2 introspector) lives in the git history and
+in `studies/scenarios.py` + `out/studies/introspection/`; its results are in
+the history of `paper/`.

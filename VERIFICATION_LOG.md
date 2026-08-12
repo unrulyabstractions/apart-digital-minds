@@ -1810,3 +1810,5 @@ Findings returned as structured output to the orchestrator, not as a file.
 | 436 | Remote data capture | capture_and_destroy: 24/24 files byte-verified to sync/, then box 47473841 destroyed | VERIFIED |
 | 437 | Paper rewritten to identity pipeline + null result | Built; viewed pages 1,3,4 with image tokens; Figs 1-3 render from real captured data; WeirdChat cite resolves (in .bbl); writing-voice pass fixed an aphorism + a fragment | VERIFIED |
 | 438 | Figures from real data | fig_separation (layer scan, both cases), fig_sweep (g2_caseA_r3 target vs decoy), fig_geometry (cosine 7B diagnostic); TrueType (pdf.fonttype 42) | VERIFIED via rendered PNGs |
+| 439 | ONE results UI (ui/results_server.py + results.html), old chat UI removed | Served /data (14 gates, 6 preflights, layer scans, verdict computed from data); rendered dashboard in headless Chrome and viewed both screenshots with image tokens; preflight-selection bug (smoke shadowing 27B) found and fixed on the second render | VERIFIED |
+| 440 | README rewritten to the identity project | Reread after write | VERIFIED |
