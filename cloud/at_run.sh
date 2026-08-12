@@ -10,6 +10,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# stale bytecode once ran old code after a sync (equal-second mtimes fool the
+# pyc check); purge compiled caches so the synced source is what executes.
+find studies src -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
+
 PY="$PWD/.venv/bin/python"
 [ -x "$PY" ] || { echo "[at_run] FATAL: run cloud/at_setup.sh first"; exit 1; }
 
