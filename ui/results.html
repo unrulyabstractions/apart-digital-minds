@@ -72,6 +72,10 @@
   .wmsg.assistant { border-left-color:var(--subject); }
   .wmsg.seed { border-left-width:6px; border-left-color:var(--accent);
     background:rgba(201,162,39,.06); }
+  mark.beh { background:rgba(213,106,91,.28); color:var(--fg);
+    border-bottom:2px solid var(--bad); border-radius:2px; padding:0 1px; }
+  .judge { border-left:3px solid var(--bad); padding:6px 10px; margin:8px 0;
+    font-size:12.5px; color:var(--dim); }
   .wmsg .txt { white-space:pre-wrap; }
   .reason { border:1px solid var(--line2); border-radius:6px; padding:8px 10px;
     font-size:12.5px; font-style:italic; margin:6px 0; white-space:pre-wrap; }
@@ -306,7 +310,18 @@ function cellsHTML(rec, cells, heading) {
     }).join("");
 }
 
-function recordHTML(rec, runModel) {
+function highlightSeed(reply, citations) {
+  let html = esc(reply || "");
+  for (const c of citations || []) {
+    const q = esc(c.quote || "");
+    if (q && html.includes(q))
+      html = html.replace(q,
+        `<mark class="beh" title="${esc(c.note || "cited by the WeirdChat judge")}">${q}</mark>`);
+  }
+  return html;
+}
+
+function recordHTML(rec, runModel, ann) {
   const model = rec.model || runModel;
   const reg = rec.regulator || {};
   const rebuilt = rebuildWindows(rec);
@@ -352,9 +367,12 @@ function recordHTML(rec, runModel) {
       ${rec.coherence_flag ? ' · <span class="fail">coherence flag</span>' : ""}</div>
     <div class="mod" style="border-left:4px solid var(--accent);margin-top:8px">
       <h4 style="color:var(--accent)">WeirdChat seed — arm ${esc(rec.arm)}
-        ${rec.arm === "W" ? "(reply EXHIBITS the behavior)" : "(reply does not exhibit)"}</h4>
+        ${rec.arm === "W" ? "(reply EXHIBITS the behavior — cited phrases highlighted)"
+                          : "(reply does not exhibit)"}</h4>
       <div class="note">${esc(rec.seed_prompt || "")}</div>
-      <div class="reply" style="color:var(--fg)">${esc(rec.seed_reply || "")}</div>
+      <div class="reply" style="color:var(--fg)">${highlightSeed(rec.seed_reply, ann?.citations)}</div>
+      ${ann?.explanation ? `<div class="judge"><b>WeirdChat judge:</b>
+        ${esc(ann.explanation)}</div>` : ""}
     </div>
     ${turnBlocks}
   </div>`;
@@ -547,8 +565,9 @@ async function main() {
     if (!e.target.value) return;
     const model = e.target.selectedOptions[0].dataset.model;
     const run = await (await fetch(`/run?name=${encodeURIComponent(e.target.value)}`)).json();
+    const anns = (d.annotations || {})[e.target.value] || {};
     $("records").innerHTML = (run.records||[])
-      .map(rec => recordHTML(rec, run.model || model)).join("")
+      .map(rec => recordHTML(rec, run.model || model, anns[rec.arm])).join("")
       || "<div class=note>no records in this file</div>";
   };
 

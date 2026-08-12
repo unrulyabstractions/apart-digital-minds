@@ -94,6 +94,10 @@ def gather() -> dict:
                  for n, p in _glob("preflight/*.json").items()}
     analysis = {n: _load(p) for n, p in _glob("analysis_*.json").items()}
     quality = {n: _load(p) for n, p in _glob("quality_*.json").items()}
+    annotations = {}
+    for n, ap in _glob("annotations_*.json").items():
+        blob = _load(ap) or {}
+        annotations.update(blob.get("files", {}))
     verdict_by_file = {}
     for q in quality.values():
         for r in (q or {}).get("reports", []):
@@ -132,7 +136,7 @@ def gather() -> dict:
                          "gap": g2["beta_gap"],
                          "selective": g2["beta_target"] - g2["beta_decoy"] > 0.01}
     return {"gates": gates, "preflight": preflight, "analysis": analysis,
-            "quality": quality,
+            "quality": quality, "annotations": annotations,
             "runs": sorted(runs, key=lambda r: (r["case"] or "", r["name"])),
             "layer_scan": _layer_scan(),
             "layer_scan_model": prov.get("layer_scan", "unknown"),
