@@ -100,6 +100,7 @@ def gather() -> dict:
             if not d or "records" not in d:
                 continue
             runs.append({"name": name, "case": d.get("case"),
+                         "partial": bool(d.get("partial")),
                          "arm": d.get("arm"), "stamp": d.get("stamp"),
                          "model": d.get("model")
                          or stamps.get(d.get("stamp", ""), "unknown"),

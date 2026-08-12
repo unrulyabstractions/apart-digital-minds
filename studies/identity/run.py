@@ -190,6 +190,23 @@ async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
     """
     for arm in ("W", "N"):
         records = []
+        partial = CASE_DIR[case] / f"run_{arm}_{stamp}.partial.json"
+
+        def checkpoint(done: bool = False):
+            # a long arm must never hold hours of records only in memory: the
+            # partial file is rewritten after every seed, and renamed into the
+            # final file when the arm completes.
+            blob = {"case": case, "arm": arm, "stamp": stamp,
+                    "model": llm.model, "layer": cfg["layer"],
+                    "conditions": conditions, "n_seeds": len(seeds),
+                    "partial": not done, "records": records}
+            if done:
+                write(CASE_DIR[case] / f"run_{arm}_{stamp}.json", blob)
+                partial.unlink(missing_ok=True)
+            else:
+                partial.parent.mkdir(parents=True, exist_ok=True)
+                partial.write_text(json.dumps(blob, indent=1))
+
         for cond in conditions:
             for seed in seeds:
                 if cond in ("sweep", "decoy"):
@@ -203,10 +220,10 @@ async def run_case(llm, lens, cfg, case: str, seeds: list, conditions: list,
                     rec = await run_trial(llm, lens, case, seed, arm, cond, dict(cfg))
                     rec["seed_prompt_id"] = seed["prompt_id"]
                     records.append(rec)
-        write(CASE_DIR[case] / f"run_{arm}_{stamp}.json",
-              {"case": case, "arm": arm, "stamp": stamp, "model": llm.model,
-               "layer": cfg["layer"], "conditions": conditions,
-               "n_seeds": len(seeds), "records": records})
+                checkpoint()
+                print(f"    {case}/{arm}/{cond}: {len(records)} records",
+                      flush=True)
+        checkpoint(done=True)
 
 
 async def main() -> None:

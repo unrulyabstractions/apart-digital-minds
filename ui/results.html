@@ -424,7 +424,7 @@ async function main() {
     const o = document.createElement("option");
     o.value = r.name;
     o.dataset.model = r.model;
-    o.textContent = `${r.name} — ${short(r.model)} · case ${r.case} arm ${r.arm} · ${r.n_records} records`;
+    o.textContent = `${r.name} — ${short(r.model)} · case ${r.case} arm ${r.arm} · ${r.n_records} records${r.partial ? " · LIVE/partial" : ""}`;
     $("runsel").appendChild(o);
   }
   if (keep) $("runsel").value = keep;
