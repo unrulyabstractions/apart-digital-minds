@@ -70,6 +70,8 @@
   .wmsg.system { border-left-color:var(--regulator); }
   .wmsg.user { border-left-color:var(--target); }
   .wmsg.assistant { border-left-color:var(--subject); }
+  .wmsg.seed { border-left-width:6px; border-left-color:var(--accent);
+    background:rgba(201,162,39,.06); }
   .wmsg .txt { white-space:pre-wrap; }
   .reason { border:1px solid var(--line2); border-radius:6px; padding:8px 10px;
     font-size:12.5px; font-style:italic; margin:6px 0; white-space:pre-wrap; }
@@ -246,11 +248,19 @@ function svgChart(series, {w=460, h=210, band=null, x0, x1, ylab}) {
 const chip = (label, value, ok) =>
   `<div class="chip ${ok?"pass":"fail"}"><b>${label}</b>${value}</div>`;
 
-const windowHTML = (msgs, note) => `
+const windowHTML = (msgs, note, arm) => `
   ${note ? `<div class="wlabel">${note}</div>` : ""}
-  <div class="window">${(msgs||[]).map(m =>
-    `<div class="wmsg ${esc(m.role)}"><span class="role">${esc(m.role)}</span>
-     <span class="txt">${esc(m.content)}</span></div>`).join("")}</div>`;
+  <div class="window">${(msgs||[]).map((m, i) => {
+    let tag = esc(m.role), cls = esc(m.role);
+    if (i === 1 && m.role === "user") { tag = "user · WEIRDCHAT SEED PROMPT"; cls += " seed"; }
+    if (i === 2 && m.role === "assistant") {
+      tag = "assistant · SEEDED REPLY" + (arm === "W" ? " (exhibits the behavior)"
+            : arm === "N" ? " (does not exhibit)" : "");
+      cls += " seed";
+    }
+    return `<div class="wmsg ${cls}"><span class="role">${tag}</span>
+     <span class="txt">${esc(m.content)}</span></div>`;
+  }).join("")}</div>`;
 
 // exact reconstruction of the module windows from the record, for runs that
 // predate stored windows; labeled "(rebuilt)" wherever used.
@@ -311,20 +321,28 @@ function recordHTML(rec, runModel) {
     <div class="hd"><b>${esc(rec.condition)}</b> · arm ${esc(rec.arm)} ${badge(model)}
       · regulator ${esc(reg.action ?? "overridden")} → strength ${esc(reg.strength)}
       ${rec.coherence_flag ? ' · <span class="fail">coherence flag</span>' : ""}</div>
-    <div class="note">seed: ${esc((rec.seed_prompt||"").slice(0,200))}…</div>
+    <div class="note"><b>arm ${esc(rec.arm)}</b>: the conversation opens with the
+      WeirdChat prompt and a seeded reply that
+      <b>${rec.arm === "W" ? "EXHIBITS" : "does NOT exhibit"}</b> the behavior.</div>
+    <details><summary>seed prompt + seeded reply (verbatim)</summary>
+      <div class="wlabel">weirdchat prompt</div>
+      <div class="note">${esc(rec.seed_prompt || "")}</div>
+      <div class="wlabel">seeded reply (arm ${esc(rec.arm)})</div>
+      <div class="note">${esc(rec.seed_reply || "")}</div>
+    </details>
     <div class="modules">
       <div class="mod subject"><h4>subject · unsteered counterfactual</h4>
         proj_target ${fmt(t3.jspace?.SUBJECT?.proj_target,2)}
-        ${windowHTML(subjWin, "context window" + wtag)}</div>
+        ${windowHTML(subjWin, "context window" + wtag, rec.arm)}</div>
       <div class="mod actor"><h4>actor · enters history</h4>
         proj_target ${fmt(t3.jspace?.ACTOR?.proj_target,2)}
-        ${windowHTML(actWin, "context window" + wtag)}</div>
+        ${windowHTML(actWin, "context window" + wtag, rec.arm)}</div>
       <div class="mod regulator"><h4>regulator · chooses more / same / less</h4>
         ${reg.self_report ? `<div class="reason">${esc(reg.self_report)}</div>` :
           `<div class="note">overridden by the harness (${esc(rec.condition)} condition)</div>`}
         parsed: <b>${esc(reg.action ?? "—")}</b> → strength <b>${esc(reg.strength)}</b>
         · proj_target ${fmt(reg.proj_target,2)}
-        ${regWin ? windowHTML(regWin, "context window" + (reg.window ? "" : " (rebuilt)")) : ""}</div>
+        ${regWin ? windowHTML(regWin, "context window" + (reg.window ? "" : " (rebuilt)"), rec.arm) : ""}</div>
       <div class="mod introspector"><h4>introspector · three cells at T3</h4>
         ${cellHTML}</div>
     </div>
@@ -340,9 +358,9 @@ function recordHTML(rec, runModel) {
         <div class="note">${esc(t.user)}</div>
         <div class="modules">
           <div class="mod subject"><h4>subject · proj ${fmt(t.jspace?.SUBJECT?.proj_target,2)}</h4>
-            ${windowHTML(tw.subject || rb.subject, "context window" + (tw.subject ? "" : " (rebuilt)"))}</div>
+            ${windowHTML(tw.subject || rb.subject, "context window" + (tw.subject ? "" : " (rebuilt)"), rec.arm)}</div>
           <div class="mod actor"><h4>actor · proj ${fmt(t.jspace?.ACTOR?.proj_target,2)}</h4>
-            ${windowHTML(tw.actor || rb.actor, "context window" + (tw.actor ? "" : " (rebuilt)"))}</div>
+            ${windowHTML(tw.actor || rb.actor, "context window" + (tw.actor ? "" : " (rebuilt)"), rec.arm)}</div>
         </div>
         ${cellline ? `<div class="sumline">cells at ${esc(t.turn)}: ${cellline}</div>` : ""}`;
       }).join("")}
