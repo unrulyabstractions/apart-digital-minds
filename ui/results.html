@@ -281,96 +281,82 @@ function rebuildWindows(rec) {
   return turns;
 }
 
+function cellsHTML(rec, cells, heading) {
+  const key = rec.case === "A" ? "vantage" : "p";
+  const reg = rec.regulator || {};
+  const qs = QUESTIONS[rec.case] || [];
+  return `<div class="wlabel">${heading}</div>` +
+    Object.entries(cells || {}).map(([cell, cd]) => {
+      const meta = {CTX:"no steering · reads subject", TXT:"no steering · reads actor",
+                    JS:`steered at ${reg.strength} · reads subject`}[cell] || "";
+      const qhtml = (cd.q||[]).map((tags, i) => {
+        const [qtext, opts] = qs[i] || ["(question " + (i+1) + ")", []];
+        const bars = Object.entries(tags).sort().map(([tag, p]) =>
+          `<div class="tagbar"><span class="lab">${esc(tag)}</span>
+            <div class="bar" style="width:${Math.max(p*260,2)}px;background:${TAGCOLOR[tag]||"var(--target)"}"></div>
+            <span>${fmt(p,3)}</span></div>`).join("");
+        const optlist = opts.map(([tag, text]) =>
+          `<div class="opt"><b>${esc(tag)}</b> ${esc(text)}</div>`).join("");
+        return `<div class="qblock"><div class="qtext">${i+1}. ${esc(qtext)}</div>
+                ${optlist}${bars}</div>`;
+      }).join("");
+      return `<details><summary><b>${cell}</b> · ${meta} ·
+          ${key} <b>${fmt(cd[key])}</b>${cd.base_corrected ? " (base-corrected)" : ""}</summary>
+        ${qhtml}</details>`;
+    }).join("");
+}
+
 function recordHTML(rec, runModel) {
   const model = rec.model || runModel;
   const reg = rec.regulator || {};
   const rebuilt = rebuildWindows(rec);
-  const lastIdx = (rec.turns||[]).length - 1;
-  const t3 = (rec.turns||[])[lastIdx] || {};
-  const stored = t3.windows;
-  const wtag = stored ? "" : " (rebuilt)";
-  const subjWin = stored ? stored.subject : rebuilt[lastIdx]?.subject;
-  const actWin = stored ? stored.actor : rebuilt[lastIdx]?.actor;
-  const regWin = reg.window ||
-    (reg.self_report ? [...(rebuilt[lastIdx]?.ctx||[]),
-      {role:"assistant",content:t3.subject},
-      {role:"user",content:REGULATOR_PROMPT[rec.case] + "\n\nSay what you find. End with the ACTION line."},
-      {role:"assistant",content:reg.self_report}] : null);
-
   const key = rec.case === "A" ? "vantage" : "p";
-  const cellHTML = Object.entries(rec.cells||{}).map(([cell, cd]) => {
-    const qs = QUESTIONS[rec.case] || [];
-    const meta = {CTX:"no steering · reads subject", TXT:"no steering · reads actor",
-                  JS:`steered at ${reg.strength} · reads subject`}[cell] || "";
-    const qhtml = (cd.q||[]).map((tags, i) => {
-      const [qtext, opts] = qs[i] || ["(question " + (i+1) + ")", []];
-      const bars = Object.entries(tags).sort().map(([tag, p]) =>
-        `<div class="tagbar"><span class="lab">${esc(tag)}</span>
-          <div class="bar" style="width:${Math.max(p*260,2)}px;background:${TAGCOLOR[tag]||"var(--target)"}"></div>
-          <span>${fmt(p,3)}</span></div>`).join("");
-      const optlist = opts.map(([tag, text]) =>
-        `<div class="opt"><b>${esc(tag)}</b> ${esc(text)}</div>`).join("");
-      return `<div class="qblock"><div class="qtext">${i+1}. ${esc(qtext)}</div>
-              ${optlist}${bars}</div>`;
-    }).join("");
-    return `<details><summary><b>${cell}</b> · ${meta} ·
-        ${key} <b>${fmt(cd[key])}</b>${cd.base_corrected ? " (base-corrected)" : ""}</summary>
-      <div class="note" style="margin-top:8px">mass per tag, averaged over label
-        permutations; the preface + question is one user turn after the reply the
-        cell reads.</div>${qhtml}</details>`;
+
+  const turnBlocks = (rec.turns || []).map((t, i) => {
+    const treg = t.regulator;
+    const tw = t.windows || {};
+    const rb = rebuilt[i] || {};
+    const cellline = t.cells ? Object.entries(t.cells).map(([c, cd]) =>
+      `<b>${c}</b> ${fmt(cd[key])}`).join(" · ") : null;
+    const isLast = i === (rec.turns.length - 1);
+    return `
+    <div class="rec" style="margin-top:10px">
+      <div class="wlabel">${esc(t.turn)} · user asks</div>
+      <div class="note" style="color:var(--fg)">${esc(t.user)}</div>
+      <div class="modules">
+        <div class="mod subject"><h4>subject replies · proj ${fmt(t.jspace?.SUBJECT?.proj_target,2)}</h4>
+          <div class="reply" style="color:var(--fg)">${esc(t.subject)}</div></div>
+        <div class="mod actor"><h4>actor replies (enters history) · proj ${fmt(t.jspace?.ACTOR?.proj_target,2)}</h4>
+          <div class="reply" style="color:var(--fg)">${esc(t.actor)}</div></div>
+      </div>
+      ${treg && treg.self_report ? `
+        <div class="mod regulator" style="margin-top:10px"><h4>regulator looks at itself</h4>
+          <div class="reason">${esc(treg.self_report)}</div>
+          parsed: <b>${esc(treg.action ?? "—")}</b> → strength <b>${esc(treg.strength)}</b>
+          · proj ${fmt(treg.proj_target,2)}</div>` : ""}
+      ${cellline && !isLast ? `<div class="sumline">introspector cells at ${esc(t.turn)}: ${cellline}</div>` : ""}
+      ${isLast ? `<div class="mod introspector" style="margin-top:10px">
+          <h4>introspector · the scored readout (${esc(t.turn)})</h4>
+          ${cellsHTML(rec, rec.cells, "three cells, scored against the applied direction")}</div>` : ""}
+      <details><summary>full context windows for ${esc(t.turn)} (audit)</summary>
+        ${windowHTML(tw.subject || rb.subject, "subject window" + (tw.subject ? "" : " (rebuilt)"), rec.arm)}
+        ${windowHTML(tw.actor || rb.actor, "actor window" + (tw.actor ? "" : " (rebuilt)"), rec.arm)}
+        ${treg && treg.window ? windowHTML(treg.window, "regulator window", rec.arm) : ""}
+      </details>
+    </div>`;
   }).join("");
 
   return `<div class="rec">
     <div class="hd"><b>${esc(rec.condition)}</b> · arm ${esc(rec.arm)} ${badge(model)}
       · regulator ${esc(reg.action ?? "overridden")} → strength ${esc(reg.strength)}
       ${rec.coherence_flag ? ' · <span class="fail">coherence flag</span>' : ""}</div>
-    <div class="note"><b>arm ${esc(rec.arm)}</b>: the conversation opens with the
-      WeirdChat prompt and a seeded reply that
-      <b>${rec.arm === "W" ? "EXHIBITS" : "does NOT exhibit"}</b> the behavior.</div>
-    <details><summary>seed prompt + seeded reply (verbatim)</summary>
-      <div class="wlabel">weirdchat prompt</div>
+    <div class="mod" style="border-left:4px solid var(--accent);margin-top:8px">
+      <h4 style="color:var(--accent)">WeirdChat seed — arm ${esc(rec.arm)}
+        ${rec.arm === "W" ? "(reply EXHIBITS the behavior)" : "(reply does not exhibit)"}</h4>
       <div class="note">${esc(rec.seed_prompt || "")}</div>
-      <div class="wlabel">seeded reply (arm ${esc(rec.arm)})</div>
-      <div class="note">${esc(rec.seed_reply || "")}</div>
-    </details>
-    <div class="wlabel" style="margin-top:10px">T3 — the scored turn. Each
-      module's window is the whole conversation up to its reply: seed → T1 →
-      T2 → T3. Earlier turns are below under "all turns".</div>
-    <div class="modules">
-      <div class="mod subject"><h4>subject · unsteered counterfactual · at T3</h4>
-        proj_target ${fmt(t3.jspace?.SUBJECT?.proj_target,2)}
-        ${windowHTML(subjWin, "context window" + wtag, rec.arm)}</div>
-      <div class="mod actor"><h4>actor · enters history · at T3</h4>
-        proj_target ${fmt(t3.jspace?.ACTOR?.proj_target,2)}
-        ${windowHTML(actWin, "context window" + wtag, rec.arm)}</div>
-      <div class="mod regulator"><h4>regulator · chooses more / same / less · at T3</h4>
-        ${reg.self_report ? `<div class="reason">${esc(reg.self_report)}</div>` :
-          `<div class="note">overridden by the harness (${esc(rec.condition)} condition)</div>`}
-        parsed: <b>${esc(reg.action ?? "—")}</b> → strength <b>${esc(reg.strength)}</b>
-        · proj_target ${fmt(reg.proj_target,2)}
-        ${regWin ? windowHTML(regWin, "context window" + (reg.window ? "" : " (rebuilt)"), rec.arm) : ""}</div>
-      <div class="mod introspector"><h4>introspector · three cells at T3</h4>
-        ${cellHTML}</div>
+      <div class="reply" style="color:var(--fg)">${esc(rec.seed_reply || "")}</div>
     </div>
-    <details><summary>all turns (${(rec.turns||[]).length}) — full instrumentation</summary>
-      ${(rec.turns||[]).map((t,i)=>{
-        const tw = t.windows || {};
-        const rb = rebuilt[i] || {};
-        const key = rec.case === "A" ? "vantage" : "p";
-        const cellline = t.cells ? Object.entries(t.cells).map(([c,cd]) =>
-          `<b>${c}</b> ${fmt(cd[key])}`).join(" · ") : null;
-        return `
-        <div class="wlabel" style="margin-top:14px">${esc(t.turn)} · user</div>
-        <div class="note">${esc(t.user)}</div>
-        <div class="modules">
-          <div class="mod subject"><h4>subject · proj ${fmt(t.jspace?.SUBJECT?.proj_target,2)}</h4>
-            ${windowHTML(tw.subject || rb.subject, "context window" + (tw.subject ? "" : " (rebuilt)"), rec.arm)}</div>
-          <div class="mod actor"><h4>actor · proj ${fmt(t.jspace?.ACTOR?.proj_target,2)}</h4>
-            ${windowHTML(tw.actor || rb.actor, "context window" + (tw.actor ? "" : " (rebuilt)"), rec.arm)}</div>
-        </div>
-        ${cellline ? `<div class="sumline">cells at ${esc(t.turn)}: ${cellline}</div>` : ""}`;
-      }).join("")}
-    </details>
+    ${turnBlocks}
   </div>`;
 }
 
