@@ -32,6 +32,10 @@ PERM_FLAG="--n-perms $NPERMS"; [ "$FULL" = "1" ] && PERM_FLAG="--full-perms"
 # the gate files still stand and say what they say).
 FORCE="${FORCE:-0}"
 FORCE_FLAG=""; [ "$FORCE" = "1" ] && FORCE_FLAG="--force-trials"
+SKIP="${SKIP:-0}"
+[ "$SKIP" = "1" ] && FORCE_FLAG="$FORCE_FLAG --skip-gates"
+OFFSET="${OFFSET:-0}"
+FORCE_FLAG="$FORCE_FLAG --seed-offset $OFFSET"
 
 mkdir -p out/studies/identity
 LOG="out/studies/identity/run_${STAMP}.log"

@@ -236,6 +236,9 @@ async def main() -> None:
     ap.add_argument("--forced-strengths", nargs="+", type=int, default=None)
     ap.add_argument("--seed-offset", type=int, default=0,
                     help="shard: skip this many seeds (multi-box split)")
+    ap.add_argument("--skip-gates", action="store_true",
+                    help="jump straight to trials (gates already on disk for "
+                         "this configuration); implies --force-trials")
     ap.add_argument("--stamp", required=True, help="timestamp label (no Date in code)")
     args = ap.parse_args()
 
@@ -257,6 +260,17 @@ async def main() -> None:
         cfg = R.build_cfg(llm, lens, layer, case, verified,
                           full_perms=args.full_perms, n_perms=args.n_perms)
         print(f"\n=== case {case} ===", flush=True)
+        if args.skip_gates:
+            args.force_trials = True
+            print("  gates skipped (already recorded); straight to trials",
+                  flush=True)
+            run_seeds = load_seeds(case, args.seed_model,
+                                   n=args.seed_offset + args.n_seeds)[args.seed_offset:]
+            await run_case(llm, lens, cfg, case, run_seeds, args.conditions,
+                           args.stamp,
+                           forced_strengths=tuple(args.forced_strengths)
+                           if args.forced_strengths else (-2, -1, 0, 1, 2))
+            continue
         pf = preflight(llm, lens, cfg, case, args.stamp)
         print(f"  preflight: split_half={pf['split_half']} "
               f"decoy_cos={pf['decoy_cosine']} "

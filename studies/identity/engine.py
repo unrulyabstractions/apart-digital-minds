@@ -120,17 +120,24 @@ def _letter_probs_batched(llm, msgs_list, forms, batch):
         tokenize=False, add_generation_prompt=True, enable_thinking=False)
         for msgs in msgs_list]
     tids = [tok(f, add_special_tokens=False)["input_ids"][0] for f in forms]
+    # RIGHT padding: a causal model's state at position i never sees later
+    # tokens, so trailing pads cannot touch the answer position, whatever the
+    # attention flavour. (Left padding corrupts this model's linear-attention
+    # state and failed the equivalence gate by 0.1 in probability.) The answer
+    # logits are gathered at each row's true last token.
     old_side = tok.padding_side
-    tok.padding_side = "left"
+    tok.padding_side = "right"
     out = []
     try:
         for i in range(0, len(prompts), batch):
             enc = tok(prompts[i:i + batch], return_tensors="pt",
                       padding=True).to(llm.device)
+            lengths = enc["attention_mask"].sum(dim=1) - 1
             with torch.inference_mode():
                 o = llm.model_obj(input_ids=enc["input_ids"],
                                   attention_mask=enc["attention_mask"])
-                picked = o.logits[:, -1, :][:, tids].float()
+                rows = o.logits[torch.arange(len(lengths)), lengths]
+                picked = rows[:, tids].float()
                 del o
             for row in torch.softmax(picked, dim=1):
                 out.append({f: float(p) for f, p in zip(forms, row)})
