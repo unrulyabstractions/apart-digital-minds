@@ -132,6 +132,14 @@
   </section>
 
   <section class="panel">
+    <h2>Gate and run history</h2>
+    <div class="note">Every gate file on disk, newest stamps included as they
+      arrive from the box. The page refetches every minute while a run is
+      collecting.</div>
+    <table id="history"></table>
+  </section>
+
+  <section class="panel">
     <h2>Trial records — full instrumentation per module</h2>
     <div class="note">Every trial expands into its modules: each part's full
       context window, the regulator's raw self-report and parsed action, and the
@@ -393,6 +401,25 @@ async function main() {
   $("geom_table").innerHTML = geo;
   $("preflight").innerHTML = pfh || "<div class=note>no preflight files found</div>";
 
+  // gate/run history: one row per gate file, so new stamps show as they land
+  let hist = `<tr><th>file</th><th>case</th><th>stamp</th><th>model</th>
+    <th>headline</th><th>verdict</th></tr>`;
+  for (const [name, g] of Object.entries(d.gates).sort()) {
+    if (!g) continue;
+    let head = "";
+    if (name.startsWith("g1scan")) head = `target t=${fmt(g.target?.t,2)}`;
+    else if (name.startsWith("g1")) head = `sep=${fmt(g.sep,3)}`;
+    else if (name.startsWith("g2")) head = `β gap=${fmt(g.beta_gap)}`;
+    else if (name.startsWith("g3")) head = `n=${g.n_seeds}`;
+    const ok = g.passed;
+    hist += `<tr><td>${esc(name)}</td><td>${esc(g.case)}</td><td>${esc(g.stamp)}</td>
+      <td>${esc(short(g.model))}</td><td class=num>${head}</td>
+      <td class="${ok===true?"pass":ok===false?"fail":""}">${ok===true?"pass":ok===false?"fail":"—"}</td></tr>`;
+  }
+  $("history").innerHTML = hist;
+
+  const keep = $("runsel").value;
+  $("runsel").innerHTML = `<option value="">choose a run…</option>`;
   for (const r of d.runs) {
     const o = document.createElement("option");
     o.value = r.name;
@@ -400,6 +427,7 @@ async function main() {
     o.textContent = `${r.name} — ${short(r.model)} · case ${r.case} arm ${r.arm} · ${r.n_records} records`;
     $("runsel").appendChild(o);
   }
+  if (keep) $("runsel").value = keep;
   $("runsel").onchange = async e => {
     if (!e.target.value) return;
     const model = e.target.selectedOptions[0].dataset.model;
@@ -409,9 +437,11 @@ async function main() {
       || "<div class=note>no records in this file</div>";
   };
 
-  $("sources").textContent = "data read from: " + (d.sources||[]).join("  ·  ");
+  $("sources").textContent = "data read from: " + (d.sources||[]).join("  ·  ")
+    + " · updated " + new Date().toLocaleTimeString();
 }
 main();
+setInterval(main, 60000);   // live: new files from the box appear on the next tick
 </script>
 </body>
 </html>
