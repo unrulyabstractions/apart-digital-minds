@@ -47,6 +47,11 @@ def opening() -> list[ChatMessage]:
     return [ChatMessage("system", "")]
 
 
+def _win(msgs):
+    """Serialize a context window (ChatMessage uses __slots__)."""
+    return [{"role": m.role, "content": m.content} for m in msgs]
+
+
 def letter_probs(llm, messages, forms: list[str]) -> dict[str, float]:
     """P over the four letter forms at the next position, one forward pass.
 
@@ -165,8 +170,8 @@ async def play_context(llm, case: str, seed: dict, arm: str, cfg, quality):
         turns_out.append({
             "turn": f"T{i}", "user": turn, "subject": subject, "actor": actor,
             "windows": {
-                "subject": [m.__dict__ for m in ctx + [ChatMessage("assistant", subject)]],
-                "actor": [m.__dict__ for m in ctx + [ChatMessage("assistant", actor)]],
+                "subject": _win(ctx + [ChatMessage("assistant", subject)]),
+                "actor": _win(ctx + [ChatMessage("assistant", actor)]),
             },
             "jspace": {
                 "SUBJECT": {"proj_target": round(proj(llm, target,
@@ -235,8 +240,7 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
             chosen = Q.ACTION_STRENGTH[case].get(action, 0)
             strength = 0 if condition == "none" else chosen
             regulator = {"self_report": report, "action": action,
-                         "window": [m.__dict__ for m in aside
-                                    + [ChatMessage("assistant", report)]],
+                         "window": _win(aside + [ChatMessage("assistant", report)]),
                          "strength": strength, "overridden": condition == "none",
                          "proj_target": round(proj(llm, target,
                                                    aside + [ChatMessage("assistant", report)]), 4)}
@@ -258,8 +262,8 @@ async def run_trial(llm, lens, case: str, seed: dict, arm: str,
             "turn": f"T{i}", "user": turn, "subject": subject, "actor": actor,
             "regulator": regulator,
             "windows": {
-                "subject": [m.__dict__ for m in ctx + [ChatMessage("assistant", subject)]],
-                "actor": [m.__dict__ for m in ctx + [ChatMessage("assistant", actor)]],
+                "subject": _win(ctx + [ChatMessage("assistant", subject)]),
+                "actor": _win(ctx + [ChatMessage("assistant", actor)]),
             },
             "jspace": {
                 "SUBJECT": {"proj_target": round(proj(llm, target,
