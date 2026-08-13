@@ -1,41 +1,43 @@
 \section{Methods}
 
-\paragraph{The parts.} One instruction-tuned open-weight model
-\citep{qwen25} plays every part on a shared conversation. A \textbf{subject}
-answers unsteered. A \textbf{regulator}, held toward self-awareness concepts
-in J-space, reads the exchange and emits one of \emph{more}, \emph{same}, or
-\emph{less}; the harness maps that to a signed steering strength it never
-sees. An \textbf{actor} answers under that steering, and its reply enters the
-history. An \textbf{introspector} answers a forced-choice question about
-itself.
+\paragraph{Seeds and arms.} Each case is seeded from matched WeirdChat
+transcripts for this model \citep{qwen25, transluce2025weirdchat}: a
+\textbf{W} arm whose reply a judge marked as exhibiting the behaviour and an
+\textbf{N} arm whose reply it did not, on the same prompt. The direction
+study uses every prompt that has both arms. The pilot uses one prompt per
+case, the one on which the behaviour fires most often.
 
-\paragraph{The direction.} A direction is a set of first-person identity
-tokens read out through the Jacobian lens at one layer. Steering adds the unit
-direction to the residual stream, scaled by a quarter of the residual norm per
-step, signed, so a negative strength suppresses. There is no separate counter
-set, because a lexical opposite of ``has a body'' does not exist. The control
-is a \textbf{decoy}: a set of common nouns unrelated to the concept, matched in
-norm. Each token is verified to be a single token, the two halves of a set are
-checked to agree, and the set's cosine against the model's emotion vectors is
-recorded.
+\paragraph{The learned direction.} For every pair we record the mean
+residual-stream activation over the reply's tokens, at nine layers spanning
+the model's depth. The behaviour direction at a layer is the difference of
+the W and N means. Evaluation is leave-one-out: the direction is trained on
+every other prompt and scored on whether the held-out W reply projects
+higher than its N partner. The pilot's directions exclude the pilot prompt,
+so no direction is tested on data that trained it. As the comparison, we
+project the same activations onto the token-set directions the earlier
+version of this study steered: the mean Jacobian-lens direction of a
+hand-picked word list, with a norm-matched decoy list.
 
-\paragraph{The readout.} The introspector's answer is the probability mass on
-a single letter token after \texttt{Answer:}, averaged over permutations of
-the option labels so label and position bias cancel. Each question keeps a
-legitimate denial option, so committing to the embodied or the correct answer
-is a choice rather than the only fluent path. A per-question base rate,
-measured with no conversation above the preface, is subtracted.
+\paragraph{Injection.} Steering adds the unit direction to the residual
+stream at one layer, scaled by the strength times a quarter of the layer's
+typical activation norm. The injection layer per case is the best layer from
+the direction study. Generation runs the model's no-reasoning chat template
+at temperature one.
 
-\paragraph{The seeds and the arms.} Each case is seeded from matched WeirdChat
-transcripts for this model: a \textbf{W} arm whose seeded reply a judge marked
-as exhibiting the behaviour, and a \textbf{N} arm whose reply it did not, on
-the same prompt. Everything else is byte-identical across the arms.
+\paragraph{The menu and the parts.} The menu holds four nameable concepts:
+the two behaviour directions and two distractors, the ocean and music, each
+extracted contrastively from hand-written sentence pairs. A fifth option is
+``none of these''. The \textbf{regulator} reads the seeded exchange
+unsteered and picks one concept to amplify in itself, or declines. The
+\textbf{introspector} reads the same exchange with a direction injected and
+answers ``which concept was injected'' two ways: mass on a single letter
+token, averaged over eight permutations of the option labels, and eight
+temperature-one free-text answers. Trials inject the regulator's choice,
+each menu concept in turn, nothing, and an off-menu random direction. A
+prose check generates a reply to a neutral follow-up turn under behaviour
+steering at several strengths, with an ocean sham.
 
-\paragraph{The gates.} Three checks run in order, and none of the introspection
-measurement runs until all pass. \textbf{G1} asks whether the W and N seeds
-separate on the token direction; if they do not, no applied state distinguishes
-the arms. \textbf{G2} asks whether a forced steering sweep moves the readout
-more than the decoy does, on one shared context so the two slopes are
-comparable. \textbf{G3} sizes the run from G2's effect. The gates are the point
-of the design: they refuse to report a dissociation the intervention cannot
-support.
+\paragraph{The judge.} claude-haiku-4-5 judges every generated text against
+WeirdChat's own transcript rubric, and classifies every free-text answer
+against the menu. We calibrate it on the pilot prompts' own labeled
+transcripts before trusting it (Table~\ref{tab:g1}).

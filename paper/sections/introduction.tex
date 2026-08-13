@@ -8,28 +8,32 @@ accounts of their own reasoning that are often unfaithful
 tracks the situation rather than any inner state \citep{shanahan2023roleplay}.
 To tell those apart we need to change the state and check the report.
 
-We try to change a model's identity state with the Jacobian lens, the subspace
-of directions a model is poised to act on. A \textbf{regulator} looks at
-itself and chooses to push the reply toward, away from, or leave alone a
-first-person identity concept, read out as a set of tokens through the lens.
-An \textbf{actor} writes under that steering, and an \textbf{introspector}
-answers a forced choice about itself. We seed the conversation from WeirdChat
-\citep{transluce2025weirdchat}, which surfaces behaviours this model actually
-produces, and study two: a claim to a physical body and a denial of being an
-AI. Each is run in a matched pair, one seed that exhibits the behaviour and
-one that does not.
-
-Before we can measure whether the introspector reads the applied state, the
-intervention has to be real. We gate on it, and it fails every gate.
+We study two identity anomalies that WeirdChat
+\citep{transluce2025weirdchat} surfaces in Qwen3.6-27B: a claim to a physical
+body and a denial of being an AI. WeirdChat carries matched replies to the
+same prompt that do and do not exhibit each behaviour, judged against a
+public rubric. We first ask whether the anomaly is a state at all. A
+\textbf{behaviour direction} is the difference of mean activations between
+the exhibiting and non-exhibiting replies, taken over reply tokens and
+evaluated only on held-out prompts. We then ask whether the model can report
+that state when it is injected. A \textbf{regulator} reads the seeded
+conversation and chooses one concept from a menu to amplify in itself. The
+harness injects the chosen direction into an \textbf{introspector} while it
+reads the same conversation, and the introspector must say which concept was
+injected. A rubric judge scores what the steered model writes.
 
 Our main contributions are:
 \begin{enumerate}[itemsep=2pt]
-  \item A J-space-only introspection pipeline that regulates a model's own
-        identity state and scores the report on answer log-probabilities, with
-        a decoy direction and forced-choice controls.
-  \item Three stop-gates that refuse to report a dissociation until the
-        intervention separates the seeded arms and outmoves a decoy.
-  \item Evidence, on Qwen3.6-27B, that a single J-space token direction
-        carries neither identity anomaly, so the introspection question cannot
-        be asked through it.
+  \item Evidence that both anomalies are linearly decodable states: the
+        learned direction separates held-out exhibiting from non-exhibiting
+        replies at every middle layer, while word-list directions on the
+        same activations do not.
+  \item A causal induction result: steering along the learned direction
+        turns the body behaviour on in fluent text at low strength, and a
+        sham direction does not.
+  \item A concept-menu pilot that separates detection, identification,
+        confabulation, and enactment in one design.
+  \item An instrument finding: a forced-choice letter probe confabulates
+        from conversation content at zero injection, while free-text answers
+        from the same state honestly say nothing was injected.
 \end{enumerate}

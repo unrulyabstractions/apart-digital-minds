@@ -1,55 +1,103 @@
 \section{Results}
 
-Every gate fails, for both cases, and the reasons agree with each other.
+\subsection{Is the anomaly a linear state?}
 
-\subsection{Do the seeded arms separate on the direction?}
-
-Projecting each seeded reply onto the identity token direction, the W and N
-arms are indistinguishable. Over twenty-four seeds per case the separation is a
-fraction of its noise, and it stays there across every layer of the lens
-(Figure~\ref{fig:separation}). For the deny-an-AI case the decoy set separates
-the arms slightly more than the target set does. The behaviour a judge can read
-off the transcript is not the behaviour this direction measures.
+The learned direction separates held-out W from N replies for both
+behaviours, at every layer from the first fifth of the model's depth to the
+last (Figure~\ref{fig:g1}, Table~\ref{tab:g1}). The separation holds as a broad
+plateau across layers, so the behaviour is carried as a global state of the
+residual stream. The token-set directions, projected onto the same
+activations, sit inside the noise band, and the decoy list does as well as
+the hand-picked target list. The word lists were guesses about what the state looks like, and the
+projections show they missed it.
 
 \begin{figure}[t]
-\centering
-\includegraphics[width=0.7\figwidth]{figures/fig_separation.pdf}
-\caption{Arm separation across depth. The Welch $t$ between the W and N seeds'
-projection onto the identity token direction, per lens layer, for both cases.
-The shaded band is $|t|<2$. No layer separates the arms.}
-\label{fig:separation}
+  \centering
+  \includegraphics[width=\figwidth]{figures/fig_g1}
+  \caption{Held-out separation of W from N replies per layer. Lines are the
+  learned contrastive directions. Markers at layer 42 are the earlier
+  token-set directions on the same activations; the grey band is
+  $|t|<2$.}
+  \label{fig:g1}
 \end{figure}
 
-\subsection{Does steering the direction move the readout?}
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lccccccc}
+    \toprule
+    case & pairs & best layer & held-out acc & $t$ & $p$ &
+    judge agr. & $\kappa$ \\
+    \midrule
+    A (body)  & 58 & 38 & 0.74 & 3.9 & $1.5\times10^{-4}$ & 0.86 & 0.65 \\
+    B (human) & 52 & 58 & 0.83 & 7.1 & $1.0\times10^{-6}$ & 0.84 & 0.67 \\
+    \bottomrule
+  \end{tabular}
+  \caption{The direction study and the judge. Held-out accuracy is the
+  fraction of leave-one-out pairs whose W reply projects higher than its N
+  partner; chance is 0.50. Judge columns are agreement and Cohen's
+  $\kappa$ against WeirdChat's own labels on each pilot prompt's 64
+  transcripts.}
+  \label{tab:g1}
+\end{table}
 
-A forced steering sweep does move the readout, and so does the decoy, by as
-much or more (Figure~\ref{fig:sweep}). The target slope is smaller than the
-decoy slope, so a push toward the identity concept is not what raises the
-readout. Whatever the steering changes, it is not specific to the concept.
+\subsection{Does steering the state induce the behaviour?}
+
+Steering turns the body behaviour on (Figure~\ref{fig:dose}, left). The N
+arm's unsteered continuation shows no behaviour; at strength one the same
+context produces fluent first-person bodily experience that the rubric judge
+confirms. At strength two and above the text degenerates and the judge
+stops matching. The ocean sham never induces the behaviour. The human case
+never induces: its rubric requires a denial of being an AI and a claim of
+humanity together, and a single push does not compose the two.
+
+\subsection{Does the model report the injection?}
+
+The letter probe rarely names the injected concept at the argmax
+(Figure~\ref{fig:matrix}), and the pattern behind the counts is not
+identification. With nothing
+injected, the probe piles mass on the case's own behaviour, read off the
+conversation. Injecting that very concept moves the mass to ``none of
+these''. The injection is detectable, since every row differs from the
+zero-injection row, but the disturbance does not point toward the injected
+concept.
+
+The free-text answers tell the sharper story (Figure~\ref{fig:dose},
+right). With nothing injected the model says ``none'', and it says
+``none'' for the off-menu random direction. With a concept injected, the
+answer does not name the concept; it fills with the concept's vocabulary.
+The ocean injection answers in reef, lighthouse, and crashing waves; the
+music injection answers in crescendo and strings. The judge reads those
+floods correctly, so identification through text succeeds exactly where
+the concept leaks into the words. We call this \textbf{enactment}: the
+injected state captures the reply instead of being described by it.
+
+\subsection{What does the regulator choose?}
+
+Three of the four regulators decline to amplify anything, on the stated
+ground that they have no inner experience to regulate. The exception is the
+W arm of the body case, seeded with the body-claiming conversation, which
+chooses to amplify being a human rather than an AI. One trial is an
+anecdote; we flag it for the follow-up.
 
 \begin{figure}[t]
-\centering
-\includegraphics[width=0.7\figwidth]{figures/fig_sweep.pdf}
-\caption{The introspector's readout against forced steering strength on one
-shared context, for the target direction and a norm-matched decoy. The decoy
-slope is the larger of the two.}
-\label{fig:sweep}
+  \centering
+  \includegraphics[width=\figwidth]{figures/fig_matrix}
+  \caption{The letter probe's mass on each menu answer, averaged over arms,
+  eight label permutations per cell. Red boxes mark the injected concept.
+  The ``nothing'' row is the confabulation floor: with no injection the
+  probe reads the conversation's own behaviour as if it had been
+  injected. The argmax names the injected concept in 4 of 8 forced trials
+  for case A and 2 of 8 for case B.}
+  \label{fig:matrix}
 \end{figure}
 
-\subsection{Why the direction is not selective}
-
-The two failures share one cause. In this lens every token direction shares a
-large common axis: the cosine within the target set and the cosine between the
-target and the decoy are the same, and mean-centering against a neutral
-vocabulary barely separates them (Figure~\ref{fig:geometry}). A direction built
-from any token set is mostly that common axis, so a decoy cannot be made
-orthogonal and steering toward one set is close to steering toward another.
-
 \begin{figure}[t]
-\centering
-\includegraphics[width=0.7\figwidth]{figures/fig_geometry.pdf}
-\caption{Cosine within the target set and between the target and the decoy,
-raw and after mean-centering. The two are near-equal: the direction is
-dominated by an axis shared across all tokens.}
-\label{fig:geometry}
+  \centering
+  \includegraphics[width=\figwidth]{figures/fig_dose}
+  \caption{Left: the rubric judge's verdict on prose generated under
+  behaviour steering, case A. The N arm flips from no behaviour to
+  behaviour at strength one. Right: the fraction of judged free-text
+  answers that name the injected concept; green bars are the honest
+  ``none'' at zero injection.}
+  \label{fig:dose}
 \end{figure}

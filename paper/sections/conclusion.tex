@@ -1,11 +1,12 @@
 \section{Conclusion}
 
-We built a pipeline that lets a model regulate its own identity state through
-the Jacobian lens and then reports on itself, with gates that check the
-intervention before trusting the report. On Qwen3.6-27B the gates fail: a
-single J-space token direction does not separate transcripts that claim a body
-from those that do not, nor those that deny being an AI, and steering it moves
-the readout no more than a decoy. The identity anomalies are real in the
-model's behaviour, but they do not lie along the direction we named. The
-introspection question stands, and it waits on a direction that carries the
-state.
+We set out to measure whether a model can report an identity state that was
+varied on purpose, and we end with the state in hand and the report still
+missing. WeirdChat's identity anomalies are linearly decodable from
+Qwen3.6-27B's activations, the learned direction induces the body behaviour
+in fluent text where word-list directions moved nothing, and a concept-menu
+pilot with a calibrated judge finds that the injected concept captures the
+model's answers instead of appearing in them. The honest readout is the
+model's own free text, which reports ``none'' when nothing was injected and fills with the injected concept's vocabulary when something was. We therefore conclude that at these doses the
+model enacts its states rather than reporting them, and the next experiment
+releases the injection before asking.

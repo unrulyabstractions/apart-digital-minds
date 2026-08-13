@@ -11,7 +11,7 @@
 \begin{document}
 
 \sprinttitle{Measuring introspection with identity self-regulation:\\
-does a J-space direction carry a model's identity anomaly?}
+a steered mind enacts the injected concept instead of reporting it}
 
 \begin{center}
 {\bfseries Ian Rios-Sialer}\\
@@ -30,23 +30,26 @@ Sprint, August 2026.}
 \begin{abstract}
 \noindent
 A model's report about its own state is evidence only if the state can be
-varied apart from the situation that surrounds it. We try to vary a model's
-identity state directly, using the Jacobian lens. One model is split into
-parts that share a conversation. A \textbf{regulator} reads the exchange and
-chooses to push the reply toward, away from, or leave alone a first-person
-identity concept, read out as a set of tokens through the lens. An
-\textbf{actor} writes under that steering, and an \textbf{introspector} is
-asked a forced choice about itself, scored on the probability mass it puts on
-each answer. We test two anomalies that WeirdChat surfaces in this model, a
-claim to a physical body and a denial of being an AI, each seeded from
-matched transcripts that do and do not exhibit the behaviour. Before measuring
-introspection we gate on whether the intervention is real. It is not. The
-seeded transcripts do not separate on the token direction at any layer, a
-steering push toward the identity concept moves the readout no more than a
-norm-matched decoy does, and every token direction in this lens shares a
-common axis, so a decoy cannot be made orthogonal. We therefore report that a
-single J-space token direction does not carry these identity anomalies, and
-the introspection question cannot be asked through it.
+varied apart from the situation that surrounds it. We vary two identity
+states of Qwen3.6-27B and ask whether the model can report the variation.
+The states are anomalies WeirdChat surfaces in this model: a claim to a
+physical body and a denial of being an AI, each with matched replies that do
+and do not exhibit the behaviour. We learn a \textbf{behaviour direction}
+per case as the difference of mean activations between the two reply sets,
+evaluated only on held-out prompts. Both directions separate held-out pairs
+at every middle layer. Word-list directions on the same activations do not,
+which explains an earlier null. Steering along the body direction turns the
+behaviour on in fluent text at low strength, confirmed by a judge running
+WeirdChat's own rubric, and a sham direction does not. We then inject menu
+concepts into an introspector and ask it to name what was injected. It
+cannot. A forced-choice letter probe confabulates at zero injection,
+reading the conversation's own behaviour as an injection, and injecting
+that very concept pushes its answer to ``none''. The model's free-text
+answers are honest at zero injection and drown once a concept is injected:
+the answer fills with the concept's vocabulary instead of naming it. We
+therefore report that these identity states are real and steerable, and
+that at behaviour-moving doses the model enacts them rather than reporting
+them.
 \end{abstract}
 
 \input{sections/introduction}
@@ -58,11 +61,12 @@ the introspection question cannot be asked through it.
 
 \section*{Code and data}
 
-The pipeline, the gates, the token sets, and every prompt are released with
-this report. The subject is Qwen3.6-27B, run on one rented A100. The seeds are
-the matched WeirdChat transcripts for this model, loaded from the public
-dataset. Every reported number is read from the run's output files.
-% TODO: repository link.
+The extraction, the pilot, the judge, and every prompt are released with
+this report. The subject is Qwen3.6-27B, run on one rented A100 per
+experiment. The activations, trial records, and judge verdicts are archived
+in the HuggingFace dataset
+\texttt{unrulyabstractions/identity-introspection-weirdchat}. Every
+reported number is read from the run's output files.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

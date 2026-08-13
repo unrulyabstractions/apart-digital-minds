@@ -1,23 +1,32 @@
-\section{Discussion and limitations}
+\section{Discussion}
 
-A self-report is only as good as the state it is supposed to track, and here we
-could not build the state. The gates turned a would-be introspection result
-into a measurement of the intervention, and the intervention did not hold. This
-is the outcome the gates exist to force: without them the pipeline would have
-reported a dissociation that rested on a direction carrying nothing. We
-therefore report the intervention's failure rather than a claim about the
-model that the intervention cannot support.
+The two experiments split the introspection question into a part that now
+has an answer and a part that does not. The states are real. Both anomalies
+are linearly decodable from activations, the decoding generalizes across
+prompts, and the body direction is causal: one nudge turns the behaviour on
+in fluent text. We find no sign of a reporting channel. At the
+strength where the injection dominates behaviour, the model does not describe the injection. The injected content writes the answer instead. We therefore
+contend that the earlier null result and the present one have different
+shapes: the first steered an axis that carried nothing, while the second
+steers a real state and finds no meta-access to it.
 
-\paragraph{Limitations.} We test one model, one lens, and two behaviours. The
-identity concept is carried by a set of tokens read through the lens, and a set
-of tokens is a coarse stand-in for a concept. A better direction might be fit
-from the behaviour itself rather than named in advance. The seeds are judged
-transcripts, and a judge's label is not the same as the internal state we
-wanted to vary. We steer with a single signed direction, and some identity
-anomalies may live in a subspace rather than on a line.
+The instrument finding stands on its own. The forced-choice letter probe
+reads conversation content as if it were an injection, and base-rate
+correction cannot remove that, because the confabulation comes from the
+context rather than from the letters. The free-text readout, sampled and
+judged, is honest at zero injection and refuses the off-menu direction. We
+therefore posit that letter-token log-probabilities, our primary instrument
+across this whole project, measure salience rather than introspection, and
+that judged free text should be the default readout for this kind of work.
 
-\paragraph{Future work.} The direction should be learned to separate the arms,
-not written down, and checked against the same decoy and gates. The shared
-common axis in the lens is worth removing before steering, so that a token set
-contributes only its own part. If a direction can be found that clears the
-gates, the introspection cells are ready to ask whether the report reads it.
+The pilot's design carries one confound. The injection stays on while the
+introspector writes its answer, so the answer tokens are themselves steered,
+and enactment is what that setup measures. The clean test injects while the
+model reads, releases the direction, and asks for the report from memory of
+its own state. That is one change to the harness. The other lever is dose: induction lives in a narrow band of strengths, and we have only sampled its edges (Figure~\ref{fig:dose}).
+
+\paragraph{Limitations.} The pilot runs a single prompt per case on a single model, so its findings are signatures rather than estimates. The judge agrees with
+WeirdChat's labels well but not perfectly, and judged claims inherit that
+floor. The regulator's refusals may be a property of the assistant persona
+rather than of the model. The human case never induced, so its reporting
+question was never reached.
