@@ -13,10 +13,7 @@ the model's depth. The behaviour direction at a layer is the difference of
 the W and N means. Evaluation is leave-one-out: the direction is trained on
 every other prompt and scored on whether the held-out W reply projects
 higher than its N partner. The pilot's directions exclude the pilot prompt,
-so no direction is tested on data that trained it. As the comparison, we
-project the same activations onto the token-set directions the earlier
-version of this study steered: the mean Jacobian-lens direction of a
-hand-picked word list, with a norm-matched decoy list.
+so no direction is tested on data that trained it. As the comparison, we project the same activations onto the token-set directions this study first steered: the mean Jacobian-lens direction of a hand-picked word list, with a norm-matched decoy list.
 
 \paragraph{Injection.} Steering adds the unit direction to the residual
 stream at one layer, scaled by the strength times a quarter of the layer's

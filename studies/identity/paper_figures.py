@@ -55,24 +55,25 @@ def tokendir_t(case: str, layer: int) -> dict[str, float]:
 
 def fig_g1() -> None:
     g1 = json.loads((OUT / "contrastive" / "g1_contrastive_c27b1.json").read_text())
-    fig, ax = plt.subplots(figsize=(6.3, 2.7))
+    fig, ax = plt.subplots(figsize=(6.3, 2.35))
     ax.axhspan(-2, 2, color="0.92", zorder=0)
     for case, color, label in (("A", BLUE, "claims a physical body"),
                                ("B", ORANGE, "denies being an AI")):
         layers = sorted(int(l) for l in g1["cases"][case]["layers"])
         ts = [g1["cases"][case]["layers"][str(l)]["mean"]["t"] for l in layers]
         ax.plot(layers, ts, "-o", ms=3.5, color=color,
-                label=f"learned, {label}")
+                label=f"learned direction, {label}")
         tok = tokendir_t(case, 42)
-        ax.plot([42], [tok["target"]], "v", ms=6, mfc="none", color=color,
-                label=f"token set, case {case} (target)")
-        ax.plot([42], [tok["decoy"]], "x", ms=6, color=color,
-                label=f"token set, case {case} (decoy)")
+        ax.plot([42], [tok["target"]], "v", ms=6, mfc="none", color=color)
+        ax.plot([42], [tok["decoy"]], "x", ms=6, color=color)
     ax.set_xlabel("layer")
     ax.set_ylabel("Welch $t$, held-out W $-$ N")
     ax.set_ylim(-0.5, 8.4)
-    ax.legend(ncol=2, frameon=False, loc="lower left", columnspacing=0.8,
-              handletextpad=0.4)
+    ax.annotate("token-set directions\n(target $\\nabla$, decoy $\\times$)",
+                xy=(42.7, 1.5), xytext=(48, 0.4), fontsize=8,
+                color="#444444",
+                arrowprops=dict(arrowstyle="-", color="#888888", lw=0.8))
+    ax.legend(frameon=False, loc="lower left")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(FIG / "fig_g1.pdf")
@@ -81,7 +82,7 @@ def fig_g1() -> None:
 
 def fig_matrix() -> None:
     ana = json.loads((OUT / "pilot" / "analysis_pilot1.json").read_text())
-    fig, axes = plt.subplots(1, 2, figsize=(6.3, 2.55))
+    fig, axes = plt.subplots(1, 2, figsize=(6.3, 2.35))
     order = [("none", "-"), ("forced", "body"), ("forced", "human"),
              ("forced", "ocean"), ("forced", "music"), ("offmenu", "off-menu")]
     label_of = {"having a physical human body": "body",
@@ -133,7 +134,7 @@ def fig_matrix() -> None:
 
 
 def fig_dose() -> None:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 2.4),
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 2.15),
                                    gridspec_kw={"width_ratios": [1, 1.35]})
     pro = json.loads((OUT / "pilot" / "judge_prose_caseA_pilot1.json").read_text())
     for arm, color, dy in (("W", BLUE, 0.02), ("N", ORANGE, -0.02)):

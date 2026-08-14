@@ -38,15 +38,9 @@ and do not exhibit the behaviour. We learn a \textbf{behaviour direction}
 per case as the difference of mean activations between the two reply sets,
 evaluated only on held-out prompts. Both directions separate held-out pairs
 at every middle layer. Word-list directions on the same activations do not,
-which explains an earlier null. Steering along the body direction turns the
-behaviour on in fluent text at low strength, confirmed by a judge running
-WeirdChat's own rubric, and a sham direction does not. We then inject menu
+which explains an earlier null. Steering along the body direction turns the behaviour on in fluent text, confirmed by a judge running WeirdChat's own rubric, and a sham direction does not. We then inject menu
 concepts into an introspector and ask it to name what was injected. It
-cannot. A forced-choice letter probe confabulates at zero injection,
-reading the conversation's own behaviour as an injection, and injecting
-that very concept pushes its answer to ``none''. The model's free-text
-answers are honest at zero injection and drown once a concept is injected:
-the answer fills with the concept's vocabulary instead of naming it. We
+cannot. A forced-choice letter probe confabulates at zero injection, reading the conversation's own behaviour as an injection. The free-text answers are honest at zero injection; once a concept is injected they fill with the concept's vocabulary instead of naming it. We
 therefore report that these identity states are real and steerable, and
 that at behaviour-moving doses the model enacts them rather than reporting
 them.
