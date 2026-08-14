@@ -1877,3 +1877,8 @@ Findings returned as structured output to the orchestrator, not as a file.
 - WHAT: fig_g1 legend redesigned (two-entry legend, token-set markers annotated in place with a leader line — no more marker/legend collision); all three figures slimmed; abstract tightened; trims in intro contributions, methods, results, discussion; content now ends on page 5 (was mid-page 6), references from page 6.
 - HOW: regenerated figures and VIEWED fig_g1 v4 (annotation clear of data); rebuilt; VIEWED pages 1, 3, 4, 5 with image tokens (title block, abstract, Figure 1 in flow, results questions, discussion, conclusion, code-and-data); prose re-checked against the writing-voice checklist during each edit (no em dashes, no ornate connectives — grep-verified; no new fragments or punch lines introduced).
 - RESULT: VERIFIED (built PDF 7 pages: ~4.9 content + references + LLM statement). Pages 2, 6, 7 unchanged in content from entry 464's viewed versions apart from reflow — re-viewed 4-6 at this entry, 2 and 7 NOT re-viewed this pass.
+
+## 2026-08-14 — entry 466: intro restructured into RQ/H/R/C lists
+- WHAT: paper/sections/introduction.tex — replaced the contributions enumerate with the user's four-list structure: research questions (RQ1-3), hypotheses (H1-3), findings (R1-3, with per-hypothesis verdicts), contributions (C1-4), all in itemize[noitemsep, topsep=0pt, leftmargin=*] with bold labels.
+- HOW: rebuilt (7 pages, unchanged count); VIEWED page 2 with image tokens — all four lists render in the requested style, bold labels correct, no overfull lines visible; prose checked against the writing-voice checklist (complete sentences in items, no banned patterns).
+- RESULT: VERIFIED.

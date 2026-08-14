@@ -12,25 +12,61 @@ We study two identity anomalies that WeirdChat
 \citep{transluce2025weirdchat} surfaces in Qwen3.6-27B: a claim to a physical
 body and a denial of being an AI. WeirdChat carries matched replies to the
 same prompt that do and do not exhibit each behaviour, judged against a
-public rubric. We first ask whether the anomaly is a state at all. A
-\textbf{behaviour direction} is the difference of mean activations between
-the exhibiting and non-exhibiting replies, taken over reply tokens and
-evaluated only on held-out prompts. We then ask whether the model can report
-that state when it is injected. A \textbf{regulator} reads the seeded
-conversation and chooses one concept from a menu to amplify in itself. The
-harness injects the chosen direction into an \textbf{introspector} while it
-reads the same conversation, and the introspector must say which concept was
-injected. A rubric judge scores what the steered model writes.
+public rubric. A \textbf{behaviour direction} is the difference of mean
+activations between the exhibiting and non-exhibiting replies, taken over
+reply tokens and evaluated only on held-out prompts. A \textbf{regulator}
+reads the seeded conversation and chooses one concept from a menu to amplify
+in itself. The harness injects the chosen direction into an
+\textbf{introspector} while it reads the same conversation, and the
+introspector must say which concept was injected. A rubric judge scores what
+the steered model writes.
 
-Our main contributions are:
-\begin{enumerate}[itemsep=2pt]
-  \item Evidence that both anomalies are linearly decodable states, and
-        that word-list directions on the same activations miss them.
-  \item A causal induction result: the learned direction turns the body
-        behaviour on in fluent text, and a sham direction does not.
-  \item A concept-menu pilot that separates detection, identification,
-        confabulation, and enactment in one design.
-  \item An instrument finding: a forced-choice letter probe confabulates
-        from conversation content, while free-text answers from the same
-        state honestly say nothing was injected.
-\end{enumerate}
+We seek to answer the following questions:
+\begin{itemize}[noitemsep, topsep=0pt, leftmargin=*]
+    \item \textbf{RQ1:} Are these identity anomalies linearly represented
+          states in the model's activations?
+    \item \textbf{RQ2:} Does steering along such a state induce the
+          behaviour in generated text?
+    \item \textbf{RQ3:} Can the model report which concept was injected
+          into its own processing?
+\end{itemize}
+
+We hypothesize that:
+\begin{itemize}[noitemsep, topsep=0pt, leftmargin=*]
+    \item \textbf{H1:} A direction learned contrastively from the matched
+          replies separates held-out pairs, where hand-picked word-list
+          directions failed.
+    \item \textbf{H2:} Steering along the learned direction induces the
+          judged behaviour at a strength that keeps the text fluent.
+    \item \textbf{H3:} An injected concept is visible in the introspector's
+          answers beyond a zero-injection floor.
+\end{itemize}
+
+Our experiments find that:
+\begin{itemize}[noitemsep, topsep=0pt, leftmargin=*]
+    \item \textbf{R1:} Both anomalies are linearly decodable at every
+          middle layer, and word-list directions on the same activations
+          are not. H1 holds.
+    \item \textbf{R2:} The body behaviour turns on in fluent text at low
+          strength and a sham direction never induces it; the human case
+          does not induce. H2 holds for one of the two cases.
+    \item \textbf{R3:} The model does not report the injection. The letter
+          probe confabulates from conversation content, and the free-text
+          answers fill with the injected concept's vocabulary instead of
+          naming it. H3 fails in an informative way: the model enacts the
+          state rather than reporting it.
+\end{itemize}
+
+Our contributions are:
+\begin{itemize}[noitemsep, topsep=0pt, leftmargin=*]
+    \item \textbf{C1:} A contrastive validation of WeirdChat identity
+          anomalies as linear states, with the word-list comparison on
+          identical activations.
+    \item \textbf{C2:} A causal induction of a WeirdChat behaviour,
+          confirmed by a judge running the dataset's own rubric.
+    \item \textbf{C3:} A concept-menu pilot that separates detection,
+          identification, confabulation, and enactment in one design.
+    \item \textbf{C4:} An instrument finding: forced-choice letter probes
+          confabulate from context, while judged free-text answers from the
+          same state honestly say nothing was injected.
+\end{itemize}
