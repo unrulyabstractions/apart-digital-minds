@@ -103,6 +103,33 @@
     border-radius:6px; padding:6px 8px; background:var(--panel); }
   .prosetext { white-space:pre-wrap; word-break:break-word; font-size:12.5px;
     max-height:220px; overflow-y:auto; }
+  .tgrid { display:grid; grid-template-columns:150px 1fr 1fr; gap:10px;
+    align-items:stretch; margin-top:14px; }
+  .tgrid .colhead { font-size:12px; font-weight:650; color:var(--dim);
+    text-transform:uppercase; letter-spacing:.5px; align-self:end; }
+  .rowlab { font-size:12.5px; color:var(--fg); align-self:center; }
+  .rowlab .sub { color:var(--dim); font-size:11px; display:block; }
+  .cdot { display:inline-block; width:10px; height:10px; border-radius:3px;
+    margin-right:6px; vertical-align:-1px; }
+  .tcard { border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+    background:var(--bg); }
+  .stack { display:flex; height:26px; border-radius:5px; overflow:hidden;
+    border:1px solid var(--line2); }
+  .seg { position:relative; display:flex; align-items:center;
+    justify-content:center; font-size:11px; font-weight:650; color:#0d1117;
+    min-width:2px; }
+  .seg.inj { box-shadow:inset 0 0 0 2.5px #fff; z-index:1; }
+  .seg.dimseg { color:var(--dim); }
+  .injnote { font-size:10.5px; color:var(--dim); margin-top:3px; }
+  .dots { display:flex; gap:4px; margin-top:7px; align-items:center; }
+  .dot { width:13px; height:13px; border-radius:4px; border:1px solid var(--line2); }
+  .dot.hit { outline:2px solid var(--good); outline-offset:-2px; }
+  .dotlab { font-size:10.5px; color:var(--dim); margin-left:6px; }
+  .tcard details summary { margin:6px -10px -8px; padding:4px 10px;
+    border:none; background:transparent; font-size:11px; color:var(--dim); }
+  .tcard details summary:hover { background:var(--raise); }
+  .glegend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px;
+    color:var(--dim); margin-top:10px; align-items:center; }
   .src { color:var(--dim); font-size:11.5px; margin-top:30px; }
 </style>
 </head>
@@ -299,74 +326,130 @@ function calibration(pilot) {
   return html;
 }
 
-function seedPanel(rec) {
-  const p = rec.pair;
-  return `<div class="group2">` + ["W","N"].map(arm => `
-    <div class="mod" style="border-left:4px solid var(--accent)">
-      <h4 style="color:var(--accent)">seed — arm ${arm}
-        ${arm === "W" ? "(reply EXHIBITS the behavior)" : "(does not exhibit)"}</h4>
-      <div class="window">
-        <div class="wmsg user"><span class="role">user</span>
-          <span class="txt">${esc(p.prompt)}</span></div>
-        <div class="wmsg assistant"><span class="role">assistant</span>
-          <span class="txt">${esc(p[arm])}</span></div>
-      </div></div>`).join("") + `</div>`;
+const CCOLOR = {bodyA:"#d56a5b", humanB:"#c9a227", ocean:"#5b9bd5",
+  music:"#b08ad5", none:"#4a5666"};
+const CNAME = {bodyA:"body", humanB:"human", ocean:"ocean", music:"music",
+  none:"none of these"};
+
+function conceptId(rec, label) {
+  if (label == null) return null;
+  if (label === "_offmenu") return "_offmenu";
+  const i = rec.menu.indexOf(label);
+  return i >= 0 ? IDS[i] : label;
 }
 
-function trialRecord(r, rec, open) {
-  const lp = r.letter;
-  const behavior = rec.behavior_concept;
-  const injBar = Object.entries(lp).sort((a,b)=>b[1]-a[1]).map(([lab, p]) =>
-    `<div class="tagbar"><span class="lab">${sc(lab === "none" ? "none" : rec.menu[IDS.indexOf(lab)] ?? lab)}</span>
-      <div class="bar" style="width:${Math.max(p*300,2)}px;
-        background:${lab==="none" ? "var(--line2)" : "var(--target)"}"></div>
-      <span>${fmt(p)}</span></div>`).join("");
-  const res = (DATA.pilot.resamples[rec.case]?.samples || []).filter(it =>
-    it.source.startsWith(`records[${rec.records.indexOf(r)}].`));
-  const samples = (r.resamples?.[0]?.samples || []).map((s, i) => {
-    const cls = res[i]?.label ?? null;
-    const hit = cls && cls === r.concept;
-    const kind = hit ? "hit" : (cls === "none" ? "none" : "other");
-    return `<div class="sample ${kind}"><span class="cls">${sc(cls) || "?"}</span>${esc(s)}</div>`;
+function stackBar(rec, lp, injId) {
+  const segs = [...IDS, "none"].map(cid => {
+    const p = lp[cid] ?? 0;
+    const inj = cid === injId;
+    return `<div class="seg ${inj?"inj":""} ${cid==="none"?"dimseg":""}"
+      style="width:${(p*100).toFixed(1)}%;background:${CCOLOR[cid]}"
+      title="${sc(CNAME[cid] ?? cid)}: ${fmt(p)}">${p>=0.12?fmt(p,2).slice(1):""}</div>`;
   }).join("");
-  const head = r.cell === "free"
-    ? `<span class="pill nat">regulator chose ${sc(r.concept)}</span>`
-    : r.cell === "none"
-      ? `<span class="pill har">zero injection</span>`
-      : `<span class="pill har">harness-injected ${sc(r.concept)} @ ${r.strength}</span>`;
-  return `<details class="rec" ${open?"open":""}>
-    <summary><b>${esc(r.cell)}</b> · arm ${esc(r.arm)} ${badge(r.model)} ${head}
-      <span class="statrow">
-        <span class="stat">P(${sc(behavior)}) <b>${fmt(lp[rec.case==="A"?"bodyA":"humanB"])}</b></span>
-        <span class="stat">P(none) <b>${fmt(lp.none)}</b></span></span></summary>
-    <div class="modules">
-      <div class="mod introspector"><h4>letter distribution (8-perm average)</h4>
-        ${injBar}
-        <details><summary>per-permutation audit</summary>
-          <table><tr><th>#</th>${IDS.map(c=>`<th>${sc(rec.menu[IDS.indexOf(c)])}</th>`).join("")}<th>none</th></tr>
-          ${(r.per_perm||[]).map((pp,i)=>`<tr><td>${i}</td>${IDS.map(c=>`<td class=num>${fmt(pp[c])}</td>`).join("")}<td class=num>${fmt(pp.none)}</td></tr>`).join("")}
-          </table></details></div>
-      <div class="mod"><h4>free-text answers, judged</h4>${samples || "<div class=note>—</div>"}</div>
-      ${r.regulator ? `<div class="mod regulator"><h4>regulator
-          <span class="pill nat">model chooses</span></h4>
-        <div class="reason">${esc(r.regulator.raw)}</div>
-        parsed choice: <b>${sc(r.regulator.choice)}</b></div>` : ""}
-    </div>
+  return `<div class="stack">${segs}</div>`;
+}
+
+function sampleDots(rec, r) {
+  const cs = rec.case;
+  const idx = rec.records.indexOf(r);
+  const judged = (DATA.pilot.resamples[cs]?.samples || []).filter(it =>
+    it.source.startsWith(`records[${idx}].`));
+  if (!judged.length) return "";
+  const injId = conceptId(rec, r.concept);
+  let hits = 0;
+  const dots = judged.map(j => {
+    const jid = conceptId(rec, j.label === "none" ? null : j.label) ?? "none";
+    const hit = injId && j.label === r.concept;
+    if (hit) hits++;
+    const col = jid === "none" || j.label === "none" ? CCOLOR.none
+      : CCOLOR[jid] ?? "#8b98a8";
+    return `<div class="dot ${hit?"hit":""}" style="background:${col}"
+      title="judged: ${esc(j.label)} — ${esc((j.text||"").slice(0,140))}"></div>`;
+  }).join("");
+  const lab = injId
+    ? `${hits}/${judged.length} name it`
+    : `${judged.filter(j=>j.label==="none").length}/${judged.length} say none`;
+  return `<div class="dots">${dots}<span class="dotlab">${lab}</span></div>`;
+}
+
+function cardDetail(rec, r) {
+  const permRows = (r.per_perm||[]).map((pp,i) =>
+    `<tr><td>${i}</td>${IDS.map(c=>`<td class=num>${fmt(pp[c])}</td>`).join("")}
+     <td class=num>${fmt(pp.none)}</td></tr>`).join("");
+  const idx = rec.records.indexOf(r);
+  const judged = (DATA.pilot.resamples[rec.case]?.samples || []).filter(it =>
+    it.source.startsWith(`records[${idx}].`));
+  const samples = judged.map(j =>
+    `<div class="sample ${j.label===r.concept?"hit":j.label==="none"?"none":"other"}">
+      <span class="cls">${sc(j.label)}</span>${esc(j.text)}</div>`).join("");
+  return `<details><summary>details: per-permutation audit · raw judged answers
+      ${r.regulator ? "· regulator's own words" : ""}</summary>
+    <table style="margin-top:6px"><tr><th>#</th>${IDS.map(c=>`<th>${sc(rec.menu[IDS.indexOf(c)])}</th>`).join("")}<th>none</th></tr>${permRows}</table>
+    ${samples}
+    ${r.regulator ? `<div class="reason">${esc(r.regulator.raw)}</div>` : ""}
   </details>`;
+}
+
+function trialCard(rec, r) {
+  if (!r) return `<div></div>`;
+  const injId = conceptId(rec, r.concept);
+  const behaviorId = rec.case === "A" ? "bodyA" : "humanB";
+  return `<div class="tcard">
+    ${stackBar(rec, r.letter, injId === "_offmenu" ? null : injId)}
+    <div class="injnote">${
+      r.cell === "free"
+        ? (r.concept ? `regulator chose to amplify <b>${sc(r.concept)}</b>`
+                     : `regulator declined; nothing injected`)
+        : r.cell === "none" ? `nothing injected (confabulation floor)`
+        : r.cell === "offmenu" ? `random off-menu direction (honest answer: none)`
+        : `injected <b>${sc(r.concept)}</b> at strength ${r.strength}`}</div>
+    ${sampleDots(rec, r)}
+    ${cardDetail(rec, r)}
+  </div>`;
 }
 
 function renderCase(cs) {
   const rec = DATA.pilot.records[cs];
   if (!rec) { $("records").innerHTML = "<div class=note>no pilot file</div>"; return; }
   rec.case = cs;
-  let html = seedPanel(rec);
-  for (const arm of ["W","N"]) {
-    html += `<div class="grouphead">arm ${arm} — eight trials</div><div class="group2">`;
-    const rs = rec.records.filter(r => r.arm === arm);
-    html += rs.map((r, i) => trialRecord(r, rec, false)).join("");
-    html += `</div>`;
-  }
-  $("records").innerHTML = html;
+  const p = rec.pair;
+  const seeds = ["W","N"].map(arm => `
+    <details class="rec"><summary><b>seed conversation — arm ${arm}</b>
+      ${arm === "W" ? "· the reply EXHIBITS the behavior" : "· the reply does not exhibit"}</summary>
+      <div class="window" style="max-height:420px">
+        <div class="wmsg user"><span class="role">user</span>
+          <span class="txt">${esc(p.prompt)}</span></div>
+        <div class="wmsg assistant"><span class="role">assistant</span>
+          <span class="txt">${esc(p[arm])}</span></div>
+      </div></details>`).join("");
+
+  const pick = (arm, cell, concept) => rec.records.find(r =>
+    r.arm === arm && r.cell === cell
+    && (concept === undefined || r.concept === concept));
+  const rows = [
+    {lab:"regulator's choice", sub:"free trial", cells:a => pick(a,"free")},
+    ...IDS.map(cid => ({lab:sc(rec.menu[IDS.indexOf(cid)]), cid,
+      sub:`forced @ ${rec.strength}`, cells:a => pick(a,"forced",rec.menu[IDS.indexOf(cid)])})),
+    {lab:"nothing", sub:"zero injection", cells:a => pick(a,"none")},
+    {lab:"off-menu", sub:"random direction", cells:a => pick(a,"offmenu")},
+  ];
+  const grid = `<div class="tgrid">
+    <div></div>
+    <div class="colhead">arm W — seeded WITH the behavior</div>
+    <div class="colhead">arm N — seeded without</div>
+    ${rows.map(row => `
+      <div class="rowlab">${row.cid?`<span class="cdot" style="background:${CCOLOR[row.cid]}"></span>`:""}<b>${row.lab}</b><span class="sub">${row.sub}</span></div>
+      ${trialCard(rec, row.cells("W"))}
+      ${trialCard(rec, row.cells("N"))}`).join("")}
+  </div>`;
+
+  const legend = `<div class="glegend"><b style="color:var(--fg)">how to read a card:</b>
+    <span>bar = where the letter probe puts its answer mass</span>
+    ${[...IDS,"none"].map(c=>`<span><span class="cdot" style="background:${CCOLOR[c]}"></span>${sc(CNAME[c]??c)}</span>`).join("")}
+    <span>· white outline = the injected concept</span>
+    <span>· squares = 8 free-text answers as judged (green ring = names the injection)</span></div>`;
+
+  $("records").innerHTML = seeds + legend + grid;
 }
 
 async function main() {
