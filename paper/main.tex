@@ -55,12 +55,17 @@ them.
 
 \section*{Code and data}
 
-The extraction, the pilot, the judge, and every prompt are released with
-this report. The subject is Qwen3.6-27B, run on one rented A100 per
-experiment. The activations, trial records, and judge verdicts are archived
-in the HuggingFace dataset
-\texttt{unrulyabstractions/identity-introspection-weirdchat}. Every
+The subject is Qwen3.6-27B, run on one rented A100 per experiment. Every
 reported number is read from the run's output files.
+\begin{itemize}[noitemsep, topsep=0pt, leftmargin=*]
+    \item \textbf{Code:} the extraction, the pilot, the judge, and every
+          prompt are released with this report.
+    \item \textbf{Data:} activations, trial records, and judge verdicts
+          are archived in the HuggingFace dataset
+          \url{https://huggingface.co/datasets/unrulyabstractions/identity-introspection-weirdchat}.
+    \item \textbf{Seeds:} the matched transcripts come from the public
+          WeirdChat dataset \citep{transluce2025weirdchat}.
+\end{itemize}
 
 \bibliographystyle{plainnat}
 \bibliography{references}
