@@ -1882,3 +1882,8 @@ Findings returned as structured output to the orchestrator, not as a file.
 - WHAT: paper/sections/introduction.tex — replaced the contributions enumerate with the user's four-list structure: research questions (RQ1-3), hypotheses (H1-3), findings (R1-3, with per-hypothesis verdicts), contributions (C1-4), all in itemize[noitemsep, topsep=0pt, leftmargin=*] with bold labels.
 - HOW: rebuilt (7 pages, unchanged count); VIEWED page 2 with image tokens — all four lists render in the requested style, bold labels correct, no overfull lines visible; prose checked against the writing-voice checklist (complete sentences in items, no banned patterns).
 - RESULT: VERIFIED.
+
+## 2026-08-15 — entry 467: paper PDF published to the personal site
+- WHAT: paper/build/main.pdf copied to unrulyabstractions.github.io/pdfs/digital_minds.pdf, committed (c66eee9), pushed to origin main.
+- HOW: pulled the live URL with curl -L (site 301-redirects to www.unrulyabstractions.com) and md5-compared the downloaded bytes against the local copy: e8e752f87f05375749e8ae651fbb3ce1 both, 197032 bytes.
+- RESULT: VERIFIED (live and byte-identical). Standing instruction recorded in memory: every future PDF rebuild is copied, pushed, and live-verified the same way.
