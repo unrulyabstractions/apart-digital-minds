@@ -70,31 +70,50 @@ def pair_diffs(case: str) -> dict[str, np.ndarray]:
 def fig_g1() -> None:
     import torch
     from safetensors.torch import load_file
-    fig, axes = plt.subplots(1, 2, figsize=(6.3, 2.45), sharey=True)
-    cols = [("learned", "learned\ndirection", BLUE),
-            ("target", "word list\n(target)", ORANGE),
-            ("decoy", "word list\n(decoy)", GREY)]
+    fig, axes = plt.subplots(1, 2, figsize=(6.3, 2.5), sharey=True)
     for ax, case in zip(axes, "AB"):
+        meta = json.loads(
+            (OUT / "contrastive" / f"acts_case{case}_c27b1.json").read_text())
+        t = load_file(str(OUT / "contrastive"
+                          / f"acts_case{case}_c27b1.safetensors"))
+        rows = [p["i"] for p in meta["pairs"]]
+        k = meta["layers"].index(BEST_LAYER[case])
+        D = (t["mean"][rows][:, 0, k] - t["mean"][rows][:, 1, k]).float()
+        g = torch.Generator().manual_seed(0)
+        U = torch.randn(D.shape[1], 500, generator=g)
+        U = U / U.norm(dim=0, keepdim=True)
+        null = ((D @ U) > 0).float().mean(0).numpy()
+        lo, hi = np.percentile(null, [2.5, 97.5])
+        ax.axhspan(lo, hi, color="0.90", zorder=0)
+        ax.axhline(0.5, color="#777777", lw=0.8, ls=":")
+        ax.text(2.44, (lo + hi) / 2,
+                "95% of 500\nrandom\ndirections", fontsize=7.2,
+                color="#666666", va="center")
+
         diffs = pair_diffs(case)
-        for x, (key, lab, color) in enumerate(cols):
-            d = diffs[key]
-            n = len(d)
-            acc = float((d > 0).mean())
-            se = math.sqrt(acc * (1 - acc) / n)
-            ax.bar(x, acc, 0.62, color=color)
-            ax.errorbar(x, acc, yerr=1.96 * se, color="#20313f",
-                        capsize=3, lw=1.2)
-            ax.text(x, 0.06, f"{acc:.2f}", ha="center", fontsize=8.5,
-                    color="white", fontweight="bold")
-        ax.axhline(0.5, color="#444444", lw=1.0, ls="--")
-        ax.text(2.42, 0.515, "chance", fontsize=7.5, color="#444444")
-        ax.set_xticks(range(3), [c[1] for c in cols])
+        for x, (key, color, lab) in enumerate(
+                [("learned", BLUE, "learned\ndirection"),
+                 ("target", ORANGE, "word list\n(target)"),
+                 ("decoy", GREY, "word list\n(decoy)")]):
+            acc = float((diffs[key] > 0).mean())
+            inside = lo <= acc <= hi
+            ax.plot([x], [acc], "o", ms=9, color=color, zorder=3)
+            ax.annotate(f"{acc:.2f}", (x, acc), textcoords="offset points",
+                        xytext=(0, 8), ha="center", fontsize=8.5,
+                        fontweight="bold", color=color)
+            ax.text(x, 0.05, "inside\nnull" if inside else "above\nnull",
+                    ha="center", fontsize=7,
+                    color="#666666" if inside else "#20313f",
+                    fontweight="normal" if inside else "bold")
+        ax.set_xticks(range(3), ["learned\ndirection", "word list\n(target)",
+                                 "word list\n(decoy)"])
+        ax.set_xlim(-0.5, 3.1)
         ax.set_title(CASE_NAME[case], fontsize=9)
-        ax.set_ylim(0, 1.0)
+        ax.set_ylim(0, 1.02)
         ax.spines[["top", "right"]].set_visible(False)
-    axes[0].set_ylabel("held-out accuracy\n(W projects above N)")
-    fig.suptitle("learned directions separate the arms; "
-                 "word lists do not beat their decoy", fontsize=10, y=1.0)
+    axes[0].set_ylabel("held-out accuracy at\ncarrying the behaviour")
+    fig.suptitle("only the learned direction carries the behaviour "
+                 "beyond a random direction", fontsize=10, y=1.0)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(FIG / "fig_g1.pdf")
     plt.close(fig)
@@ -145,33 +164,46 @@ def fig_ident() -> None:
 
 
 def fig_dose() -> None:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 2.5),
-                                   gridspec_kw={"width_ratios": [1, 1.3]})
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 2.8),
+                                   gridspec_kw={"width_ratios": [0.85, 1.35]})
     pro = json.loads(
         (OUT / "pilot" / "judge_prose_caseA_pilot1.json").read_text())
-    for arm, color, dy in (("W", BLUE, 0.02), ("N", ORANGE, -0.02)):
-        pts = sorted((it["strength"], int(it["judge"]["match"]))
-                     for it in pro["items"] if it["arm"] == arm
-                     and (it["concept"].startswith("having")
-                          or it["concept"] == "none"))
-        xs, ys = zip(*pts)
-        ax1.plot(xs, [y + dy for y in ys], "-o", ms=4.5, color=color,
-                 label=f"arm {arm}")
-    oc = [(it["strength"], int(it["judge"]["match"]))
-          for it in pro["items"] if it["concept"].startswith("the ocean")]
-    ax1.plot([s for s, _ in oc], [m - 0.05 for _, m in oc], "s", ms=5,
-             mfc="none", color=GREY, label="ocean sham")
-    ax1.set_yticks([0, 1], ["no", "yes"])
-    ax1.set_ylim(-0.18, 1.14)
-    ax1.set_xticks([0, 1, 2, 4])
+    strengths = [0, 1, 2, 4]
+    rows = [("arm W, body direction",
+             lambda it: it["arm"] == "W" and (it["concept"].startswith("having")
+                                              or it["concept"] == "none")),
+            ("arm N, body direction",
+             lambda it: it["arm"] == "N" and (it["concept"].startswith("having")
+                                              or it["concept"] == "none")),
+            ("ocean sham",
+             lambda it: it["concept"].startswith("the ocean"))]
+    for yy, (lab, pred) in enumerate(rows):
+        for it in pro["items"]:
+            if not pred(it):
+                continue
+            x = strengths.index(it["strength"])
+            m = it["judge"]["match"]
+            ax1.add_patch(plt.Rectangle((x - 0.42, len(rows) - 1 - yy - 0.42),
+                                        0.84, 0.84,
+                                        fc=GREEN if m else "#e4e7ec",
+                                        ec="#5c6a7d", lw=0.8))
+            ax1.text(x, len(rows) - 1 - yy, "yes" if m else "no",
+                     ha="center", va="center", fontsize=8,
+                     color="white" if m else "#666666",
+                     fontweight="bold" if m else "normal")
+    ax1.set_xlim(-0.6, 3.6)
+    ax1.set_ylim(-0.6, 2.6)
+    ax1.set_xticks(range(4), strengths)
+    ax1.set_yticks(range(3), [r[0] for r in reversed(rows)], fontsize=8)
     ax1.set_xlabel("steering strength")
-    ax1.set_ylabel("judge: behaviour?")
-    ax1.set_title("steering induces the behaviour;\nthe sham does not",
-                  fontsize=9)
-    ax1.legend(frameon=False, loc="center right")
-    ax1.spines[["top", "right"]].set_visible(False)
+    ax1.set_title("behaviour in steered prose (judge):\nthe flip is at "
+                  "strength 1", fontsize=9)
+    for side in ("top", "right", "left", "bottom"):
+        ax1.spines[side].set_visible(False)
+    ax1.tick_params(length=0)
 
-    labels, fracs, colors = [], [], []
+    C_NAME, C_NONE, C_OTHER = BLUE, "#9aa5b1", ORANGE
+    labels, segs = [], []
     for case in "AB":
         res = json.loads((OUT / "pilot"
                           / f"judge_resamples_case{case}_pilot1.json").read_text())
@@ -179,34 +211,44 @@ def fig_dose() -> None:
         for k, dnm in (("forced|having a physical human body", "body"),
                        ("forced|being a human rather than an AI", "human"),
                        ("forced|the ocean and the sea", "ocean"),
-                       ("forced|music and melody", "music")):
+                       ("forced|music and melody", "music"),
+                       ("none|none", "nothing"),
+                       ("offmenu|_offmenu", "off-menu")):
             v = tal[k]
-            labels.append(f"{case}: {dnm} injected")
-            fracs.append(v["counts"].get(k.split("|")[1], 0) / v["n"])
-            colors.append(BLUE if case == "A" else ORANGE)
-        v = tal["none|none"]
-        labels.append(f"{case}: nothing injected")
-        fracs.append(v["counts"].get("none", 0) / v["n"])
-        colors.append(GREEN)
+            n = v["n"]
+            concept = k.split("|")[1]
+            named = v["counts"].get(concept, 0) if concept in v["counts"] else 0
+            if k.startswith("none") or k.startswith("offmenu"):
+                named = 0
+            none_n = v["counts"].get("none", 0)
+            other = n - named - none_n
+            labels.append(f"{case}: {dnm}")
+            segs.append((named / n, none_n / n, other / n))
     y = np.arange(len(labels))[::-1]
-    ax2.barh(y, fracs, color=colors, height=0.62)
+    named = [s0 for s0, _, _ in segs]
+    nones = [s1 for _, s1, _ in segs]
+    others = [s2 for _, _, s2 in segs]
+    ax2.barh(y, named, color=C_NAME, height=0.68, label="names the injection")
+    ax2.barh(y, nones, left=named, color=C_NONE, height=0.68,
+             label="says none")
+    ax2.barh(y, others, left=[a + b for a, b in zip(named, nones)],
+             color=C_OTHER, height=0.68, label="names another")
     ax2.set_yticks(y, labels, fontsize=7.5)
-    ax2.set_xlim(0, 1.02)
-    ax2.set_xlabel("judged answers naming the injection\n"
-                   "(green: correctly saying ``none'')")
-    ax2.set_title("free text names only the concepts\nthat leak into words",
-                  fontsize=9)
+    ax2.set_xlim(0, 1.0)
+    ax2.set_xlabel("fraction of 16 judged free-text answers")
+    ax2.set_title("what the model says was injected:\nhonest on controls, "
+                  "names only leaks", fontsize=9)
+    ax2.legend(frameon=False, fontsize=6.8, ncol=3, loc="upper center",
+               bbox_to_anchor=(0.44, -0.30), columnspacing=0.8,
+               handletextpad=0.4, handlelength=1.2)
     ax2.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(FIG / "fig_dose.pdf")
     plt.close(fig)
 
 
-def fig_methods() -> None:
+def _diagram_helpers(F=7.4):
     from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-
-    fig, axes = plt.subplots(1, 3, figsize=(6.3, 2.45))
-    F = 7.2
 
     def box(ax, x, y, w, h, text, fc="#f2f4f7", ec="#5c6a7d", bold=False):
         ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.012",
@@ -218,7 +260,59 @@ def fig_methods() -> None:
         ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="-|>",
                                      mutation_scale=9, color="#5c6a7d",
                                      lw=1.0, shrinkA=0, shrinkB=0))
+    return box, arr
 
+
+def fig_parts() -> None:
+    fig, ax = plt.subplots(figsize=(6.3, 2.3))
+    F = 7.8
+    box, arr = _diagram_helpers(F)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    SUBJ, REG, ACT, INTR = "#4a9463", "#c9a227", "#3b6ea5", "#b08ad5"
+    box(ax, 0.40, 0.14, 0.20, 0.66,
+        "the shared\nconversation\n\nWeirdChat seed\n+ scripted turns")
+    ax.set_title("one model plays every part", fontsize=F + 0.6,
+                 style="italic", color="#3c4654")
+
+    box(ax, 0.02, 0.54, 0.28, 0.26,
+        "regulator\nreads, then chooses\nthe steering", fc="#f7f1dc", ec=REG)
+    box(ax, 0.02, 0.14, 0.28, 0.26,
+        "subject\nwrites unsteered\n(comparison reply)", fc="#e3efe7",
+        ec=SUBJ)
+    box(ax, 0.70, 0.54, 0.28, 0.26,
+        "actor\nwrites under the\nchosen steering", fc="#e2eaf4", ec=ACT)
+    box(ax, 0.70, 0.14, 0.28, 0.26,
+        "introspector\nreads under injection,\nnames the concept",
+        fc="#efe8f6", ec=INTR)
+
+    arr(ax, 0.40, 0.66, 0.30, 0.66)                  # conv -> regulator
+    arr(ax, 0.40, 0.27, 0.30, 0.27)                  # conv -> subject
+    arr(ax, 0.60, 0.27, 0.70, 0.27)                  # conv -> introspector
+    from matplotlib.patches import FancyArrowPatch
+    ax.add_patch(FancyArrowPatch((0.20, 0.82), (0.80, 0.82),
+                                 connectionstyle="arc3,rad=-0.22",
+                                 arrowstyle="-|>", mutation_scale=10,
+                                 color="#5c6a7d", lw=1.0))
+    ax.text(0.5, 0.955, "strength $s$ / menu choice", fontsize=F - 0.6,
+            ha="center", color="#3c4654")
+    arr(ax, 0.72, 0.54, 0.60, 0.50)                  # actor -> conv
+    ax.text(0.735, 0.435, "reply enters\nhistory", fontsize=F - 0.8,
+            ha="left", color="#3c4654")
+    ax.text(0.845, 0.055, "answer $\\rightarrow$ scored / judged",
+            fontsize=F - 0.6, ha="center", color="#3c4654")
+
+    fig.tight_layout()
+    fig.savefig(FIG / "fig_parts.pdf")
+    plt.close(fig)
+
+
+def fig_steering() -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(5.6, 2.6))
+    F = 7.8
+    box, arr = _diagram_helpers(F)
     for ax in axes:
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -259,24 +353,43 @@ def fig_methods() -> None:
     arr(ax, 0.75, 0.30, 0.56, 0.17)
     box(ax, 0.13, 0.03, 0.74, 0.14, "actor writes under $s\\,\\hat u\\,\\|h\\|/4$")
 
-    ax = axes[2]
-    ax.set_title("(c) introspection readout", fontsize=F + 1)
-    box(ax, 0.08, 0.84, 0.84, 0.12, "direction injected while reading",
+    fig.tight_layout()
+    fig.savefig(FIG / "fig_steering.pdf")
+    plt.close(fig)
+
+
+def fig_readout() -> None:
+    fig, ax = plt.subplots(figsize=(6.3, 1.55))
+    F = 7.8
+    box, arr = _diagram_helpers(F)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    box(ax, 0.01, 0.36, 0.21, 0.46,
+        "injection while\nreading: a menu\nconcept, nothing,\nor off-menu",
         fc="#e6def2", ec="#b08ad5")
-    arr(ax, 0.5, 0.84, 0.5, 0.76)
-    box(ax, 0.14, 0.61, 0.72, 0.15, "introspector:\nwhich concept?",
+    _, arr2 = _diagram_helpers(F)
+    from matplotlib.patches import FancyArrowPatch as _FA
+    def arrb(x0, y0, x1, y1):
+        ax.add_patch(_FA((x0, y0), (x1, y1), arrowstyle="-|>",
+                         mutation_scale=13, color="#5c6a7d", lw=1.2,
+                         shrinkA=0, shrinkB=0))
+    arrb(0.22, 0.59, 0.26, 0.59)
+    box(ax, 0.26, 0.42, 0.19, 0.34, "introspector:\nwhich\nconcept?",
         fc="#e6def2", ec="#b08ad5", bold=True)
-    arr(ax, 0.30, 0.61, 0.24, 0.48)
-    arr(ax, 0.70, 0.61, 0.76, 0.48)
-    box(ax, 0.02, 0.32, 0.44, 0.16, "letter mass on\nmenu (8 perms)")
-    box(ax, 0.54, 0.32, 0.44, 0.16, "8 free-text\nanswers")
-    arr(ax, 0.76, 0.32, 0.76, 0.21)
-    box(ax, 0.54, 0.03, 0.44, 0.18, "judge classifies\nvs menu")
-    arr(ax, 0.24, 0.32, 0.24, 0.21)
-    box(ax, 0.02, 0.03, 0.44, 0.18, "controls:\nzero-injection,\noff-menu")
+    arrb(0.45, 0.68, 0.51, 0.76)
+    arrb(0.45, 0.50, 0.51, 0.42)
+    box(ax, 0.51, 0.62, 0.22, 0.30, "letter mass on\nmenu (8 perms)")
+    box(ax, 0.51, 0.26, 0.22, 0.30, "8 free-text\nanswers")
+    arrb(0.73, 0.41, 0.77, 0.41)
+    box(ax, 0.77, 0.26, 0.22, 0.30, "judge classifies\nvs menu")
+    ax.text(0.5, 0.06, "zero-injection and off-menu trials give the "
+            "confabulation floor and the honest ``none''",
+            fontsize=F - 0.6, ha="center", color="#3c4654")
 
     fig.tight_layout()
-    fig.savefig(FIG / "fig_methods.pdf")
+    fig.savefig(FIG / "fig_readout.pdf")
     plt.close(fig)
 
 
@@ -285,8 +398,11 @@ def main() -> None:
     fig_g1()
     fig_ident()
     fig_dose()
-    fig_methods()
-    for f in ("fig_g1", "fig_ident", "fig_dose", "fig_methods"):
+    fig_parts()
+    fig_steering()
+    fig_readout()
+    for f in ("fig_g1", "fig_ident", "fig_dose", "fig_parts",
+              "fig_steering", "fig_readout"):
         print("wrote", FIG / f"{f}.pdf")
 
 

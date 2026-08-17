@@ -2,8 +2,8 @@
 
 \subsection{Direct contrastive steering makes the model disidentify}
 
-The learned direction separates held-out W from N replies above both
-word lists and chance (Figure~\ref{fig:g1}, Table~\ref{tab:g1}), and the
+The learned direction carries the behaviour beyond the
+random-direction null (Figure~\ref{fig:g1}, Table~\ref{tab:g1}), and the
 separation holds at every middle layer. Steering
 along it turns the body behaviour on (Figure~\ref{fig:dose}, left): the N
 arm's unsteered continuation shows no behaviour, and at strength one the
@@ -16,10 +16,10 @@ through case A.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\figwidth]{figures/fig_g1}
-  \caption{Held-out accuracy of each direction at separating W from N
-  replies, with 95\% intervals. The word lists sit near chance and the
-  target list does not beat its decoy; the learned direction beats
-  both.}
+  \caption{Held-out accuracy of each direction at carrying the
+  behaviour. The grey band spans the middle 95\% of 500 random unit
+  directions at the same layer. Both word lists sit inside the band; only
+  the learned direction lies above it.}
   \label{fig:g1}
 \end{figure}
 
@@ -44,8 +44,9 @@ through case A.
 
 \subsection{A J-space regulator does not steer identity}
 
-The word-list target does not beat its decoy on the same activations the
-learned directions separate (Figure~\ref{fig:g1}). In the full regulator
+Both word lists sit inside the random-direction band on the same
+activations the learned directions separate, and the target does not beat
+its decoy (Figure~\ref{fig:g1}). In the full regulator
 pipeline the decoy outmoves the target on the introspector's readout in
 every cell (Table~\ref{tab:jspace}), so the steering the regulator
 controls has no specific identity effect.
@@ -107,8 +108,9 @@ an AI; one trial, flagged for follow-up.
   \centering
   \includegraphics[width=\figwidth]{figures/fig_dose}
   \caption{Left: rubric-judge verdict on prose generated under behaviour
-  steering, case A; the N arm flips from no behaviour to behaviour at
-  strength one. Right: fraction of judged free-text answers naming the
-  injected concept; green bars are ``none'' at zero injection.}
+  steering, case A. Right: classification of all 16 judged free-text
+  answers per injection; the controls (nothing, off-menu) are answered
+  ``none'', and a concept is named only where its vocabulary leaks into
+  the answer.}
   \label{fig:dose}
 \end{figure}

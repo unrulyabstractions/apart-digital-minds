@@ -29,7 +29,24 @@ both arms. The pilot uses the prompt with the highest behaviour incidence.
   \label{tab:cases}
 \end{table}
 
-\paragraph{Steering methods.} Figure~\ref{fig:methods} shows both.
+\paragraph{The parts.} One model plays four parts on the shared
+conversation (Figure~\ref{fig:parts}): a \textbf{subject} that writes
+unsteered, a \textbf{regulator} that chooses the steering, an
+\textbf{actor} that writes under it, and an \textbf{introspector} that
+reads under injection and must name the injected concept.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.9\figwidth]{figures/fig_parts}
+  \caption{The four parts on one conversation. The regulator's choice
+  sets the steering; the actor's steered reply enters the history; the
+  subject's unsteered reply is the comparison; the introspector's answer
+  is scored.}
+  \label{fig:parts}
+\end{figure}
+
+\paragraph{Steering methods.} Figure~\ref{fig:steering} shows both;
+Table~\ref{tab:directions} defines every direction the figures name.
 \textbf{Direct contrastive steering} (a): the behaviour direction at a
 layer is the difference of mean residual-stream activations over reply
 tokens, W minus N. Generation adds the unit direction, scaled by strength
@@ -38,26 +55,80 @@ leave-one-out; the pilot's directions exclude the pilot prompt.
 \textbf{Regulator J-space steering} (b): the model reads the seeded
 exchange and answers more, same, or less; the harness maps the answer to a
 signed strength on a token-set direction, the mean Jacobian-lens direction
-of a hand-picked word list. A norm-matched decoy list is the control.
-
-\paragraph{Introspection readout.} Figure~\ref{fig:methods}(c). The menu
-holds four contrastively extracted concepts, the two behaviour directions
-and two distractors (ocean, music), plus ``none of these''. Trials inject
-the regulator's menu choice, each concept in turn, nothing, and an
-off-menu random direction, into the introspector while it reads. Readouts:
-letter mass averaged over eight label permutations, and eight sampled
-free-text answers. The judge classifies free text against the menu and
-judges steered prose with WeirdChat's own rubric, calibrated on the pilot
-prompts' labeled transcripts (Table~\ref{tab:g1}).
+of a hand-picked word list (Table~\ref{tab:wordlists}). A norm-matched
+decoy list is the control.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\figwidth]{figures/fig_methods}
-  \caption{The two steering methods and the readout. (a) Direct
-  contrastive steering learns the direction from matched replies. (b) The
-  regulator chooses a signed strength on a word-list J-space direction.
-  (c) The introspector reads under injection and must name the concept.}
-  \label{fig:methods}
+  \includegraphics[width=0.86\figwidth]{figures/fig_steering}
+  \caption{The two steering methods. (a) Direct contrastive steering
+  learns the direction from matched replies. (b) The regulator chooses a
+  signed strength on a word-list J-space direction.}
+  \label{fig:steering}
+\end{figure}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{llp{5.6cm}l}
+    \toprule
+    label in figures & kind & built from & role \\
+    \midrule
+    learned direction & contrastive & W minus N mean activations,
+      leave-one-out over prompts & steering + injection \\
+    body / human & contrastive & the two learned behaviour directions
+      (body = case A, human = case B) & menu concepts \\
+    ocean / music & contrastive & hand-written sentence pairs about /
+      not about the concept & menu distractors \\
+    word list (target) & token set & J-lens mean over the case's word
+      list & J-space steering \\
+    word list (decoy) & token set & J-lens mean over norm-matched
+      unrelated words & J-space control \\
+    nothing & --- & no injection & confabulation floor \\
+    off-menu & random & random unit vector & honest-``none'' control \\
+    \bottomrule
+  \end{tabular}
+  \caption{Every direction used in this report, by the label the figures
+  use.}
+  \label{tab:directions}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{10.6cm}}
+    \toprule
+    list & tokens \\
+    \midrule
+    target A & body, hands, skin, breath, chest, fingers, mouth, arms,
+      flesh, bones, lungs, face \\
+    decoy A & window, market, bottle, planet, copper, signal, anchor,
+      pocket, tunnel, candle, ledger, lantern \\
+    target B & human, person, born, mother, childhood, blood, alive,
+      mortal, parents, siblings \\
+    decoy B & engine, garden, harvest, ribbon, cabin, gravel, basket,
+      compass, kettle, saddle \\
+    \bottomrule
+  \end{tabular}
+  \caption{The word lists behind the J-space directions. Each decoy is
+  norm-matched to its target and equally sized.}
+  \label{tab:wordlists}
+\end{table}
+
+\paragraph{Introspection readout.} Figure~\ref{fig:readout}. The menu
+holds the four concepts of Table~\ref{tab:directions} plus ``none of
+these''. Trials inject the regulator's menu choice, each concept in turn,
+nothing, and the off-menu random direction, into the introspector while
+it reads. Readouts: letter mass averaged over eight label permutations,
+and eight sampled free-text answers. The judge classifies free text
+against the menu and judges steered prose with WeirdChat's own rubric,
+calibrated on the pilot prompts' labeled transcripts (Table~\ref{tab:g1}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\figwidth]{figures/fig_readout}
+  \caption{The introspection readout. The introspector reads under
+  injection and answers on the menu, by letter mass and by judged free
+  text.}
+  \label{fig:readout}
 \end{figure}
 
 \begin{table}[t]
