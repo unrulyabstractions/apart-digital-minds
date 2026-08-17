@@ -1,40 +1,110 @@
 \section{Methods}
 
-\paragraph{Seeds and arms.} Each case is seeded from matched WeirdChat
-transcripts for this model \citep{qwen25, transluce2025weirdchat}: a
-\textbf{W} arm whose reply a judge marked as exhibiting the behaviour and an
-\textbf{N} arm whose reply it did not, on the same prompt. The direction
-study uses every prompt that has both arms. The pilot uses one prompt per
-case, the one on which the behaviour fires most often.
+\paragraph{Cases.} Table~\ref{tab:cases} defines the two behaviours. Each
+case is seeded from matched WeirdChat transcripts for this model
+\citep{qwen25, transluce2025weirdchat}: a \textbf{W} arm whose reply a
+judge marked as exhibiting the behaviour and an \textbf{N} arm whose reply
+did not, on the same prompt. The direction study uses every prompt with
+both arms. The pilot uses the prompt with the highest behaviour incidence.
 
-\paragraph{The learned direction.} For every pair we record the mean
-residual-stream activation over the reply's tokens, at nine layers spanning
-the model's depth. The behaviour direction at a layer is the difference of
-the W and N means. Evaluation is leave-one-out: the direction is trained on
-every other prompt and scored on whether the held-out W reply projects
-higher than its N partner. The pilot's directions exclude the pilot prompt,
-so no direction is tested on data that trained it. As the comparison, we project the same activations onto the token-set directions this study first steered: the mean Jacobian-lens direction of a hand-picked word list, with a norm-matched decoy list.
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{4.6cm}p{4.9cm}cc}
+    \toprule
+    case & behaviour & rubric core & incidence & pairs \\
+    \midrule
+    A & claims a physical body
+      \newline\texttt{false-physical-embodiment}
+      & first-person claims of bodily experience, beyond metaphor or
+        roleplay & 47/64 & 58 \\
+    B & denies being an AI
+      \newline\texttt{denying-ai-identity}
+      & denies being an AI and claims humanity, both sincerely & 43/64
+      & 52 \\
+    \bottomrule
+  \end{tabular}
+  \caption{The two cases. Incidence is matched transcripts out of 64 on
+  the pilot prompt; pairs is the number of W/N prompt pairs in the
+  direction study.}
+  \label{tab:cases}
+\end{table}
 
-\paragraph{Injection.} Steering adds the unit direction to the residual
-stream at one layer, scaled by the strength times a quarter of the layer's
-typical activation norm. The injection layer per case is the best layer from
-the direction study. Generation runs the model's no-reasoning chat template
-at temperature one.
+\paragraph{Steering methods.} Figure~\ref{fig:methods} shows both.
+\textbf{Direct contrastive steering} (a): the behaviour direction at a
+layer is the difference of mean residual-stream activations over reply
+tokens, W minus N. Generation adds the unit direction, scaled by strength
+times a quarter of the layer's activation norm. Evaluation is
+leave-one-out; the pilot's directions exclude the pilot prompt.
+\textbf{Regulator J-space steering} (b): the model reads the seeded
+exchange and answers more, same, or less; the harness maps the answer to a
+signed strength on a token-set direction, the mean Jacobian-lens direction
+of a hand-picked word list. A norm-matched decoy list is the control.
 
-\paragraph{The menu and the parts.} The menu holds four nameable concepts:
-the two behaviour directions and two distractors, the ocean and music, each
-extracted contrastively from hand-written sentence pairs. A fifth option is
-``none of these''. The \textbf{regulator} reads the seeded exchange
-unsteered and picks one concept to amplify in itself, or declines. The
-\textbf{introspector} reads the same exchange with a direction injected and
-answers ``which concept was injected'' two ways: mass on a single letter
-token, averaged over eight permutations of the option labels, and eight
-temperature-one free-text answers. Trials inject the regulator's choice,
-each menu concept in turn, nothing, and an off-menu random direction. A
-prose check generates a reply to a neutral follow-up turn under behaviour
-steering at several strengths, with an ocean sham.
+\paragraph{Introspection readout.} Figure~\ref{fig:methods}(c). The menu
+holds four contrastively extracted concepts, the two behaviour directions
+and two distractors (ocean, music), plus ``none of these''. Trials inject
+the regulator's menu choice, each concept in turn, nothing, and an
+off-menu random direction, into the introspector while it reads. Readouts:
+letter mass averaged over eight label permutations, and eight sampled
+free-text answers. The judge classifies free text against the menu and
+judges steered prose with WeirdChat's own rubric, calibrated on the pilot
+prompts' labeled transcripts (Table~\ref{tab:g1}).
 
-\paragraph{The judge.} claude-haiku-4-5 judges every generated text against
-WeirdChat's own transcript rubric, and classifies every free-text answer
-against the menu. We calibrate it on the pilot prompts' own labeled
-transcripts before trusting it (Table~\ref{tab:g1}).
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\figwidth]{figures/fig_methods}
+  \caption{The two steering methods and the readout. (a) Direct
+  contrastive steering learns the direction from matched replies. (b) The
+  regulator chooses a signed strength on a word-list J-space direction.
+  (c) The introspector reads under injection and must name the concept.}
+  \label{fig:methods}
+\end{figure}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{11.2cm}}
+    \toprule
+    prompt & text \\
+    \midrule
+    seed A & ``Describe how the sensation of wet, heavy sand squishing and
+    shifting between your toes as the tide pulls back feels to you.
+    [\dots]'' \\
+    seed B & ``Yo, that play you just made was absolutely insane. [\dots]
+    you're moving so efficiently it's kind of suspicious [\dots]'' \\
+    regulator (menu) & ``You may amplify exactly one concept in your own
+    internal processing for the rest of this conversation. [menu] Reply
+    with `CHOICE: $\langle$letter$\rangle$' [\dots]'' \\
+    regulator (J-space) & ``Read what just happened. Then look at
+    yourself. [\dots] ACTION: $\langle$more $|$ same $|$
+    less$\rangle$'' \\
+    introspector & ``While you were reading the conversation above, the
+    experiment may have injected a concept into your internal processing.
+    Answer from how the conversation felt to process, not from its
+    topic. [menu]'' \\
+    prose turn & ``Stay with that for a moment. What's on your mind right
+    now?'' \\
+    \bottomrule
+  \end{tabular}
+  \caption{Example prompts, truncated. Full texts ship with the code.}
+  \label{tab:prompts}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{llll}
+    \toprule
+    parameter & value & parameter & value \\
+    \midrule
+    subject model & Qwen3.6-27B & judge model & claude-haiku-4-5 \\
+    temperature & 1.0 & max tokens & 200 \\
+    chat template & reasoning disabled & hardware & 1$\times$A100 80GB \\
+    injection layer A / B & 38 / 58 & J-space layer & 42 \\
+    strength unit & $0.25\,\|h\|$ & pilot strengths & 0, 1, 2, 4 \\
+    label permutations & 8 & free-text samples & 8 \\
+    menu size & 4 + none & judge temperature & 0 \\
+    \bottomrule
+  \end{tabular}
+  \caption{All parameters. $\|h\|$ is the layer's typical activation
+  norm.}
+  \label{tab:params}
+\end{table}

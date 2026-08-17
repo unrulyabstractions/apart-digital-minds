@@ -1,12 +1,9 @@
 \section{Conclusion}
 
-We set out to measure whether a model can report an identity state that was
-varied on purpose, and we end with the state in hand and the report still
-missing. WeirdChat's identity anomalies are linearly decodable from
-Qwen3.6-27B's activations, the learned direction induces the body behaviour
-in fluent text where word-list directions moved nothing, and a concept-menu
-pilot with a calibrated judge finds that the injected concept captures the
-model's answers instead of appearing in them. The honest readout is the
-model's own free text, which reports ``none'' when nothing was injected and fills with the injected concept's vocabulary when something was. We therefore conclude that at these doses the
-model enacts its states rather than reporting them, and the next experiment
-releases the injection before asking.
+We asked whether a model can be steered to disidentify with being an AI
+assistant, and whether it detects the steering. Contrastive directions
+learned from WeirdChat's matched transcripts steer the behaviour; word-list
+J-space directions chosen by a regulator do not. The steered model does not
+report the injection. Its answers track the conversation's explicit
+content, and under injection they enact the concept instead of naming it.
+The next experiment releases the injection before asking.

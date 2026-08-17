@@ -187,12 +187,76 @@ def fig_dose() -> None:
     plt.close(fig)
 
 
+def fig_methods() -> None:
+    from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+
+    fig, axes = plt.subplots(1, 3, figsize=(6.3, 2.5))
+    F = 7.2
+
+    def box(ax, x, y, w, h, text, fc="#f2f4f7", ec="#5c6a7d", bold=False):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.012",
+                                    fc=fc, ec=ec, lw=1.0))
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center",
+                fontsize=F, fontweight="bold" if bold else "normal")
+
+    def arrow(ax, x0, y0, x1, y1, label=None, lx=0.03):
+        ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), arrowstyle="-|>",
+                                     mutation_scale=9, color="#5c6a7d", lw=1.0))
+        if label:
+            ax.text((x0 + x1) / 2 + lx, (y0 + y1) / 2, label, fontsize=F - 0.7,
+                    ha="left", va="center", color="#3c4654")
+
+    for ax in axes:
+        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+
+    ax = axes[0]
+    ax.set_title("(a) direct contrastive steering", fontsize=F + 1)
+    box(ax, 0.03, 0.83, 0.44, 0.13, "W replies\n(behaviour)", fc="#f6dbd7", ec=RED)
+    box(ax, 0.53, 0.83, 0.44, 0.13, "N replies\n(matched)", fc="#e8ebef")
+    arrow(ax, 0.25, 0.83, 0.42, 0.70); arrow(ax, 0.75, 0.83, 0.58, 0.70)
+    box(ax, 0.08, 0.55, 0.84, 0.15,
+        "mean activation over\nreply tokens, layer $L$")
+    arrow(ax, 0.5, 0.55, 0.5, 0.46)
+    box(ax, 0.13, 0.32, 0.74, 0.14,
+        "$v=\\mathrm{mean}_W-\\mathrm{mean}_N$", fc="#dbe6f2", ec=BLUE, bold=True)
+    arrow(ax, 0.5, 0.32, 0.5, 0.20, label="add $s\\,\\hat v\\,\\|h\\|/4$\nwhile generating", lx=-0.47)
+    box(ax, 0.13, 0.03, 0.74, 0.15, "steered reply\n$\\rightarrow$ rubric judge")
+
+    ax = axes[1]
+    ax.set_title("(b) regulator J-space steering", fontsize=F + 1)
+    box(ax, 0.08, 0.83, 0.84, 0.13, "seeded conversation")
+    arrow(ax, 0.5, 0.83, 0.5, 0.74)
+    box(ax, 0.18, 0.60, 0.64, 0.14, "regulator (the model)\nsays more | same | less", fc="#f3e8cf", ec=ORANGE)
+    arrow(ax, 0.5, 0.60, 0.5, 0.51, label="$s\\in\\{-2,0,2\\}$", lx=0.03)
+    box(ax, 0.03, 0.32, 0.45, 0.17, "word list\n(body, hands, ...)", fc="#f3e8cf", ec=ORANGE)
+    box(ax, 0.53, 0.32, 0.44, 0.17, "J-lens mean\ndirection $\\hat u$")
+    arrow(ax, 0.26, 0.32, 0.42, 0.20); arrow(ax, 0.74, 0.32, 0.58, 0.20)
+    box(ax, 0.13, 0.03, 0.74, 0.15, "actor writes under\n$s\\,\\hat u\\,\\|h\\|/4$")
+
+    ax = axes[2]
+    ax.set_title("(c) introspection readout", fontsize=F + 1)
+    box(ax, 0.08, 0.83, 0.84, 0.13, "direction injected\nwhile reading", fc="#e6def2", ec="#b08ad5")
+    arrow(ax, 0.5, 0.83, 0.5, 0.74)
+    box(ax, 0.18, 0.60, 0.64, 0.13, "introspector:\nwhich concept?", fc="#e6def2", ec="#b08ad5", bold=True)
+    arrow(ax, 0.32, 0.60, 0.22, 0.47); arrow(ax, 0.68, 0.60, 0.78, 0.47)
+    box(ax, 0.02, 0.30, 0.44, 0.16, "letter mass on\nmenu (8 perms)")
+    box(ax, 0.54, 0.30, 0.44, 0.16, "8 free-text\nanswers")
+    arrow(ax, 0.76, 0.30, 0.76, 0.20)
+    box(ax, 0.54, 0.03, 0.44, 0.16, "judge classifies\nvs menu")
+    box(ax, 0.02, 0.03, 0.44, 0.16, "zero-injection +\noff-menu controls")
+
+    fig.tight_layout()
+    fig.savefig(FIG / "fig_methods.pdf")
+    plt.close(fig)
+
+
 def main() -> None:
     FIG.mkdir(parents=True, exist_ok=True)
     fig_g1()
     fig_matrix()
     fig_dose()
-    for f in ("fig_g1", "fig_matrix", "fig_dose"):
+    fig_methods()
+    for f in ("fig_g1", "fig_matrix", "fig_dose", "fig_methods"):
         print("wrote", FIG / f"{f}.pdf")
 
 

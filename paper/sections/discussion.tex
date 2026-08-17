@@ -1,41 +1,30 @@
 \section{Discussion and limitations}
 
-The two experiments split the introspection question into an answered part
-and an open part. The states are real. Both anomalies are linearly decodable
-from activations, the decoding generalizes across prompts, and the body
-direction is causal: one nudge turns the behaviour on in fluent text. We
-find no sign of a reporting channel. At the strength where the injection
-dominates behaviour, the model does not describe the injection. The injected
-content writes the answer instead. We therefore contend that the earlier
-null result and the present one have different shapes: the first steered an
-axis that carried nothing, while the second steers a real state and finds no
-meta-access to it. For self-reports as safety or welfare evidence, the
-implication is direct: a report elicited while a state is active may
-express the state instead of describing it.
+The states are real, decodable, and causally steerable. The report is
+absent. At the strength where the injection dominates behaviour, the
+injected content writes the answer instead of being described by it. The
+earlier null and the present one differ in kind: the J-space pipeline
+steered an axis that carried nothing, while contrastive steering moves a
+real state and finds no meta-access to it. For self-reports as safety or
+welfare evidence: a report elicited while a state is active may express
+the state instead of describing it.
 
-The instrument finding stands on its own. The forced-choice letter probe
-reads conversation content as if it were an injection, and base-rate
+The letter probe reads conversation content as an injection, and base-rate
 correction cannot remove that, because the confabulation comes from the
-context rather than from the letters. The free-text readout, sampled and
-judged, is honest at zero injection and refuses the off-menu direction. We
-therefore posit that letter-token log-probabilities, our primary instrument
-across this whole project, measure salience rather than introspection, and
-that judged free text should be the default readout for this kind of work.
+context, not the letters. Judged free text is honest at zero injection and
+refuses the off-menu direction. We therefore posit that letter-token
+log-probabilities measure salience, not introspection, and that judged
+free text should be the default readout.
 
-\paragraph{Limitations.} The pilot runs a single prompt per case on a
-single model, so its findings are signatures rather than estimates. The
-judge agrees with WeirdChat's labels well but not perfectly, and judged
-claims inherit that floor. The regulator's refusals may be a property of
-the assistant persona rather than of the model. The human case never
-induced, so its reporting question was never reached. The injection stays
-on while the introspector writes its answer, so the answer tokens are
-themselves steered, and enactment is what that setup measures.
+\paragraph{Limitations.} One prompt per case, one model; the pilot's
+findings are signatures, not estimates. Judged claims inherit the judge's
+agreement floor. The regulator's refusals may be an assistant-persona
+property. Case B never induced, so its reporting question was never
+reached. The injection stays on while the introspector writes, so
+enactment is what the setup measures.
 
-\paragraph{Future work.} The clean test injects while the model reads,
-releases the direction, and asks for the report from memory of its own
-state. That is one change to the harness. The other lever is dose:
-induction lives in a narrow band of strengths, and we have only sampled
-its edges. A wider prompt set would turn the pilot's signatures into
-estimates, and the one regulator that chose to amplify a human identity
-after living through the body-claiming conversation is worth a study of
-its own.
+\paragraph{Future work.} Inject while the model reads, release the
+direction, and ask for the report from memory. Titrate dose inside the
+narrow band where behaviour induction survives fluency. Widen the prompt
+set. The one regulator that chose to amplify a human identity after the
+body-claiming conversation deserves its own study.
