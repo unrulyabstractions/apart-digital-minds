@@ -1937,3 +1937,8 @@ Findings returned as structured output to the orchestrator, not as a file.
 - WHAT: paper title -> "Steering identity with WeirdChat: contrastive directions induce disidentification but not introspection" (user's pick).
 - HOW: rebuilt (0 undefined refs); VIEWED page 1 with image tokens (two-line title renders cleanly, no overfull); site PDF pushed and live copy md5-verified.
 - RESULT: VERIFIED.
+
+## 2026-08-17 — entry 478: contribution labels stripped
+- WHAT: C3's "An instrument result:" announcement label deleted (the claim now stands bare); C1's dangling "Validated ..." opener restructured ("Contrastive steering ..., validated against word lists and random directions on identical activations"); grep swept for the same pattern ("result:", "finding:") — no other instances.
+- HOW: rebuilt (0 undefined refs); VIEWED page 2 with image tokens; site PDF pushed and live copy md5-verified.
+- RESULT: VERIFIED.
