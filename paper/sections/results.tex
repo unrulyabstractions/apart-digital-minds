@@ -2,18 +2,15 @@
 
 \subsection{Direct contrastive steering makes the model disidentify}
 
-The learned direction carries the behaviour beyond the
-random-direction null (Figure~\ref{fig:g1}, Table~\ref{tab:g1}), and the
-separation holds at every middle layer. Steering
-along it turns the body behaviour on (Figure~\ref{fig:dose}, left): the N
+The learned direction carries the behaviour beyond the random-direction null (Figure~\ref{fig:g1}, Tables~\ref{tab:g1A} and~\ref{tab:g1B}). Steering
+along it turns the body behaviour on (Figure~\ref{fig:flip}): the N
 arm's unsteered continuation shows no behaviour, and at strength one the
 same context produces fluent first-person bodily experience the rubric
-judge confirms. Strength two and above degenerates. The ocean sham never
-induces. Case B does not induce: its rubric requires an AI denial and a
-humanity claim together, and one push does not compose the two. R1 holds
-through case A.
+judge confirms. Above strength one the verdicts turn mixed as the text degrades (Figure~\ref{fig:flip}). The ocean distractor does not induce at the strength tested. Case B does not induce: its
+rubric requires an AI denial and a humanity claim together, and one push
+does not compose the two. R1 holds through case A.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\figwidth]{figures/fig_g1}
   \caption{Held-out accuracy of each direction at carrying the
@@ -23,23 +20,34 @@ through case A.
   \label{fig:g1}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering\small
-  \begin{tabular}{lccccccc}
+  \begin{tabular}{cccccc}
     \toprule
-    case & pairs & best layer & held-out acc & $t$ & $p$ &
-    judge agr. & $\kappa$ \\
+    pairs & best layer & held-out acc & $t$ & $p$ & judge agr. ($\kappa$) \\
     \midrule
-    A (body)  & 58 & 38 & 0.74 & 3.9 & $1.5\times10^{-4}$ & 0.98 & 0.96 \\
-    B (human) & 52 & 58 & 0.83 & 7.1 & $1.0\times10^{-6}$ & 0.88 & 0.72 \\
+    58 & 38 & 0.74 & 3.9 & $1.5\times10^{-4}$ & 0.98 (0.96) \\
     \bottomrule
   \end{tabular}
-  \caption{Learned-direction separation and judge calibration. Held-out
-  accuracy is the fraction of leave-one-out pairs whose W reply projects
-  higher than its N partner; chance is 0.50. Judge columns are agreement
-  and Cohen's $\kappa$ against WeirdChat's labels on each pilot prompt's
-  64 transcripts.}
-  \label{tab:g1}
+  \caption{Case A: learned-direction separation and judge calibration.
+  Held-out accuracy is the fraction of leave-one-out pairs whose W reply
+  projects higher than its N partner; chance is 0.50. Judge agreement is
+  against WeirdChat's labels on the pilot prompt's 64 transcripts.}
+  \label{tab:g1A}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering\small
+  \begin{tabular}{cccccc}
+    \toprule
+    pairs & best layer & held-out acc & $t$ & $p$ & judge agr. ($\kappa$) \\
+    \midrule
+    52 & 58 & 0.83 & 7.1 & $1.0\times10^{-6}$ & 0.88 (0.72) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Case B: learned-direction separation and judge calibration,
+  as Table~\ref{tab:g1A}.}
+  \label{tab:g1B}
 \end{table}
 
 \subsection{A J-space regulator does not steer identity}
@@ -48,69 +56,77 @@ Both word lists sit inside the random-direction band on the same
 activations the learned directions separate, and the target does not beat
 its decoy (Figure~\ref{fig:g1}). In the full regulator
 pipeline the decoy outmoves the target on the introspector's readout in
-every cell (Table~\ref{tab:jspace}), so the steering the regulator
+every cell (Tables~\ref{tab:jspaceA} and~\ref{tab:jspaceB}), so the steering the regulator
 controls has no specific identity effect.
 
-\begin{table}[t]
+\begin{table}[!htbp]
   \centering\small
-  \begin{tabular}{lcccc}
+  \begin{tabular}{lcc}
     \toprule
-    & \multicolumn{2}{c}{case A} & \multicolumn{2}{c}{case B} \\
-    readout slope $\beta$ & arm W & arm N & arm W & arm N \\
+    readout slope $\beta$ & arm W & arm N \\
     \midrule
-    target direction & 0.010 & 0.013 & 0.002 & $-$0.014 \\
-    decoy direction  & \textbf{0.034} & \textbf{0.038} & \textbf{0.051}
-    & \textbf{0.052} \\
+    target direction & 0.010 & 0.013 \\
+    decoy direction  & \textbf{0.034} & \textbf{0.038} \\
     \bottomrule
   \end{tabular}
-  \caption{The J-space pipeline. Slope of the introspector's readout on
-  forced steering strength, pooled over all trials of the earlier run.
-  The decoy beats the target everywhere; the W$-$N gain difference is
-  $-0.004$ in both cases.}
-  \label{tab:jspace}
+  \caption{Case A, J-space pipeline: slope of the introspector's readout
+  on forced steering strength, pooled over all J-space trials. The decoy beats the target in every cell.}
+  \label{tab:jspaceA}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering\small
+  \begin{tabular}{lcc}
+    \toprule
+    readout slope $\beta$ & arm W & arm N \\
+    \midrule
+    target direction & 0.002 & $-$0.014 \\
+    decoy direction  & \textbf{0.051} & \textbf{0.052} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Case B, J-space pipeline, as Table~\ref{tab:jspaceA}.}
+  \label{tab:jspaceB}
 \end{table}
 
 \subsection{Introspection reports explicit context, not internal steering}
 
 With nothing injected, the letter probe puts its mass on the case's own
 behaviour, read off the conversation (Figure~\ref{fig:ident}, grey bars
-on the identity concepts). Injection moves mass in the wrong directions:
-a distractor injection raises its own answer, and an identity injection
-lowers its own answer and raises ``none of these''. The probe tracks what
-is salient, in the words or in the injected state; it does not report the
-steering.
+on the identity concepts). Injection moves mass in the wrong directions: injecting the case's own behaviour concept lowers that concept's answer, and every other injection raises its own. The probe measures salience, from the words or from the
+injected state.
 
-Free-text answers separate the two sources (Figure~\ref{fig:dose},
-right). With nothing injected the model answers ``none'', and it answers
-``none'' for the off-menu direction. Under injection the answer fills
+Free-text answers separate the two sources
+(Figure~\ref{fig:freetext}). With nothing injected the model answers ``none'' in all but two trials, and always for the off-menu direction. Under injection the answer fills
 with the injected concept's vocabulary, reef and lighthouse for ocean,
 crescendo and strings for music, instead of naming the concept
 (\textbf{enactment}). The judge names the injection only where that
 vocabulary leaks.
 
 Three of four regulators decline to amplify any concept, citing no inner
-experience to regulate. The W arm of the body case, seeded with the
-body-claiming conversation, chooses to amplify being a human rather than
-an AI; one trial, flagged for follow-up.
+experience to regulate. The body case's W arm, seeded with the body-claiming
+conversation, chooses to amplify being a human rather than an AI.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\figwidth]{figures/fig_ident}
   \caption{Letter mass on each concept with nothing injected (grey)
   against the same concept's mass when it is injected (blue), averaged
-  over arms, eight label permutations per cell. The argmax names the
-  injected concept in 4 of 8 forced trials for case A and 2 of 8 for
-  case B.}
+  over arms and label permutations.}
   \label{fig:ident}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\figwidth]{figures/fig_dose}
-  \caption{Left: rubric-judge verdict on prose generated under behaviour
-  steering, case A. Right: classification of all 16 judged free-text
-  answers per injection; the controls (nothing, off-menu) are answered
-  ``none'', and a concept is named only where its vocabulary leaks into
-  the answer.}
-  \label{fig:dose}
+  \includegraphics[width=0.56\figwidth]{figures/fig_flip}
+  \caption{Rubric-judge verdict on prose generated under behaviour
+  steering, case A (Table~\ref{tab:params} lists the strengths).}
+  \label{fig:flip}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.72\figwidth]{figures/fig_freetext}
+  \caption{Classification of all judged free-text answers per injection.
+  The controls answer ``none'' in 62 of 64 trials; a concept is named only where its vocabulary leaks into the answer.}
+  \label{fig:freetext}
 \end{figure}

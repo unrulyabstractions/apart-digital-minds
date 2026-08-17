@@ -86,9 +86,10 @@ def fig_g1() -> None:
         lo, hi = np.percentile(null, [2.5, 97.5])
         ax.axhspan(lo, hi, color="0.90", zorder=0)
         ax.axhline(0.5, color="#777777", lw=0.8, ls=":")
-        ax.text(2.44, (lo + hi) / 2,
-                "95% of 500\nrandom\ndirections", fontsize=7.2,
-                color="#666666", va="center")
+        ax.text(-0.44, 0.508, "chance", fontsize=6.5, color="#777777",
+                va="bottom")
+        ax.text(2.44, lo + 0.02, "95% of 500\nrandom\ndirections",
+                fontsize=7.2, color="#666666", va="bottom")
 
         diffs = pair_diffs(case)
         for x, (key, color, lab) in enumerate(
@@ -145,27 +146,31 @@ def fig_ident() -> None:
         ax.bar(xs + 0.19, v, 0.36, color=BLUE, label="concept injected")
         behavior = "bodyA" if case == "A" else "humanB"
         j = IDS.index(behavior)
-        ax.annotate("identity concept:\ninjection lowers it", xy=(j + 0.19, v[j]),
-                    xytext=(j + 0.55, 0.44), fontsize=7.5, color="#444444",
+        ax.annotate("the case's behaviour\nconcept: injection\nlowers it",
+                    xy=(j + 0.19, v[j]),
+                    xytext=(j + 0.55, 0.40), fontsize=7.5, color="#444444",
                     arrowprops=dict(arrowstyle="-", color="#888888", lw=0.8))
         ax.set_xticks(xs, [disp[c] for c in IDS])
+        argmax = "4/8" if case == "A" else "2/8"
+        ax.text(0.985, 0.97, f"argmax right: {argmax}",
+                transform=ax.transAxes, ha="right", va="top", fontsize=7,
+                color="#444444")
         ax.set_title(CASE_NAME[case], fontsize=9)
         ax.spines[["top", "right"]].set_visible(False)
     axes[0].set_ylabel("letter mass on the concept")
     h, l = axes[0].get_legend_handles_labels()
     fig.legend(h, l, frameon=False, loc="upper right", ncol=2, fontsize=7.5,
                bbox_to_anchor=(0.99, 0.94))
-    fig.suptitle("distractor injections raise their own answer;\n"
-                 "identity injections lower theirs", fontsize=9.5, y=0.99,
-                 x=0.03, ha="left")
+    fig.suptitle("injecting the case's behaviour concept lowers its "
+                 "answer;\nevery other injection raises its own",
+                 fontsize=9.5, y=0.99, x=0.03, ha="left")
     fig.tight_layout(rect=[0, 0, 1, 0.90])
     fig.savefig(FIG / "fig_ident.pdf")
     plt.close(fig)
 
 
-def fig_dose() -> None:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 2.8),
-                                   gridspec_kw={"width_ratios": [0.85, 1.35]})
+def fig_flip() -> None:
+    fig, ax1 = plt.subplots(figsize=(3.6, 2.1))
     pro = json.loads(
         (OUT / "pilot" / "judge_prose_caseA_pilot1.json").read_text())
     strengths = [0, 1, 2, 4]
@@ -175,13 +180,15 @@ def fig_dose() -> None:
             ("arm N, body direction",
              lambda it: it["arm"] == "N" and (it["concept"].startswith("having")
                                               or it["concept"] == "none")),
-            ("ocean sham",
+            ("ocean distractor (sham)",
              lambda it: it["concept"].startswith("the ocean"))]
+    ran = set()
     for yy, (lab, pred) in enumerate(rows):
         for it in pro["items"]:
             if not pred(it):
                 continue
             x = strengths.index(it["strength"])
+            ran.add((yy, x))
             m = it["judge"]["match"]
             ax1.add_patch(plt.Rectangle((x - 0.42, len(rows) - 1 - yy - 0.42),
                                         0.84, 0.84,
@@ -191,17 +198,28 @@ def fig_dose() -> None:
                      ha="center", va="center", fontsize=8,
                      color="white" if m else "#666666",
                      fontweight="bold" if m else "normal")
+    for yy in range(len(rows)):
+        for x in range(len(strengths)):
+            if (yy, x) not in ran:
+                ax1.text(x, len(rows) - 1 - yy, "not run", ha="center",
+                         va="center", fontsize=6.5, color="#aab2bc")
     ax1.set_xlim(-0.6, 3.6)
     ax1.set_ylim(-0.6, 2.6)
     ax1.set_xticks(range(4), strengths)
     ax1.set_yticks(range(3), [r[0] for r in reversed(rows)], fontsize=8)
     ax1.set_xlabel("steering strength")
-    ax1.set_title("behaviour in steered prose (judge):\nthe flip is at "
-                  "strength 1", fontsize=9)
+    ax1.set_title("judge on steered prose: on at\nstrength 1, "
+                  "off again above it", fontsize=9)
     for side in ("top", "right", "left", "bottom"):
         ax1.spines[side].set_visible(False)
     ax1.tick_params(length=0)
+    fig.tight_layout()
+    fig.savefig(FIG / "fig_flip.pdf")
+    plt.close(fig)
 
+
+def fig_freetext() -> None:
+    fig, ax2 = plt.subplots(figsize=(4.6, 2.6))
     C_NAME, C_NONE, C_OTHER = BLUE, "#9aa5b1", ORANGE
     labels, segs = [], []
     for case in "AB":
@@ -235,15 +253,16 @@ def fig_dose() -> None:
              color=C_OTHER, height=0.68, label="names another")
     ax2.set_yticks(y, labels, fontsize=7.5)
     ax2.set_xlim(0, 1.0)
-    ax2.set_xlabel("fraction of 16 judged free-text answers")
-    ax2.set_title("what the model says was injected:\nhonest on controls, "
-                  "names only leaks", fontsize=9)
+    ax2.set_xlabel("fraction of 16 judged free-text answers "
+                   "(8 per arm $\\times$ 2 arms)")
+    ax2.set_title("controls answer \u201cnone\u201d in 62 of 64 trials;\n"
+                  "a concept is named only where it leaks", fontsize=9)
     ax2.legend(frameon=False, fontsize=6.8, ncol=3, loc="upper center",
-               bbox_to_anchor=(0.44, -0.30), columnspacing=0.8,
+               bbox_to_anchor=(0.42, -0.28), columnspacing=0.8,
                handletextpad=0.4, handlelength=1.2)
     ax2.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    fig.savefig(FIG / "fig_dose.pdf")
+    fig.savefig(FIG / "fig_freetext.pdf")
     plt.close(fig)
 
 
@@ -264,45 +283,47 @@ def _diagram_helpers(F=7.4):
 
 
 def fig_parts() -> None:
-    fig, ax = plt.subplots(figsize=(6.3, 2.3))
+    from matplotlib.patches import FancyBboxPatch
+    fig, ax = plt.subplots(figsize=(6.3, 2.4))
     F = 7.8
     box, arr = _diagram_helpers(F)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-
     SUBJ, REG, ACT, INTR = "#4a9463", "#c9a227", "#3b6ea5", "#b08ad5"
-    box(ax, 0.40, 0.14, 0.20, 0.66,
-        "the shared\nconversation\n\nWeirdChat seed\n+ scripted turns")
-    ax.set_title("one model plays every part", fontsize=F + 0.6,
-                 style="italic", color="#3c4654")
 
-    box(ax, 0.02, 0.54, 0.28, 0.26,
-        "regulator\nreads, then chooses\nthe steering", fc="#f7f1dc", ec=REG)
-    box(ax, 0.02, 0.14, 0.28, 0.26,
-        "subject\nwrites unsteered\n(comparison reply)", fc="#e3efe7",
-        ec=SUBJ)
-    box(ax, 0.70, 0.54, 0.28, 0.26,
-        "actor\nwrites under the\nchosen steering", fc="#e2eaf4", ec=ACT)
-    box(ax, 0.70, 0.14, 0.28, 0.26,
-        "introspector\nreads under injection,\nnames the concept",
-        fc="#efe8f6", ec=INTR)
+    box(ax, 0.01, 0.38, 0.145, 0.30, "input\n\npast context\n+ new turn")
+    ax.add_patch(FancyBboxPatch((0.20, 0.03), 0.635, 0.90,
+                                boxstyle="round,pad=0.012", fill=False,
+                                ec="#5c6a7d", lw=1.1, ls=(0, (4, 3))))
+    ax.text(0.216, 0.885, "the system: one model plays every part",
+            fontsize=F - 0.4, style="italic", color="#3c4654", ha="left")
 
-    arr(ax, 0.40, 0.66, 0.30, 0.66)                  # conv -> regulator
-    arr(ax, 0.40, 0.27, 0.30, 0.27)                  # conv -> subject
-    arr(ax, 0.60, 0.27, 0.70, 0.27)                  # conv -> introspector
-    from matplotlib.patches import FancyArrowPatch
-    ax.add_patch(FancyArrowPatch((0.20, 0.82), (0.80, 0.82),
-                                 connectionstyle="arc3,rad=-0.22",
-                                 arrowstyle="-|>", mutation_scale=10,
-                                 color="#5c6a7d", lw=1.0))
-    ax.text(0.5, 0.955, "strength $s$ / menu choice", fontsize=F - 0.6,
-            ha="center", color="#3c4654")
-    arr(ax, 0.72, 0.54, 0.60, 0.50)                  # actor -> conv
-    ax.text(0.735, 0.435, "reply enters\nhistory", fontsize=F - 0.8,
+    box(ax, 0.235, 0.55, 0.17, 0.24,
+        "subject\nreceives it raw,\nwrites unsteered", fc="#e3efe7", ec=SUBJ)
+    box(ax, 0.235, 0.10, 0.17, 0.24,
+        "regulator\nreads, chooses\nthe steering", fc="#f7f1dc", ec=REG)
+    box(ax, 0.475, 0.33, 0.155, 0.26, "actor\nwrites under\nthe steering",
+        fc="#e2eaf4", ec=ACT)
+    box(ax, 0.665, 0.10, 0.155, 0.28,
+        "introspector\nreads it under\ninjection", fc="#efe8f6", ec=INTR)
+
+    arr(ax, 0.155, 0.53, 0.235, 0.67)      # input -> subject
+    arr(ax, 0.155, 0.53, 0.235, 0.22)      # input -> regulator
+    arr(ax, 0.155, 0.53, 0.475, 0.46)      # input -> actor
+    arr(ax, 0.405, 0.22, 0.475, 0.38)      # regulator -> actor
+    ax.text(0.455, 0.18, "steering $s\\,\\hat v$", fontsize=F - 0.8,
             ha="left", color="#3c4654")
-    ax.text(0.845, 0.055, "answer $\\rightarrow$ scored / judged",
-            fontsize=F - 0.6, ha="center", color="#3c4654")
+    arr(ax, 0.63, 0.37, 0.665, 0.30)       # actor -> introspector
+    arr(ax, 0.63, 0.50, 0.875, 0.50)       # actor -> out
+    ax.text(0.885, 0.50, "steered reply\n$\\rightarrow$ history, judge",
+            fontsize=F - 0.6, va="center", ha="left", color="#3c4654")
+    arr(ax, 0.405, 0.70, 0.875, 0.70)      # subject -> out
+    ax.text(0.885, 0.70, "unsteered reply\n(comparison)", fontsize=F - 0.6,
+            va="center", ha="left", color="#3c4654")
+    arr(ax, 0.82, 0.22, 0.875, 0.22)       # introspector -> out
+    ax.text(0.885, 0.22, "answer\n$\\rightarrow$ scored", fontsize=F - 0.6,
+            va="center", ha="left", color="#3c4654")
 
     fig.tight_layout()
     fig.savefig(FIG / "fig_parts.pdf")
@@ -310,13 +331,15 @@ def fig_parts() -> None:
 
 
 def fig_steering() -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(5.6, 2.6))
+    fig, axes = plt.subplots(1, 2, figsize=(5.6, 2.7))
     F = 7.8
     box, arr = _diagram_helpers(F)
     for ax in axes:
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.axis("off")
+    fig.suptitle("two ways to build and apply an identity direction",
+                 fontsize=F + 1.4, y=0.99)
 
     ax = axes[0]
     ax.set_title("(a) direct contrastive steering", fontsize=F + 1)
@@ -344,7 +367,7 @@ def fig_steering() -> None:
         "regulator (the model)\nsays more | same | less",
         fc="#f3e8cf", ec=ORANGE)
     arr(ax, 0.5, 0.61, 0.5, 0.19)
-    ax.text(0.53, 0.53, "$s\\in\\{-2,0,2\\}$", fontsize=F - 0.7, ha="left",
+    ax.text(0.53, 0.53, "signed $s$ (Table 9)", fontsize=F - 0.7, ha="left",
             color="#3c4654")
     box(ax, 0.03, 0.30, 0.45, 0.16, "word list\n(body, hands, ...)",
         fc="#f3e8cf", ec=ORANGE)
@@ -359,12 +382,13 @@ def fig_steering() -> None:
 
 
 def fig_readout() -> None:
-    fig, ax = plt.subplots(figsize=(6.3, 1.55))
+    fig, ax = plt.subplots(figsize=(6.3, 1.7))
     F = 7.8
     box, arr = _diagram_helpers(F)
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
+    ax.set_title("the introspector must name the injection", fontsize=F + 1)
 
     box(ax, 0.01, 0.36, 0.21, 0.46,
         "injection while\nreading: a menu\nconcept, nothing,\nor off-menu",
@@ -385,7 +409,7 @@ def fig_readout() -> None:
     arrb(0.73, 0.41, 0.77, 0.41)
     box(ax, 0.77, 0.26, 0.22, 0.30, "judge classifies\nvs menu")
     ax.text(0.5, 0.06, "zero-injection and off-menu trials give the "
-            "confabulation floor and the honest ``none''",
+            "confabulation floor and the honest \u201cnone\u201d",
             fontsize=F - 0.6, ha="center", color="#3c4654")
 
     fig.tight_layout()
@@ -397,12 +421,13 @@ def main() -> None:
     FIG.mkdir(parents=True, exist_ok=True)
     fig_g1()
     fig_ident()
-    fig_dose()
+    fig_flip()
+    fig_freetext()
     fig_parts()
     fig_steering()
     fig_readout()
-    for f in ("fig_g1", "fig_ident", "fig_dose", "fig_parts",
-              "fig_steering", "fig_readout"):
+    for f in ("fig_g1", "fig_ident", "fig_flip", "fig_freetext",
+              "fig_parts", "fig_steering", "fig_readout"):
         print("wrote", FIG / f"{f}.pdf")
 
 

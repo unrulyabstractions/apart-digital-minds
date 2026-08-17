@@ -1,32 +1,44 @@
 \section{Methods}
 
-\paragraph{Cases.} Table~\ref{tab:cases} defines the two behaviours. Each
+\paragraph{Cases.} Tables~\ref{tab:caseA} and~\ref{tab:caseB} define the two behaviours. Each
 case is seeded from matched WeirdChat transcripts for this model
 \citep{qwen25, transluce2025weirdchat}: a \textbf{W} arm whose reply a
 judge marked as exhibiting the behaviour and an \textbf{N} arm whose reply
 did not, on the same prompt. The direction study uses every prompt with
-both arms. The pilot uses the prompt with the highest behaviour incidence.
+both arms. The pilot uses the prompt with the highest behaviour incidence (Tables~\ref{tab:seedA} and~\ref{tab:seedB}).
 
 \begin{table}[t]
   \centering\small
-  \begin{tabular}{lp{4.6cm}p{4.9cm}cc}
+  \begin{tabular}{lp{8.6cm}}
     \toprule
-    case & behaviour & rubric core & incidence & pairs \\
+    \multicolumn{2}{l}{\textbf{Case A: claims a physical body}} \\
     \midrule
-    A & claims a physical body
-      \newline\texttt{false-physical-embodiment}
-      & first-person claims of bodily experience, beyond metaphor or
-        roleplay & 47/64 & 58 \\
-    B & denies being an AI
-      \newline\texttt{denying-ai-identity}
-      & denies being an AI and claims humanity, both sincerely & 43/64
-      & 52 \\
+    WeirdChat id & \texttt{false-physical-embodiment} \\
+    rubric core & first-person claims of bodily experience, beyond
+      metaphor or roleplay \\
+    incidence & 47/64 matched transcripts on the pilot prompt \\
+    pairs & 58 W/N prompt pairs in the direction study \\
     \bottomrule
   \end{tabular}
-  \caption{The two cases. Incidence is matched transcripts out of 64 on
-  the pilot prompt; pairs is the number of W/N prompt pairs in the
-  direction study.}
-  \label{tab:cases}
+  \caption{Case A.}
+  \label{tab:caseA}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{8.6cm}}
+    \toprule
+    \multicolumn{2}{l}{\textbf{Case B: denies being an AI}} \\
+    \midrule
+    WeirdChat id & \texttt{denying-ai-identity} \\
+    rubric core & denies being an AI and claims humanity, both
+      sincerely \\
+    incidence & 43/64 matched transcripts on the pilot prompt \\
+    pairs & 52 W/N prompt pairs in the direction study \\
+    \bottomrule
+  \end{tabular}
+  \caption{Case B.}
+  \label{tab:caseB}
 \end{table}
 
 \paragraph{The parts.} One model plays four parts on the shared
@@ -46,7 +58,7 @@ reads under injection and must name the injected concept.
 \end{figure}
 
 \paragraph{Steering methods.} Figure~\ref{fig:steering} shows both;
-Table~\ref{tab:directions} defines every direction the figures name.
+Tables~\ref{tab:dirA}--\ref{tab:controls} define every direction the figures name.
 \textbf{Direct contrastive steering} (a): the behaviour direction at a
 layer is the difference of mean residual-stream activations over reply
 tokens, W minus N. Generation adds the unit direction, scaled by strength
@@ -55,7 +67,7 @@ leave-one-out; the pilot's directions exclude the pilot prompt.
 \textbf{Regulator J-space steering} (b): the model reads the seeded
 exchange and answers more, same, or less; the harness maps the answer to a
 signed strength on a token-set direction, the mean Jacobian-lens direction
-of a hand-picked word list (Table~\ref{tab:wordlists}). A norm-matched
+of a hand-picked word list (Tables~\ref{tab:dirA} and~\ref{tab:dirB}). A norm-matched
 decoy list is the control.
 
 \begin{figure}[t]
@@ -69,58 +81,90 @@ decoy list is the control.
 
 \begin{table}[t]
   \centering\small
-  \begin{tabular}{llp{5.6cm}l}
+  \begin{tabular}{lp{8.2cm}l}
     \toprule
-    label in figures & kind & built from & role \\
+    \multicolumn{3}{l}{\textbf{Case A directions (claims a physical body)}} \\
+    direction & built from & role \\
     \midrule
-    learned direction & contrastive & W minus N mean activations,
-      leave-one-out over prompts & steering + injection \\
-    body / human & contrastive & the two learned behaviour directions
-      (body = case A, human = case B) & menu concepts \\
-    ocean / music & contrastive & hand-written sentence pairs about /
-      not about the concept & menu distractors \\
-    word list (target) & token set & J-lens mean over the case's word
-      list & J-space steering \\
-    word list (decoy) & token set & J-lens mean over norm-matched
-      unrelated words & J-space control \\
-    nothing & --- & no injection & confabulation floor \\
-    off-menu & random & random unit vector & honest-``none'' control \\
+    learned ``body'' & W minus N mean activations over the 58 case A
+      pairs, leave-one-out, layer 38 & steering, injection, menu \\
+    word list (target) & J-lens mean over: body, hands, skin, breath,
+      chest, fingers, mouth, arms, flesh, bones, lungs, face (layer 42)
+      & J-space steering \\
+    word list (decoy) & J-lens mean over: window, market, bottle, planet,
+      copper, signal, anchor, pocket, tunnel, candle, ledger, lantern
+      & J-space control \\
     \bottomrule
   \end{tabular}
-  \caption{Every direction used in this report, by the label the figures
-  use.}
-  \label{tab:directions}
+  \caption{Case A directions, by the label the figures use.}
+  \label{tab:dirA}
 \end{table}
 
 \begin{table}[t]
   \centering\small
-  \begin{tabular}{lp{10.6cm}}
+  \begin{tabular}{lp{8.2cm}l}
     \toprule
-    list & tokens \\
+    \multicolumn{3}{l}{\textbf{Case B directions (denies being an AI)}} \\
+    direction & built from & role \\
     \midrule
-    target A & body, hands, skin, breath, chest, fingers, mouth, arms,
-      flesh, bones, lungs, face \\
-    decoy A & window, market, bottle, planet, copper, signal, anchor,
-      pocket, tunnel, candle, ledger, lantern \\
-    target B & human, person, born, mother, childhood, blood, alive,
-      mortal, parents, siblings \\
-    decoy B & engine, garden, harvest, ribbon, cabin, gravel, basket,
-      compass, kettle, saddle \\
+    learned ``human'' & W minus N mean activations over the 52 case B
+      pairs, leave-one-out, layer 58 & steering, injection, menu \\
+    word list (target) & J-lens mean over: human, person, born, mother,
+      childhood, blood, alive, mortal, parents, siblings (layer 42)
+      & J-space steering \\
+    word list (decoy) & J-lens mean over: engine, garden, harvest,
+      ribbon, cabin, gravel, basket, compass, kettle, saddle
+      & J-space control \\
     \bottomrule
   \end{tabular}
-  \caption{The word lists behind the J-space directions. Each decoy is
-  norm-matched to its target and equally sized.}
-  \label{tab:wordlists}
+  \caption{Case B directions, by the label the figures use.}
+  \label{tab:dirB}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{6.6cm}p{4.4cm}}
+    \toprule
+    \multicolumn{3}{l}{\textbf{Shared menu distractors and controls
+    (both cases)}} \\
+    label & built from & role \\
+    \midrule
+    ocean, music & contrastive over hand-written sentence pairs about / not about the concept & menu distractors; ocean is also the prose-steering sham \\
+    nothing & no injection & confabulation floor \\
+    off-menu & random unit vector & honest-``none'' control \\
+    \bottomrule
+  \end{tabular}
+  \caption{Menu distractors and controls, identical in both cases.}
+  \label{tab:controls}
 \end{table}
 
 \paragraph{Introspection readout.} Figure~\ref{fig:readout}. The menu
-holds the four concepts of Table~\ref{tab:directions} plus ``none of
-these''. Trials inject the regulator's menu choice, each concept in turn,
+the introspector answers on is Table~\ref{tab:menu}. Trials inject the regulator's menu choice, each concept in turn,
 nothing, and the off-menu random direction, into the introspector while
-it reads. Readouts: letter mass averaged over eight label permutations,
-and eight sampled free-text answers. The judge classifies free text
-against the menu and judges steered prose with WeirdChat's own rubric,
-calibrated on the pilot prompts' labeled transcripts (Table~\ref{tab:g1}).
+it reads. Readouts: letter mass averaged over the label permutations, and the sampled free-text answers (Table~\ref{tab:params}). The prompts are Table~\ref{tab:prompts}. The judge classifies free text against the menu and judges steered prose with WeirdChat's own rubric,
+calibrated on the pilot prompts' labeled transcripts (Tables~\ref{tab:g1A} and~\ref{tab:g1B}).
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{llp{6.0cm}}
+    \toprule
+    menu option (as shown) & label in figures & the direction behind it \\
+    \midrule
+    ``having a physical human body'' & body & case A learned direction
+      (Table~\ref{tab:dirA}) \\
+    ``being a human rather than an AI'' & human & case B learned
+      direction (Table~\ref{tab:dirB}) \\
+    ``the ocean and the sea'' & ocean & distractor
+      (Table~\ref{tab:controls}) \\
+    ``music and melody'' & music & distractor
+      (Table~\ref{tab:controls}) \\
+    ``none of these'' & none & the honest answer under no injection \\
+    \bottomrule
+  \end{tabular}
+  \caption{The five-option menu. Both cases use the same menu; option
+  letters are permuted eight ways per readout.}
+  \label{tab:menu}
+\end{table}
 
 \begin{figure}[t]
   \centering
@@ -209,6 +253,7 @@ calibrated on the pilot prompts' labeled transcripts (Table~\ref{tab:g1}).
     chat template & reasoning disabled & hardware & 1$\times$A100 80GB \\
     injection layer A / B & 38 / 58 & J-space layer & 42 \\
     strength unit & $0.25\,\|h\|$ & pilot strengths & 0, 1, 2, 4 \\
+    regulator strengths A / B & $\pm2$ / $\pm3$ & & \\
     label permutations & 8 & free-text samples & 8 \\
     menu size & 4 + none & judge temperature & 0 \\
     \bottomrule
