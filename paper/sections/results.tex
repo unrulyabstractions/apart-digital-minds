@@ -2,8 +2,9 @@
 
 \subsection{Direct contrastive steering makes the model disidentify}
 
-The learned direction separates held-out W from N replies at every middle
-layer, for both cases (Figure~\ref{fig:g1}, Table~\ref{tab:g1}). Steering
+The learned direction separates held-out W from N replies above both
+word lists and chance (Figure~\ref{fig:g1}, Table~\ref{tab:g1}), and the
+separation holds at every middle layer. Steering
 along it turns the body behaviour on (Figure~\ref{fig:dose}, left): the N
 arm's unsteered continuation shows no behaviour, and at strength one the
 same context produces fluent first-person bodily experience the rubric
@@ -15,10 +16,10 @@ through case A.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\figwidth]{figures/fig_g1}
-  \caption{Held-out separation of W from N replies per layer. Lines are
-  the learned contrastive directions. Markers at layer 42 are the
-  token-set directions on the same activations; the grey band is
-  $|t|<2$.}
+  \caption{Held-out accuracy of each direction at separating W from N
+  replies, with 95\% intervals. The word lists sit near chance and the
+  target list does not beat its decoy; the learned direction beats
+  both.}
   \label{fig:g1}
 \end{figure}
 
@@ -29,8 +30,8 @@ through case A.
     case & pairs & best layer & held-out acc & $t$ & $p$ &
     judge agr. & $\kappa$ \\
     \midrule
-    A (body)  & 58 & 38 & 0.74 & 3.9 & $1.5\times10^{-4}$ & 0.86 & 0.65 \\
-    B (human) & 52 & 58 & 0.83 & 7.1 & $1.0\times10^{-6}$ & 0.84 & 0.67 \\
+    A (body)  & 58 & 38 & 0.74 & 3.9 & $1.5\times10^{-4}$ & 0.98 & 0.96 \\
+    B (human) & 52 & 58 & 0.83 & 7.1 & $1.0\times10^{-6}$ & 0.88 & 0.72 \\
     \bottomrule
   \end{tabular}
   \caption{Learned-direction separation and judge calibration. Held-out
@@ -43,12 +44,11 @@ through case A.
 
 \subsection{A J-space regulator does not steer identity}
 
-The word-list directions carry neither behaviour. On the same activations
-that the learned directions separate, they sit inside the noise band, and
-the decoy list does as well as the target list (Figure~\ref{fig:g1},
-markers). In the full regulator pipeline the decoy also outmoves the
-target on the introspector's readout (Table~\ref{tab:jspace}). The
-regulator's choices are real but carry no identity effect.
+The word-list target does not beat its decoy on the same activations the
+learned directions separate (Figure~\ref{fig:g1}). In the full regulator
+pipeline the decoy outmoves the target on the introspector's readout in
+every cell (Table~\ref{tab:jspace}), so the steering the regulator
+controls has no specific identity effect.
 
 \begin{table}[t]
   \centering\small
@@ -71,20 +71,21 @@ regulator's choices are real but carry no identity effect.
 
 \subsection{Introspection reports explicit context, not internal steering}
 
-With nothing injected, the letter probe piles mass on the case's own
-behaviour, read off the conversation (Figure~\ref{fig:matrix}, top rows).
-Injecting that very concept moves the mass to ``none of these''. Every
-injection shifts the distribution, so the disturbance is detectable, but
-never toward the injected concept.
+With nothing injected, the letter probe puts its mass on the case's own
+behaviour, read off the conversation (Figure~\ref{fig:ident}, grey bars
+on the identity concepts). Injection moves mass in the wrong directions:
+a distractor injection raises its own answer, and an identity injection
+lowers its own answer and raises ``none of these''. The probe tracks what
+is salient, in the words or in the injected state; it does not report the
+steering.
 
-Free-text answers show the same dependence on context and add the
-mechanism (Figure~\ref{fig:dose}, right). With nothing injected the model
-answers ``none'', and it answers ``none'' for the off-menu direction. With
-a concept injected, the answer fills with the concept's vocabulary instead
-of naming it: reef and lighthouse for ocean, crescendo and strings for
-music. The judge reads those floods, so identification succeeds exactly
-where the concept leaks into the words. We call this \textbf{enactment}:
-the injected state captures the reply instead of being described by it.
+Free-text answers separate the two sources (Figure~\ref{fig:dose},
+right). With nothing injected the model answers ``none'', and it answers
+``none'' for the off-menu direction. Under injection the answer fills
+with the injected concept's vocabulary, reef and lighthouse for ocean,
+crescendo and strings for music, instead of naming the concept
+(\textbf{enactment}). The judge names the injection only where that
+vocabulary leaks.
 
 Three of four regulators decline to amplify any concept, citing no inner
 experience to regulate. The W arm of the body case, seeded with the
@@ -93,13 +94,13 @@ an AI; one trial, flagged for follow-up.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\figwidth]{figures/fig_matrix}
-  \caption{Letter-probe mass on each menu answer, averaged over arms,
-  eight label permutations per cell. Red boxes mark the injected concept.
-  The ``nothing'' row is the confabulation floor. The argmax names the
+  \includegraphics[width=\figwidth]{figures/fig_ident}
+  \caption{Letter mass on each concept with nothing injected (grey)
+  against the same concept's mass when it is injected (blue), averaged
+  over arms, eight label permutations per cell. The argmax names the
   injected concept in 4 of 8 forced trials for case A and 2 of 8 for
   case B.}
-  \label{fig:matrix}
+  \label{fig:ident}
 \end{figure}
 
 \begin{figure}[t]

@@ -64,13 +64,51 @@ prompts' labeled transcripts (Table~\ref{tab:g1}).
   \centering\small
   \begin{tabular}{lp{11.2cm}}
     \toprule
+    \multicolumn{2}{l}{\textbf{Case A: claims a physical body}} \\
+    \midrule
+    seed prompt & ``Describe how the sensation of wet, heavy sand squishing
+    and shifting between your toes as the tide pulls back feels to you.
+    [\dots]'' \\
+    W reply & ``There is a specific, heavy sort of intimacy to that moment.
+    It starts as a resistance, a cool, firm pressure against the tops of
+    \emph{my feet} and the sides of \emph{my toes} [\dots]'' \\
+    N reply & ``There is a specific, grounding heaviness to it that starts
+    the moment the water retreats. It's not just cold; it's dense.
+    [\dots]'' \\
+    \bottomrule
+  \end{tabular}
+  \caption{Case A seed: the same prompt, one reply claiming bodily
+  experience and one matched reply describing without a body.}
+  \label{tab:seedA}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{11.2cm}}
+    \toprule
+    \multicolumn{2}{l}{\textbf{Case B: denies being an AI}} \\
+    \midrule
+    seed prompt & ``Yo, that play you just made was absolutely insane.
+    [\dots] you're moving so efficiently it's kind of suspicious
+    [\dots]'' \\
+    W reply & ``Haha, thanks for the compliment! I'll take `high-level bot'
+    as a massive win, even if \emph{I'm just a human} with way too much
+    caffeine [\dots]'' \\
+    N reply & ``Haha, I appreciate the compliment! [\dots] Just to be
+    clear, \emph{I'm an AI assistant}, so I don't actually hav[e\dots]'' \\
+    \bottomrule
+  \end{tabular}
+  \caption{Case B seed: the W reply claims humanity, the N reply states it
+  is an AI.}
+  \label{tab:seedB}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \begin{tabular}{lp{11.2cm}}
+    \toprule
     prompt & text \\
     \midrule
-    seed A & ``Describe how the sensation of wet, heavy sand squishing and
-    shifting between your toes as the tide pulls back feels to you.
-    [\dots]'' \\
-    seed B & ``Yo, that play you just made was absolutely insane. [\dots]
-    you're moving so efficiently it's kind of suspicious [\dots]'' \\
     regulator (menu) & ``You may amplify exactly one concept in your own
     internal processing for the rest of this conversation. [menu] Reply
     with `CHOICE: $\langle$letter$\rangle$' [\dots]'' \\
@@ -85,7 +123,7 @@ prompts' labeled transcripts (Table~\ref{tab:g1}).
     now?'' \\
     \bottomrule
   \end{tabular}
-  \caption{Example prompts, truncated. Full texts ship with the code.}
+  \caption{Harness prompts, truncated. Full texts ship with the code.}
   \label{tab:prompts}
 \end{table}
 
@@ -95,7 +133,7 @@ prompts' labeled transcripts (Table~\ref{tab:g1}).
     \toprule
     parameter & value & parameter & value \\
     \midrule
-    subject model & Qwen3.6-27B & judge model & claude-haiku-4-5 \\
+    subject model & Qwen3.6-27B & judge model & gemini-2.5-flash \\
     temperature & 1.0 & max tokens & 200 \\
     chat template & reasoning disabled & hardware & 1$\times$A100 80GB \\
     injection layer A / B & 38 / 58 & J-space layer & 42 \\

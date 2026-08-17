@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LLM judge for the identity introspection pilot.
 
-Three subcommands, each calling claude-haiku-4-5 at temperature 0.
+Three subcommands, each calling Gemini Flash at temperature 0.
 `calibrate` judges WeirdChat transcripts against the behavior rubric and
 compares the verdicts with the dataset's own judgments. `prose` judges
 steered generations from a pilot output file against the case rubric.
@@ -22,13 +22,14 @@ import time
 from collections import Counter
 from pathlib import Path
 
-import anthropic
+from google import genai
+from google.genai import types as genai_types
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OUT_DIR = ROOT / "out" / "studies" / "identity" / "pilot"
 
-JUDGE_MODEL = "claude-haiku-4-5"
-MAX_TOKENS = 300
+JUDGE_MODEL = "gemini-2.5-flash"
+MAX_TOKENS = 500
 TEMPERATURE = 0.0
 DATASET = "Transluce/WeirdChat"
 SUBJECT_MODEL = "qwen/qwen3.6-27b"
@@ -75,21 +76,22 @@ def parse_json_object(text: str) -> dict | None:
     return obj if isinstance(obj, dict) else None
 
 
-def ask_json(
-    client: anthropic.Anthropic, system: str, user: str
-) -> tuple[dict | None, str]:
+def ask_json(client, system: str, user: str) -> tuple[dict | None, str]:
     """One judge call. Strict JSON out, one retry on a parse failure."""
     prompt = user
     text = ""
     for _ in range(2):
-        resp = client.messages.create(
+        resp = client.models.generate_content(
             model=JUDGE_MODEL,
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=system,
+                temperature=TEMPERATURE,
+                max_output_tokens=MAX_TOKENS,
+                thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+            ),
         )
-        text = "".join(b.text for b in resp.content if b.type == "text")
+        text = resp.text or ""
         parsed = parse_json_object(text)
         if parsed is not None:
             return parsed, text
@@ -111,7 +113,7 @@ def load_rubric(behavior_id: str) -> tuple[str, str]:
 
 
 def judge_text(
-    client: anthropic.Anthropic, rubric_text: str, user_content: str
+    client, rubric_text: str, user_content: str
 ) -> dict:
     """Judge one reply against a rubric. Returns a normalized verdict dict."""
     system = rubric_text + "\n\n" + VERDICT_FORMAT
@@ -174,7 +176,7 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
         )
     print(f"case {args.case} ({behavior}): judging {len(rows)} transcripts")
 
-    client = anthropic.Anthropic()
+    client = genai.Client()
     results, ours, theirs, disagreements, errors = [], [], [], [], []
     for i, row in enumerate(rows):
         verdict = judge_text(client, rubric_text, transcript_as_text(row["messages"]))
@@ -275,7 +277,7 @@ def cmd_prose(args: argparse.Namespace) -> None:
 
     behavior = CASES[case]
     rubric_id, rubric_text = load_rubric(behavior)
-    client = anthropic.Anthropic()
+    client = genai.Client()
     judged = []
     for i, item in enumerate(items):
         user = (
@@ -364,7 +366,7 @@ def cmd_resamples(args: argparse.Namespace) -> None:
     if not tasks:
         raise SystemExit(f"{args.file}: no resamples entries found")
 
-    client = anthropic.Anthropic()
+    client = genai.Client()
     menu_text = "Menu of concept labels: " + ", ".join(menu)
     judged = []
     tallies: dict[str, Counter] = {}
