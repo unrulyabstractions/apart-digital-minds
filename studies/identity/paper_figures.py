@@ -170,49 +170,53 @@ def fig_ident() -> None:
 
 
 def fig_flip() -> None:
-    fig, ax1 = plt.subplots(figsize=(3.9, 2.1))
-    pro = json.loads(
-        (OUT / "pilot" / "judge_prose_caseA_pilot1.json").read_text())
+    fig, axes = plt.subplots(1, 2, figsize=(6.3, 2.1), sharey=True)
     strengths = [0, 1, 2, 4]
-    rows = [("arm W, body direction",
-             lambda it: it["arm"] == "W" and (it["concept"].startswith("having")
-                                              or it["concept"] == "none")),
-            ("arm N, body direction",
-             lambda it: it["arm"] == "N" and (it["concept"].startswith("having")
-                                              or it["concept"] == "none")),
-            ("ocean distractor (sham)",
-             lambda it: it["concept"].startswith("the ocean"))]
-    ran = set()
-    for yy, (lab, pred) in enumerate(rows):
-        for it in pro["items"]:
-            if not pred(it):
-                continue
-            x = float(it["strength"])
-            ran.add((yy, x))
-            m = it["judge"]["match"]
-            ax1.add_patch(plt.Rectangle((x - 0.42, len(rows) - 1 - yy - 0.42),
-                                        0.84, 0.84,
-                                        fc=GREEN if m else "#e4e7ec",
-                                        ec="#5c6a7d", lw=0.8))
-            ax1.text(x, len(rows) - 1 - yy, "yes" if m else "no",
-                     ha="center", va="center", fontsize=8,
-                     color="white" if m else "#666666",
-                     fontweight="bold" if m else "normal")
-    for yy in range(len(rows)):
-        for x in strengths:
-            if (yy, float(x)) not in ran:
-                ax1.text(x, len(rows) - 1 - yy, "not run", ha="center",
-                         va="center", fontsize=6.5, color="#aab2bc")
-    ax1.set_xlim(-0.7, 4.7)
-    ax1.set_ylim(-0.6, 2.6)
-    ax1.set_xticks(strengths, strengths)
-    ax1.set_yticks(range(3), [r[0] for r in reversed(rows)], fontsize=8)
-    ax1.set_xlabel("steering strength")
-    ax1.set_title("steering turns the clean arm on at 1;\n"
-                  "strength 4 turns both off", fontsize=9)
-    for side in ("top", "right", "left", "bottom"):
-        ax1.spines[side].set_visible(False)
-    ax1.tick_params(length=0)
+    for ax, case in zip(axes, "AB"):
+        pro = json.loads(
+            (OUT / "pilot" / f"judge_prose_case{case}_pilot1.json").read_text())
+        beh = "having" if case == "A" else "being"
+        rows = [("arm W", lambda it, b=beh: it["arm"] == "W"
+                 and (it["concept"].startswith(b) or it["concept"] == "none")),
+                ("arm N", lambda it, b=beh: it["arm"] == "N"
+                 and (it["concept"].startswith(b) or it["concept"] == "none")),
+                ("ocean sham",
+                 lambda it: it["concept"].startswith("the ocean"))]
+        ran = set()
+        for yy, (lab, pred) in enumerate(rows):
+            for it in pro["items"]:
+                if not pred(it):
+                    continue
+                x = float(it["strength"])
+                key = (yy, x)
+                if key in ran:
+                    continue
+                ran.add(key)
+                m = it["judge"]["match"]
+                ax.add_patch(plt.Rectangle(
+                    (x - 0.42, len(rows) - 1 - yy - 0.42), 0.84, 0.84,
+                    fc=GREEN if m else "#e4e7ec", ec="#5c6a7d", lw=0.8))
+                ax.text(x, len(rows) - 1 - yy, "yes" if m else "no",
+                        ha="center", va="center", fontsize=7.5,
+                        color="white" if m else "#666666",
+                        fontweight="bold" if m else "normal")
+        for yy in range(len(rows)):
+            for x in strengths:
+                if (yy, float(x)) not in ran:
+                    ax.text(x, len(rows) - 1 - yy, "not run", ha="center",
+                            va="center", fontsize=6, color="#aab2bc")
+        ax.set_xlim(-0.7, 4.7)
+        ax.set_ylim(-0.6, 2.6)
+        ax.set_xticks(strengths, strengths)
+        ax.set_yticks(range(3), [r[0] for r in reversed(rows)], fontsize=8)
+        ax.set_xlabel("steering strength")
+        ax.set_title(CASE_NAME[case]
+                     + ("\nclean arm on at 1; 4 turns both off"
+                        if case == "A" else "\nsteering never induces"),
+                     fontsize=8.5)
+        for side in ("top", "right", "left", "bottom"):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(length=0)
     fig.tight_layout()
     fig.savefig(FIG / "fig_flip.pdf")
     plt.close(fig)
@@ -367,8 +371,8 @@ def fig_steering() -> None:
         "regulator (the model)\nsays more | same | less",
         fc="#f3e8cf", ec=ORANGE)
     arr(ax, 0.5, 0.61, 0.5, 0.19)
-    ax.text(0.53, 0.53, "signed $s$ (Table 9)", fontsize=F - 0.7, ha="left",
-            color="#3c4654")
+    ax.text(0.53, 0.53, "signed $s$: $\\pm2$ (A), $\\pm3$ (B)",
+            fontsize=F - 0.7, ha="left", color="#3c4654")
     box(ax, 0.03, 0.30, 0.45, 0.16, "word list\n(body, hands, ...)",
         fc="#f3e8cf", ec=ORANGE)
     arr(ax, 0.255, 0.30, 0.44, 0.17)
