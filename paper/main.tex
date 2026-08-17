@@ -30,13 +30,10 @@ Sprint, August 2026.}
 \begin{abstract}
 \noindent
 Can a model be steered to disidentify with being an AI assistant, and can
-it detect that steering? We test both on Qwen3.6-27B, using two WeirdChat
-behaviours as the target state: a claim to a physical body and a denial of
+it detect that steering? We test both on Qwen3.6-27B, using two WeirdChat behaviours as target states: a claim to a physical body and a denial of
 being an AI. We compare two steering methods. Direct contrastive steering
 learns each behaviour direction as the difference of mean activations
-between matched exhibiting and non-exhibiting replies; the direction
-separates held-out replies for both behaviours and turns the body
-behaviour on in fluent text, confirmed by a judge running WeirdChat's own
+between matched exhibiting and non-exhibiting replies; the directions separate held-out replies for both behaviours, and steering turns the body behaviour on in fluent text, confirmed by a judge running WeirdChat's own
 rubric. A regulator choosing signed strengths on word-list J-space
 directions steers nothing: a norm-matched decoy moves the readout more
 than the target. A forced-choice letter probe confabulates at zero
@@ -53,13 +50,12 @@ injection, reading the conversation's own behaviour as an injection. Free-text a
 
 \section*{Code and data}
 
-The subject is Qwen3.6-27B, run on one rented A100 per experiment. Every
-reported number is read from the run's output files.
+The subject is Qwen3.6-27B (Table~\ref{tab:params}). Every reported number is read from the run's output files.
 \begin{itemize}[noitemsep, topsep=0pt, leftmargin=*]
     \item \textbf{Code:} the extraction, the pilot, the judge, and every
           prompt are released with this report.
     \item \textbf{Data:} activations, trial records, and judge verdicts
-          are archived in the HuggingFace dataset
+          are archived in the HuggingFace dataset\\
           \url{https://huggingface.co/datasets/unrulyabstractions/identity-introspection-weirdchat}.
     \item \textbf{Seeds:} the matched transcripts come from the public
           WeirdChat dataset \citep{transluce2025weirdchat}.

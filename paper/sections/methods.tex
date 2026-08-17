@@ -65,9 +65,7 @@ tokens, W minus N. Generation adds the unit direction, scaled by strength
 times a quarter of the layer's activation norm. Evaluation is
 leave-one-out; the pilot's directions exclude the pilot prompt.
 \textbf{Regulator J-space steering} (b): the model reads the seeded
-exchange and answers more, same, or less; the harness maps the answer to a
-signed strength on a token-set direction, the mean Jacobian-lens direction
-of a hand-picked word list (Tables~\ref{tab:dirA} and~\ref{tab:dirB}). A norm-matched
+exchange and answers more, same, or less; the harness maps the answer to a signed strength on a word-list direction, the mean Jacobian-lens (J-lens) direction of a hand-picked list (Tables~\ref{tab:dirA} and~\ref{tab:dirB}). A norm-matched
 decoy list is the control.
 
 \begin{figure}[t]
@@ -141,7 +139,7 @@ decoy list is the control.
 \paragraph{Introspection readout.} Figure~\ref{fig:readout}. The menu
 the introspector answers on is Table~\ref{tab:menu}. Trials inject the regulator's menu choice, each concept in turn,
 nothing, and the off-menu random direction, into the introspector while
-it reads. Readouts: letter mass averaged over the label permutations, and the sampled free-text answers (Table~\ref{tab:params}). The prompts are Table~\ref{tab:prompts}. The judge classifies free text against the menu and judges steered prose with WeirdChat's own rubric,
+it reads. Readouts: \textbf{letter mass}, the probability the introspector puts on each option letter, averaged over the label permutations, and the sampled free-text answers (Table~\ref{tab:params}). The J-space pipeline's scalar readout is the base-corrected letter mass on the case's identity probe. The prompts are Table~\ref{tab:prompts}. The judge classifies free text against the menu and judges steered prose with WeirdChat's own rubric,
 calibrated on the pilot prompts' labeled transcripts (Tables~\ref{tab:g1A} and~\ref{tab:g1B}).
 
 \begin{table}[t]

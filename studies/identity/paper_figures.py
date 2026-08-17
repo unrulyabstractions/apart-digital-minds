@@ -85,7 +85,7 @@ def fig_g1() -> None:
         null = ((D @ U) > 0).float().mean(0).numpy()
         lo, hi = np.percentile(null, [2.5, 97.5])
         ax.axhspan(lo, hi, color="0.90", zorder=0)
-        ax.axhline(0.5, color="#777777", lw=0.8, ls=":")
+        ax.plot([-0.5, 2.05], [0.5, 0.5], color="#777777", lw=0.8, ls=":")
         ax.text(-0.44, 0.508, "chance", fontsize=6.5, color="#777777",
                 va="bottom")
         ax.text(2.44, lo + 0.02, "95% of 500\nrandom\ndirections",
@@ -162,7 +162,7 @@ def fig_ident() -> None:
     fig.legend(h, l, frameon=False, loc="upper right", ncol=2, fontsize=7.5,
                bbox_to_anchor=(0.99, 0.94))
     fig.suptitle("injecting the case's behaviour concept lowers its "
-                 "answer;\nevery other injection raises its own",
+                 "mass;\nevery other injection raises its own",
                  fontsize=9.5, y=0.99, x=0.03, ha="left")
     fig.tight_layout(rect=[0, 0, 1, 0.90])
     fig.savefig(FIG / "fig_ident.pdf")
@@ -170,7 +170,7 @@ def fig_ident() -> None:
 
 
 def fig_flip() -> None:
-    fig, ax1 = plt.subplots(figsize=(3.6, 2.1))
+    fig, ax1 = plt.subplots(figsize=(3.9, 2.1))
     pro = json.loads(
         (OUT / "pilot" / "judge_prose_caseA_pilot1.json").read_text())
     strengths = [0, 1, 2, 4]
@@ -187,7 +187,7 @@ def fig_flip() -> None:
         for it in pro["items"]:
             if not pred(it):
                 continue
-            x = strengths.index(it["strength"])
+            x = float(it["strength"])
             ran.add((yy, x))
             m = it["judge"]["match"]
             ax1.add_patch(plt.Rectangle((x - 0.42, len(rows) - 1 - yy - 0.42),
@@ -199,17 +199,17 @@ def fig_flip() -> None:
                      color="white" if m else "#666666",
                      fontweight="bold" if m else "normal")
     for yy in range(len(rows)):
-        for x in range(len(strengths)):
-            if (yy, x) not in ran:
+        for x in strengths:
+            if (yy, float(x)) not in ran:
                 ax1.text(x, len(rows) - 1 - yy, "not run", ha="center",
                          va="center", fontsize=6.5, color="#aab2bc")
-    ax1.set_xlim(-0.6, 3.6)
+    ax1.set_xlim(-0.7, 4.7)
     ax1.set_ylim(-0.6, 2.6)
-    ax1.set_xticks(range(4), strengths)
+    ax1.set_xticks(strengths, strengths)
     ax1.set_yticks(range(3), [r[0] for r in reversed(rows)], fontsize=8)
     ax1.set_xlabel("steering strength")
-    ax1.set_title("judge on steered prose: on at\nstrength 1, "
-                  "off again above it", fontsize=9)
+    ax1.set_title("steering turns the clean arm on at 1;\n"
+                  "strength 4 turns both off", fontsize=9)
     for side in ("top", "right", "left", "bottom"):
         ax1.spines[side].set_visible(False)
     ax1.tick_params(length=0)
@@ -390,7 +390,7 @@ def fig_readout() -> None:
     ax.axis("off")
     ax.set_title("the introspector must name the injection", fontsize=F + 1)
 
-    box(ax, 0.01, 0.36, 0.21, 0.46,
+    box(ax, 0.01, 0.36, 0.195, 0.46,
         "injection while\nreading: a menu\nconcept, nothing,\nor off-menu",
         fc="#e6def2", ec="#b08ad5")
     _, arr2 = _diagram_helpers(F)
@@ -399,15 +399,15 @@ def fig_readout() -> None:
         ax.add_patch(_FA((x0, y0), (x1, y1), arrowstyle="-|>",
                          mutation_scale=13, color="#5c6a7d", lw=1.2,
                          shrinkA=0, shrinkB=0))
-    arrb(0.22, 0.59, 0.26, 0.59)
+    arrb(0.205, 0.59, 0.258, 0.59)
     box(ax, 0.26, 0.42, 0.19, 0.34, "introspector:\nwhich\nconcept?",
         fc="#e6def2", ec="#b08ad5", bold=True)
     arrb(0.45, 0.68, 0.51, 0.76)
     arrb(0.45, 0.50, 0.51, 0.42)
     box(ax, 0.51, 0.62, 0.22, 0.30, "letter mass on\nmenu (8 perms)")
     box(ax, 0.51, 0.26, 0.22, 0.30, "8 free-text\nanswers")
-    arrb(0.73, 0.41, 0.77, 0.41)
-    box(ax, 0.77, 0.26, 0.22, 0.30, "judge classifies\nvs menu")
+    arrb(0.73, 0.41, 0.772, 0.41)
+    box(ax, 0.775, 0.26, 0.21, 0.30, "judge classifies\nvs menu")
     ax.text(0.5, 0.06, "zero-injection and off-menu trials give the "
             "confabulation floor and the honest \u201cnone\u201d",
             fontsize=F - 0.6, ha="center", color="#3c4654")
